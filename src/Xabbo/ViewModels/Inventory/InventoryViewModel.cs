@@ -323,7 +323,15 @@ public sealed partial class InventoryViewModel : ControllerBase
 
     private void OnTradeUpdated(TradeUpdatedEventArgs e)
     {
-        foreach (var group in e.SelfOffer.GroupBy(x => x.GetDescriptor()))
+        foreach (var group in e.SelfOffer.GroupBy(x => {
+            var desc = x.GetDescriptor();
+            // Trade items now have a Kind on Origins, but inventory items do not.
+            // We need to remove the Kind so that the descriptor matches the inventory items.
+            if (Ext.Session.Is(ClientType.Origins))
+                desc = desc with { Kind = 0 };
+
+            return desc;
+        }))
         {
             _cache
                 .Lookup(group.Key)
