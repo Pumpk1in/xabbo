@@ -179,7 +179,7 @@
         </DataGrid.ContextFlyout>
         <DataGrid.Columns>
           <DataGridTextColumn SortMemberPath="Index" Header="index" Binding="{Binding Index, DataType={x:Type vm:AvatarViewModel}}" />
-          <DataGridTemplateColumn SortMemberPath="Id" Header="id" IsVisible="{DynamicResource IsModern}">
+          <DataGridTemplateColumn SortMemberPath="Id" Header="id">
             <DataTemplate DataType="vm:AvatarViewModel">
               <TextBlock Name="CellTextBlock" Classes="privacy" Text="{Binding Id}" />
             </DataTemplate>
