@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Text.RegularExpressions;
 using System.Reactive;
 using System.Reactive.Linq;
 using DynamicData;
@@ -17,7 +18,6 @@ using Xabbo.Utility;
 
 using Symbol = FluentIcons.Common.Symbol;
 using SymbolIconSource = FluentIcons.Avalonia.Fluent.SymbolIconSource;
-using System.Text.RegularExpressions;
 
 namespace Xabbo.ViewModels;
 
