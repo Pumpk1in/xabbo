@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Input.Platform;
@@ -17,5 +18,13 @@ public class ClipboardService(Application app, IUiContext uiContext) : IClipboar
         {
             clipboard.SetTextAsync(text);
         }
+    }
+
+    public Task<string?> GetTextAsync()
+    {
+        if (_app.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime { MainWindow.Clipboard: IClipboard clipboard })
+            return Task.FromResult<string?>(null);
+
+        return clipboard.GetTextAsync();
     }
 }

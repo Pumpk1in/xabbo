@@ -17,7 +17,13 @@
   x:Class="Xabbo.Avalonia.Views.WardrobePageView"
   x:DataType="vm:WardrobePageViewModel"
   x:Name="WardrobePageViewRoot"
+  Background="Transparent"
+  Focusable="True"
 >
+  <UserControl.KeyBindings>
+    <KeyBinding Gesture="Ctrl+V" Command="{Binding PasteOutfitsCmd}" />
+    <KeyBinding Gesture="Ctrl+C" Command="{Binding CopyOutfitsCmd}" />
+  </UserControl.KeyBindings>
   <Panel>
     <controls:InfoOverlay Text="{Binding EmptyStatus}" />
     <ListBox
@@ -32,6 +38,18 @@
             IconSource="{icm:SymbolIconSource Symbol=ArrowImport}"
             Text="Import in-game wardrobe"
             Command="{Binding ImportWardrobeCmd}"
+          />
+          <ui:MenuFlyoutItem
+            IconSource="{icm:SymbolIconSource Symbol=Copy}"
+            Text="Copy figure strings"
+            Command="{Binding CopyOutfitsCmd}"
+            HotKey="Ctrl+C"
+          />
+          <ui:MenuFlyoutItem
+            IconSource="{icm:SymbolIconSource Symbol=ClipboardPaste}"
+            Text="Paste figure strings"
+            Command="{Binding PasteOutfitsCmd}"
+            HotKey="Ctrl+V"
           />
           <ui:MenuFlyoutItem
             IconSource="{icm:SymbolIconSource Symbol=BackpackAdd}"
