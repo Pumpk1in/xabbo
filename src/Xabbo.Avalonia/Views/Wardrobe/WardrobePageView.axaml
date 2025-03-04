@@ -53,7 +53,7 @@
           />
           <ui:MenuFlyoutItem
             IconSource="{icm:SymbolIconSource Symbol=BackpackAdd}"
-            Text="Add current figure"
+            Text="Add current outfit"
             Command="{Binding AddCurrentFigureCmd}"
           />
         </ui:FAMenuFlyout>
@@ -115,7 +115,7 @@
               Theme="{StaticResource TransparentButton}"
               Command="{Binding #WardrobePageViewRoot.((vm:WardrobePageViewModel)DataContext).WearFigureCmd}"
               CommandParameter="{Binding}"
-              ToolTip.Tip="Wear figure"
+              ToolTip.Tip="Wear outfit"
             >
               <ic:SymbolIcon HorizontalAlignment="Center" VerticalAlignment="Center" Symbol="PersonArrowLeft" />
             </Button>
