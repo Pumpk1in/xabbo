@@ -223,7 +223,7 @@ public sealed partial class WardrobePageViewModel : PageViewModel
             if (_ext.Session.Is(ClientType.Modern))
             {
                 if (!Figure.TryParse(m.Value, out Figure? figure) ||
-                    !Figure.TryGetGender(figure, out gender))
+                    (figure.Gender is not Gender.Male && figure.Gender is not Gender.Female))
                 {
                     gender = Gender.Male;
                 }
