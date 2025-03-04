@@ -26,7 +26,7 @@ public sealed partial class WardrobePageViewModel : PageViewModel
     [GeneratedRegex(@"\b\d{25}\b")]
     private static partial Regex OriginsFigureStringRegex();
 
-    [GeneratedRegex(@"\b[a-z]{2}(-\d+){1,3}(-[a-z]{2}(-\d+){1,3})*\b")]
+    [GeneratedRegex(@"\b[a-z]{2}(-\d+){1,3}(\.[a-z]{2}(-\d+){1,3})*\b")]
     private static partial Regex ModernFigureStringRegex();
 
     public override string Header => "Wardrobe";
