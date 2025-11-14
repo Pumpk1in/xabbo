@@ -1,6 +1,7 @@
 ﻿using System.Collections.ObjectModel;
 using System.Reactive;
 using System.Reactive.Linq;
+using System.Text;
 using DynamicData;
 using DynamicData.Binding;
 using ReactiveUI;
@@ -99,18 +100,68 @@ public class ChatPageViewModel : PageViewModel
         {
             return _ => true;
         }
-        else
+        
+        // Parser les mots et phrases entre guillemets
+        var keywords = ParseKeywords(filterText);
+        
+        return (vm) => vm switch
         {
-            return (vm) => vm switch
+            ChatMessageViewModel chat =>
+                keywords.Any(keyword =>
+                    chat.Name.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
+                    chat.Message.Contains(keyword, StringComparison.OrdinalIgnoreCase)),
+            ChatLogAvatarActionViewModel action =>
+                keywords.Any(keyword =>
+                    action.UserName.Contains(keyword, StringComparison.OrdinalIgnoreCase)),
+            _ => false
+        };
+    }
+
+    private static List<string> ParseKeywords(string filterText)
+    {
+        var keywords = new List<string>();
+        var inQuotes = false;
+        var currentWord = new StringBuilder();
+        
+        for (int i = 0; i < filterText.Length; i++)
+        {
+            char c = filterText[i];
+            
+            if (c == '"')
             {
-                ChatMessageViewModel chat =>
-                    chat.Name.Contains(filterText, StringComparison.OrdinalIgnoreCase) ||
-                    chat.Message.Contains(filterText, StringComparison.OrdinalIgnoreCase),
-                ChatLogAvatarActionViewModel action =>
-                    action.UserName.Contains(filterText, StringComparison.OrdinalIgnoreCase),
-                _ => false
-            };
+                if (inQuotes)
+                {
+                    // Fin des guillemets : ajouter la phrase
+                    if (currentWord.Length > 0)
+                    {
+                        keywords.Add(currentWord.ToString());
+                        currentWord.Clear();
+                    }
+                }
+                inQuotes = !inQuotes;
+            }
+            else if (c == ' ' && !inQuotes)
+            {
+                // Espace hors guillemets : fin d'un mot
+                if (currentWord.Length > 0)
+                {
+                    keywords.Add(currentWord.ToString());
+                    currentWord.Clear();
+                }
+            }
+            else
+            {
+                currentWord.Append(c);
+            }
         }
+        
+        // Ajouter le dernier mot/phrase
+        if (currentWord.Length > 0)
+        {
+            keywords.Add(currentWord.ToString());
+        }
+        
+        return keywords;
     }
 
     private void AppendLog(ChatLogEntryViewModel vm)
