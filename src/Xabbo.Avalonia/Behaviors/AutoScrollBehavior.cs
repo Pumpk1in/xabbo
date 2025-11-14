@@ -35,7 +35,10 @@ public class AutoScrollBehavior : Behavior<ListBox>
     {
         if (_scrollViewer is { } scrollViewer)
         {
-            if (scrollViewer.Offset.Y + scrollViewer.Viewport.Height >= (scrollViewer.Extent.Height - 10))
+            // Check if chat scroll was on the bottom BEFORE the new entry
+            bool wasAtBottom = scrollViewer.Offset.Y + scrollViewer.Viewport.Height >= (scrollViewer.Extent.Height - scrollViewer.Viewport.Height - 10);
+            
+            if (wasAtBottom)
             {
                 _scrollOnNextChange = true;
             }
@@ -47,15 +50,19 @@ public class AutoScrollBehavior : Behavior<ListBox>
         if (_isScrolling)
             return;
 
-        if (_scrollOnNextChange)
+        if (_scrollOnNextChange && _scrollViewer is { } scrollViewer)
         {
-            if (AssociatedObject is { Scroll: IScrollable scrollable })
+            // Check if we have to scroll
+            if (scrollViewer.Offset.Y + scrollViewer.Viewport.Height < scrollViewer.Extent.Height - 10)
             {
-                _isScrolling = true;
-                scrollable.Offset = new Vector(
-                    scrollable.Offset.X,
-                    scrollable.Extent.Height - scrollable.Viewport.Height);
-                _isScrolling = false;
+                if (AssociatedObject is { Scroll: IScrollable scrollable })
+                {
+                    _isScrolling = true;
+                    scrollable.Offset = new Vector(
+                        scrollable.Offset.X,
+                        scrollable.Extent.Height - scrollable.Viewport.Height);
+                    _isScrolling = false;
+                }
             }
             _scrollOnNextChange = false;
         }
