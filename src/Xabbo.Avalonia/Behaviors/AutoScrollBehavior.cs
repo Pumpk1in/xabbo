@@ -3,6 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
+using Avalonia.Threading; // Important: Added for Dispatcher
 using Avalonia.Xaml.Interactivity;
 
 namespace Xabbo.Avalonia.Behaviors;
@@ -10,8 +11,6 @@ namespace Xabbo.Avalonia.Behaviors;
 public class AutoScrollBehavior : Behavior<ListBox>
 {
     private ScrollViewer? _scrollViewer;
-    private bool _isScrolling;
-    private bool _scrollOnNextChange;
 
     [RequiresUnreferencedCode("override: This functionality is not compatible with trimming.")]
     protected override void OnAttached()
@@ -25,46 +24,49 @@ public class AutoScrollBehavior : Behavior<ListBox>
         }
     }
 
+    protected override void OnDetaching()
+    {
+        if (AssociatedObject is not null)
+        {
+            AssociatedObject.TemplateApplied -= AssociatedObjectOnTemplateApplied;
+            AssociatedObject.Items.CollectionChanged -= OnCollectionChanged;
+        }
+        _scrollViewer = null;
+
+        base.OnDetaching();
+    }
+
     private void AssociatedObjectOnTemplateApplied(object? sender, TemplateAppliedEventArgs e)
     {
+        // Get the inner ScrollViewer control
         _scrollViewer = e.NameScope.Get<ScrollViewer>("PART_ScrollViewer");
-        _scrollViewer.ScrollChanged += OnScrollChanged;
+        // ScrollChanged is no longer subscribed to as we initiate the scroll after layout, preventing the race condition.
     }
 
     private void OnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        if (_scrollViewer is { } scrollViewer)
-        {
-            // Check if chat scroll was on the bottom BEFORE the new entry
-            bool wasAtBottom = scrollViewer.Offset.Y + scrollViewer.Viewport.Height >= (scrollViewer.Extent.Height - scrollViewer.Viewport.Height - 10);
-            
-            if (wasAtBottom)
-            {
-                _scrollOnNextChange = true;
-            }
-        }
-    }
-
-    private void OnScrollChanged(object? sender, ScrollChangedEventArgs e)
-    {
-        if (_isScrolling)
+        if (e.Action != NotifyCollectionChangedAction.Add || _scrollViewer is null)
             return;
 
-        if (_scrollOnNextChange && _scrollViewer is { } scrollViewer)
+        // Check if the user was scrolled to the bottom BEFORE the content change.
+        // (current visible bottom) >= (total height - tolerance).
+        bool wasAtBottom = _scrollViewer.Offset.Y + _scrollViewer.Viewport.Height >= (_scrollViewer.Extent.Height - 10);
+
+        if (wasAtBottom)
         {
-            // Check if we have to scroll
-            if (scrollViewer.Offset.Y + scrollViewer.Viewport.Height < scrollViewer.Extent.Height - 10)
+            // Schedule the scroll to happen AFTER the layout pass is complete (DispatcherPriority.Layout).
+            // Fix for multi-line items. It ensures the ScrollViewer.Extent.Height has been updated to the item's final size before attempting to scroll.
+            Dispatcher.UIThread.Post(() =>
             {
                 if (AssociatedObject is { Scroll: IScrollable scrollable })
                 {
-                    _isScrolling = true;
                     scrollable.Offset = new Vector(
                         scrollable.Offset.X,
                         scrollable.Extent.Height - scrollable.Viewport.Height);
-                    _isScrolling = false;
                 }
-            }
-            _scrollOnNextChange = false;
+            }, DispatcherPriority.ContextIdle);
         }
     }
+
+    // OnScrollChanged, _isScrolling, and _scrollOnNextChange flags are removed as they are no longer necessary with the Dispatcher-based approach.
 }
