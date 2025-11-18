@@ -22,10 +22,16 @@
       Watermark="Filter"
       Text="{Binding FilterText}"
     />
-    <ListBox Grid.Row="1" Name="ListBoxMessages" ItemsSource="{Binding Messages}" Selection="{Binding Selection}" Padding="10" SelectionMode="Multiple">
+    <ListBox Grid.Row="1" Name="ListBoxMessages" 
+         ItemsSource="{Binding Messages}" 
+         Selection="{Binding Selection}" 
+         Padding="10" 
+         SelectionMode="Multiple" 
+         x:DataType="vm:ChatPageViewModel">
       <Interaction.Behaviors>
         <behaviors:AutoScrollBehavior />
         <behaviors:ScrollToBottom />
+        <behaviors:InfiniteScrollBehavior Command="{Binding LoadHistoryCmd}" />
       </Interaction.Behaviors>
       <ListBox.Styles>
         <Style Selector="ListBoxItem:selected /template/ Rectangle#SelectionIndicator">
@@ -85,7 +91,7 @@
       <ListBox.ItemContainerTheme>
         <ControlTheme TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}" x:DataType="vm:ChatLogEntryViewModel">
           <Setter Property="Padding" Value="0" />
-          <Setter Property="MinHeight" Value="46" />
+          <Setter Property="MinHeight" Value="48" />
         </ControlTheme>
       </ListBox.ItemContainerTheme>
       <ListBox.ItemTemplate>

@@ -37,13 +37,16 @@ public class ChatPageViewModel : PageViewModel
 
     public ChatLogConfig Config => Settings.Chat.Log;
 
+    // Global counter for received messages
     private long _currentMessageId;
+    
     private readonly SourceCache<ChatLogEntryViewModel, long> _cache = new(x => x.EntryId);
 
     private readonly ReadOnlyObservableCollection<ChatLogEntryViewModel> _messages;
     public ReadOnlyObservableCollection<ChatLogEntryViewModel> Messages => _messages;
 
     public ReactiveCommand<Unit, Unit> CopySelectedEntriesCmd { get; }
+    public ReactiveCommand<Unit, int> LoadHistoryCmd { get; }
 
     public SelectionModel<ChatLogEntryViewModel> Selection { get; } = new SelectionModel<ChatLogEntryViewModel>()
     {
@@ -51,6 +54,9 @@ public class ChatPageViewModel : PageViewModel
     };
 
     [Reactive] public string? FilterText { get; set; }
+    [Reactive] public int PageSize { get; set; } = 25;
+    [Reactive] public int MaxVisible { get; set; } = 60;
+    [Reactive] public int VisibleCount { get; set; }
 
     [DependencyInjectionConstructor]
     public ChatPageViewModel(
@@ -74,12 +80,26 @@ public class ChatPageViewModel : PageViewModel
         _roomManager.AvatarChat += RoomManager_AvatarChat;
         _roomManager.AvatarUpdated += RoomManager_AvatarUpdated;
 
+        VisibleCount = MaxVisible;
+
+        LoadHistoryCmd = ReactiveCommand.Create(() => 
+        {
+            VisibleCount += PageSize;
+            return PageSize;
+        });
+
+        // Filter have to calc again after each cache change
+        // Observe FilterText, VisibleCount and cache changes
+        var filterPredicate = Observable.CombineLatest(
+            this.WhenAnyValue(x => x.FilterText),
+            this.WhenAnyValue(x => x.VisibleCount),
+            _cache.CountChanged.StartWith(0), // Trigger on every add/delete
+            (filterText, visibleCount, _) => CreateHybridFilter(filterText, visibleCount)
+        );
+
         _cache
             .Connect()
-            .Filter(this
-                .WhenAnyValue(x => x.FilterText)
-                .Select(CreateFilter)
-            )
+            .Filter(filterPredicate)
             .ObserveOn(RxApp.MainThreadScheduler)
             .SortAndBind(out _messages, SortExpressionComparer<ChatLogEntryViewModel>.Ascending(x => x.EntryId))
             .Subscribe();
@@ -87,24 +107,27 @@ public class ChatPageViewModel : PageViewModel
         CopySelectedEntriesCmd = ReactiveCommand.Create(CopySelectedEntries);
     }
 
-    private void CopySelectedEntries()
+    // Calc minAllowedId on every call
+    private Func<ChatLogEntryViewModel, bool> CreateHybridFilter(string? filterText, int visibleCount)
     {
-        _clipboard.SetText(string.Join("\n", Selection.SelectedItems));
+        // If active search/filter, always show everything
+        if (!string.IsNullOrWhiteSpace(filterText))
+        {
+            var keywords = ParseKeywords(filterText);
+            return (vm) => CheckKeywords(vm, keywords);
+        }
+
+        // Otherwise, paginate, keep only N messages
+        // Calc again minAllowedIdwith actual _currentMessageId
+        long currentMaxId = _currentMessageId;
+        long minAllowedId = Math.Max(1, currentMaxId - visibleCount + 1);
+        
+        return (vm) => vm.EntryId >= minAllowedId;
     }
 
-    private long NextEntryId() => Interlocked.Increment(ref _currentMessageId);
-
-    private static Func<ChatLogEntryViewModel, bool> CreateFilter(string? filterText)
+    private bool CheckKeywords(ChatLogEntryViewModel vm, List<string> keywords)
     {
-        if (string.IsNullOrWhiteSpace(filterText))
-        {
-            return _ => true;
-        }
-        
-        // Parser les mots et phrases entre guillemets
-        var keywords = ParseKeywords(filterText);
-        
-        return (vm) => vm switch
+        return vm switch
         {
             ChatMessageViewModel chat =>
                 keywords.Any(keyword =>
@@ -113,9 +136,19 @@ public class ChatPageViewModel : PageViewModel
             ChatLogAvatarActionViewModel action =>
                 keywords.Any(keyword =>
                     action.UserName.Contains(keyword, StringComparison.OrdinalIgnoreCase)),
+            ChatLogRoomEntryViewModel room => 
+                 keywords.Any(keyword =>
+                    room.RoomName.Contains(keyword, StringComparison.OrdinalIgnoreCase)),
             _ => false
         };
     }
+
+    private void CopySelectedEntries()
+    {
+        _clipboard.SetText(string.Join("\n", Selection.SelectedItems));
+    }
+
+    private long NextEntryId() => Interlocked.Increment(ref _currentMessageId);
 
     private static List<string> ParseKeywords(string filterText)
     {
@@ -131,7 +164,6 @@ public class ChatPageViewModel : PageViewModel
             {
                 if (inQuotes)
                 {
-                    // Fin des guillemets : ajouter la phrase
                     if (currentWord.Length > 0)
                     {
                         keywords.Add(currentWord.ToString());
@@ -142,7 +174,6 @@ public class ChatPageViewModel : PageViewModel
             }
             else if (c == ' ' && !inQuotes)
             {
-                // Espace hors guillemets : fin d'un mot
                 if (currentWord.Length > 0)
                 {
                     keywords.Add(currentWord.ToString());
@@ -155,7 +186,6 @@ public class ChatPageViewModel : PageViewModel
             }
         }
         
-        // Ajouter le dernier mot/phrase
         if (currentWord.Length > 0)
         {
             keywords.Add(currentWord.ToString());
@@ -259,5 +289,13 @@ public class ChatPageViewModel : PageViewModel
             Message = H.RenderText(e.Message),
             FigureString = figureString,
         });
+    }
+
+    public void OnScrolledToBottom()
+    {
+        if (VisibleCount > MaxVisible)
+        {
+            VisibleCount = MaxVisible;
+        }
     }
 }
