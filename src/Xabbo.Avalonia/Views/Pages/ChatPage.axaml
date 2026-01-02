@@ -37,6 +37,13 @@
         <Style Selector="ListBoxItem:selected /template/ Rectangle#SelectionIndicator">
           <Setter Property="IsVisible" Value="false" />
         </Style>
+        <Style Selector="Run.whisper">
+          <Setter Property="FontStyle" Value="Italic" />
+          <Setter Property="Foreground" Value="#a495ff" />
+        </Style>
+        <Style Selector="Run.username">
+          <Setter Property="FontWeight" Value="Bold" />
+        </Style>
       </ListBox.Styles>
       <ListBox.KeyBindings>
         <KeyBinding Gesture="Ctrl+C" Command="{Binding CopySelectedEntriesCmd}" />
@@ -77,7 +84,12 @@
                 HorizontalAlignment="Left" VerticalAlignment="Center"
                 TextWrapping="Wrap"
               >
-                <Run Classes="privacy" FontWeight="Bold" Text="{Binding Name, Mode=OneWay}" /><Run Text=":" />
+                <Run 
+                  Classes="username privacy" 
+                  Classes.whisper="{Binding IsWhisper}"
+                  FontWeight="Bold" 
+                  Text="{Binding Name, Mode=OneWay}" 
+                /><Run Text=":" />
                 <Run
                   Classes.whisper="{Binding IsWhisper}"
                   Classes.privacy="{Binding IsWhisper}"

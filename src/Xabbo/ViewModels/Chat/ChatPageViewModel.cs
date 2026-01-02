@@ -39,6 +39,7 @@ public class ChatPageViewModel : PageViewModel
 
     // Global counter for received messages
     private long _currentMessageId;
+    private const int BufferSize = 10;
     
     private readonly SourceCache<ChatLogEntryViewModel, long> _cache = new(x => x.EntryId);
 
@@ -55,7 +56,7 @@ public class ChatPageViewModel : PageViewModel
 
     [Reactive] public string? FilterText { get; set; }
     [Reactive] public int PageSize { get; set; } = 25;
-    [Reactive] public int MaxVisible { get; set; } = 60;
+    [Reactive] public int MaxVisible { get; set; } = 50;
     [Reactive] public int VisibleCount { get; set; }
 
     [DependencyInjectionConstructor]
@@ -197,6 +198,13 @@ public class ChatPageViewModel : PageViewModel
     private void AppendLog(ChatLogEntryViewModel vm)
     {
         vm.EntryId = NextEntryId();
+        
+        // Buffer to avoid brutal layout calc after each message
+        if (VisibleCount < MaxVisible + BufferSize) 
+        {
+            VisibleCount++;
+        }
+
         _cache.AddOrUpdate(vm);
     }
 
@@ -293,7 +301,8 @@ public class ChatPageViewModel : PageViewModel
 
     public void OnScrolledToBottom()
     {
-        if (VisibleCount > MaxVisible)
+        // Buffer to avoid brutal layout calc after each message
+        if (VisibleCount >= MaxVisible + BufferSize)
         {
             VisibleCount = MaxVisible;
         }

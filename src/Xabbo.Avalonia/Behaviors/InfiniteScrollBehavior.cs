@@ -67,7 +67,10 @@ public class InfiniteScrollBehavior : Behavior<ListBox>
         if (_scrollViewer.Offset.Y < 20 && _scrollViewer.Extent.Height > _scrollViewer.Viewport.Height)
         {
             var command = Command;
-            LoadMoreItems(command);
+            if (command != null && command.CanExecute(null))
+            {
+                LoadMoreItems(command);
+            }
         }
     }
 
