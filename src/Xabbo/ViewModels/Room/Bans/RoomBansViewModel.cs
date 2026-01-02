@@ -44,7 +44,7 @@ public class RoomBansViewModel : ViewModelBase
     private readonly ObservableAsPropertyHelper<string> _statusText;
     public string StatusText => _statusText.Value;
 
-    [Reactive] public IList<RoomBanViewModel>? SelectedBans { get; set; }
+    [Reactive] public IList? SelectedBans { get; set; }
 
     public ReactiveCommand<Unit, Unit> LoadBansCmd { get; }
     public ReactiveCommand<IList, Unit> UnbanSelectedUsersCmd { get; }

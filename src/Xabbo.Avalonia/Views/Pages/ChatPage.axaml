@@ -4,9 +4,12 @@
   xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
   xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
   xmlns:ic="using:FluentIcons.Avalonia.Fluent"
+  xmlns:icm="using:FluentIcons.Avalonia.Fluent.MarkupExtensions"
+  xmlns:ui="using:FluentAvalonia.UI.Controls"
   xmlns:controls="using:Xabbo.Avalonia.Controls"
   xmlns:behaviors="using:Xabbo.Avalonia.Behaviors"
   xmlns:vm="using:Xabbo.ViewModels"
+  xmlns:xc="using:Xabbo.Core"
   x:DataType="vm:ChatPageViewModel"
   mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
   x:Class="Xabbo.Avalonia.Views.ChatPage"
@@ -22,17 +25,111 @@
       Watermark="Filter"
       Text="{Binding FilterText}"
     />
-    <ListBox Grid.Row="1" Name="ListBoxMessages" 
-         ItemsSource="{Binding Messages}" 
-         Selection="{Binding Selection}" 
-         Padding="10" 
-         SelectionMode="Multiple" 
-         x:DataType="vm:ChatPageViewModel">
+    <ListBox Grid.Row="1" Name="ListBoxMessages"
+         ItemsSource="{Binding Messages}"
+         Selection="{Binding Selection}"
+         Padding="10"
+         SelectionMode="Multiple"
+         x:DataType="vm:ChatPageViewModel"
+         ContextRequested="OnContextRequested">
       <Interaction.Behaviors>
         <behaviors:AutoScrollBehavior />
         <behaviors:ScrollToBottom />
         <behaviors:InfiniteScrollBehavior Command="{Binding LoadHistoryCmd}" />
       </Interaction.Behaviors>
+      <ListBox.ContextFlyout>
+        <ui:FAMenuFlyout>
+          <ui:MenuFlyoutItem
+            IconSource="{icm:SymbolIconSource Symbol=Search}"
+            Text="Find" Command="{Binding FindUserCmd}"
+          />
+          <ui:MenuFlyoutItem
+            IconSource="{icm:SymbolIconSource Symbol=BackpackAdd}"
+            Text="Add to wardrobe"
+            Command="{Binding CopyUserToWardrobeCmd}"
+          />
+          <ui:MenuFlyoutItem
+            IconSource="{icm:SymbolIconSource Symbol=Handshake}"
+            Text="Trade user"
+            Command="{Binding TradeUserCmd}"
+          />
+          <ui:MenuFlyoutSubItem
+            IsEnabled="{Binding CopyUserFieldCmd.CanExecute^}"
+            IconSource="{icm:SymbolIconSource Symbol=Copy}"
+            Text="Copy..."
+          >
+            <ui:MenuFlyoutItem Text="Name" Command="{Binding CopyUserFieldCmd}" CommandParameter="name" />
+            <ui:MenuFlyoutItem Text="Message" Command="{Binding CopyUserFieldCmd}" CommandParameter="message" />
+            <ui:MenuFlyoutItem Text="Figure" Command="{Binding CopyUserFieldCmd}" CommandParameter="figure" />
+          </ui:MenuFlyoutSubItem>
+          <ui:MenuFlyoutSubItem
+            Classes="modern"
+            IsEnabled="{Binding OpenUserProfileCmd.CanExecute^}"
+            IconSource="{icm:SymbolIconSource Symbol=Person}"
+            Text="Open profile..."
+          >
+            <ui:MenuFlyoutItem Text="In-game" Command="{Binding OpenUserProfileCmd}" CommandParameter="game" />
+            <ui:MenuFlyoutItem Text="On the web" Command="{Binding OpenUserProfileCmd}" CommandParameter="web" />
+            <ui:MenuFlyoutItem Text="On HabboWidgets" Command="{Binding OpenUserProfileCmd}" CommandParameter="habbowidgets" />
+          </ui:MenuFlyoutSubItem>
+          <ui:MenuFlyoutSubItem
+            IconSource="{icm:SymbolIconSource Symbol=Warning}"
+            Text="Moderate..."
+          >
+            <ui:MenuFlyoutSubItem.IsEnabled>
+              <MultiBinding Converter="{x:Static BoolConverters.Or}">
+                <Binding Path="MuteUsersCmd.CanExecute^" />
+                <Binding Path="KickUsersCmd.CanExecute^" />
+                <Binding Path="BanUsersCmd.CanExecute^" />
+                <Binding Path="BounceUsersCmd.CanExecute^" />
+              </MultiBinding>
+            </ui:MenuFlyoutSubItem.IsEnabled>
+            <ui:MenuFlyoutSubItem
+              Classes="modern"
+              Text="Mute"
+              IsEnabled="{Binding MuteUsersCmd.CanExecute^}"
+              IconSource="{icm:SymbolIconSource Symbol=ChatOff}"
+            >
+              <ui:MenuFlyoutItem Text="2 mins" Command="{Binding MuteUsersCmd}" CommandParameter="2" />
+              <ui:MenuFlyoutItem Text="5 mins" Command="{Binding MuteUsersCmd}" CommandParameter="5" />
+              <ui:MenuFlyoutItem Text="10 mins" Command="{Binding MuteUsersCmd}" CommandParameter="10" />
+              <ui:MenuFlyoutItem Text="15 mins" Command="{Binding MuteUsersCmd}" CommandParameter="15" />
+              <ui:MenuFlyoutItem Text="30 mins" Command="{Binding MuteUsersCmd}" CommandParameter="30" />
+              <ui:MenuFlyoutItem Text="1 hour" Command="{Binding MuteUsersCmd}" CommandParameter="60" />
+              <ui:MenuFlyoutItem Text="6 hours" Command="{Binding MuteUsersCmd}" CommandParameter="360" />
+              <ui:MenuFlyoutItem Text="12 hours" Command="{Binding MuteUsersCmd}" CommandParameter="720" />
+              <ui:MenuFlyoutItem Text="24 hours" Command="{Binding MuteUsersCmd}" CommandParameter="1440" />
+            </ui:MenuFlyoutSubItem>
+            <ui:MenuFlyoutItem
+              Classes="modern"
+              Text="Unmute"
+              IconSource="{icm:SymbolIconSource Symbol=Chat}"
+              Command="{Binding MuteUsersCmd}"
+              CommandParameter="0"
+            />
+            <ui:MenuFlyoutItem
+              Text="Kick"
+              IconSource="{icm:SymbolIconSource Symbol=SignOut}"
+              Command="{Binding KickUsersCmd}"
+            />
+            <ui:MenuFlyoutSubItem
+              IsEnabled="{Binding BanUsersCmd.CanExecute^}"
+              IconSource="{icm:SymbolIconSource Symbol=PersonProhibited}"
+              Text="Ban"
+            >
+              <ui:MenuFlyoutItem Text="For an hour" Command="{Binding BanUsersCmd}" CommandParameter="{x:Static xc:BanDuration.Hour}" />
+              <ui:MenuFlyoutItem Text="For a day" Command="{Binding BanUsersCmd}" CommandParameter="{x:Static xc:BanDuration.Day}" />
+              <ui:MenuFlyoutItem Text="Permanently" Command="{Binding BanUsersCmd}" CommandParameter="{x:Static xc:BanDuration.Permanent}" />
+            </ui:MenuFlyoutSubItem>
+            <ui:MenuFlyoutItem
+              Classes="modern"
+              Text="Bounce"
+              IconSource="{icm:SymbolIconSource Symbol=ArrowBounce}"
+              Command="{Binding BounceUsersCmd}"
+            />
+          </ui:MenuFlyoutSubItem>
+        </ui:FAMenuFlyout>
+      </ListBox.ContextFlyout>
       <ListBox.Styles>
         <Style Selector="ListBoxItem:selected /template/ Rectangle#SelectionIndicator">
           <Setter Property="IsVisible" Value="false" />
@@ -72,23 +169,32 @@
         </DataTemplate>
         <DataTemplate DataType="vm:ChatMessageViewModel">
           <Border>
-            <Grid ColumnDefinitions="Auto,*">
+            <Grid ColumnDefinitions="Auto,Auto,*">
+              <TextBlock
+                Grid.Column="0"
+                VerticalAlignment="Center"
+                Margin="0,0,5,0"
+                Text="{Binding Timestamp, StringFormat='[HH:mm:ss]', Mode=OneWay}"
+                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                FontSize="11"
+              />
               <controls:AvatarImage
+                Grid.Column="1"
                 Margin="0,-10,0,-10"
                 FigureString="{Binding FigureString}"
                 HeadOnly="true"
                 ClipToBounds="false"
               />
               <TextBlock
-                Grid.Column="1"
+                Grid.Column="2"
                 HorizontalAlignment="Left" VerticalAlignment="Center"
                 TextWrapping="Wrap"
               >
-                <Run 
-                  Classes="username privacy" 
+                <Run
+                  Classes="username privacy"
                   Classes.whisper="{Binding IsWhisper}"
-                  FontWeight="Bold" 
-                  Text="{Binding Name, Mode=OneWay}" 
+                  FontWeight="Bold"
+                  Text="{Binding Name, Mode=OneWay}"
                 /><Run Text=":" />
                 <Run
                   Classes.whisper="{Binding IsWhisper}"

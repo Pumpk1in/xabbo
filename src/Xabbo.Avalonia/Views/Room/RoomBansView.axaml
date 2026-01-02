@@ -20,7 +20,7 @@
     />
     <controls:Loading Grid.Row="1" IsLoading="{Binding IsLoading}">
       <Panel>
-        <DataGrid x:Name="DataGridBans" ItemsSource="{Binding Bans}">
+        <DataGrid x:Name="DataGridBans" ItemsSource="{Binding Bans}" SelectionChanged="DataGridBans_SelectionChanged">
           <DataGrid.Columns>
             <DataGridTextColumn Header="id" Binding="{Binding Id}" />
             <DataGridTextColumn Header="name" Binding="{Binding Name}" />

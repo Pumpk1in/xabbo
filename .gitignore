@@ -343,3 +343,6 @@ ASALocalRun/
 
 # BeatPulse healthcheck temp database
 healthchecksdb
+
+# Claude code
+.claude/

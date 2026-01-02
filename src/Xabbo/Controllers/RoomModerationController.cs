@@ -36,7 +36,7 @@ public partial class RoomModerationController : ControllerBase
     public bool CanMute => _roomManager.CanMute;
     public bool CanKick => _roomManager.CanKick;
     public bool CanBan => _roomManager.CanBan;
-    public bool CanUnban => _roomManager.RightsLevel >= RightsLevel.GroupAdmin;
+    public bool CanUnban => _roomManager.CanBan;
     public bool IsOwner => _roomManager.IsOwner;
 
     public RoomModerationController(

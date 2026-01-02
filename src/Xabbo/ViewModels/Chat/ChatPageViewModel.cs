@@ -2,6 +2,7 @@
 using System.Reactive;
 using System.Reactive.Linq;
 using System.Text;
+using System.Web;
 using DynamicData;
 using DynamicData.Binding;
 using ReactiveUI;
@@ -9,12 +10,19 @@ using Splat;
 using Avalonia.Controls.Selection;
 using FluentIcons.Common;
 using FluentIcons.Avalonia.Fluent;
+using HanumanInstitute.MvvmDialogs;
 
 using Xabbo.Core;
 using Xabbo.Core.Game;
 using Xabbo.Core.Events;
+using Xabbo.Core.Messages.Incoming;
+using Xabbo.Core.Messages.Outgoing;
 using Xabbo.Configuration;
+using Xabbo.Controllers;
+using Xabbo.Exceptions;
+using Xabbo.Extension;
 using Xabbo.Services.Abstractions;
+using Xabbo.Utility;
 
 using IconSource = FluentAvalonia.UI.Controls.IconSource;
 
@@ -28,12 +36,18 @@ public class ChatPageViewModel : PageViewModel
     private readonly IConfigProvider<AppConfig> _settingsProvider;
     private AppConfig Settings => _settingsProvider.Value;
 
+    private readonly IExtension _ext;
+    private readonly IDialogService _dialog;
     private readonly IClipboardService _clipboard;
+    private readonly ILauncherService _launcher;
     private readonly IGameStateService _gameState;
     private readonly IFigureConverterService _figureConverter;
 
     private readonly RoomManager _roomManager;
     private readonly ProfileManager _profileManager;
+    private readonly RoomModerationController _moderation;
+    private readonly TradeManager _tradeManager;
+    private readonly WardrobePageViewModel _wardrobe;
 
     public ChatLogConfig Config => Settings.Chat.Log;
 
@@ -46,8 +60,24 @@ public class ChatPageViewModel : PageViewModel
     private readonly ReadOnlyObservableCollection<ChatLogEntryViewModel> _messages;
     public ReadOnlyObservableCollection<ChatLogEntryViewModel> Messages => _messages;
 
+    [Reactive] public IList<ChatMessageViewModel>? ContextSelection { get; set; }
+
+    private readonly ObservableAsPropertyHelper<string?> _selectedUserName;
+    public string? SelectedUserName => _selectedUserName.Value;
+
     public ReactiveCommand<Unit, Unit> CopySelectedEntriesCmd { get; }
     public ReactiveCommand<Unit, int> LoadHistoryCmd { get; }
+
+    public ReactiveCommand<Unit, Unit> FindUserCmd { get; }
+    public ReactiveCommand<Unit, Unit> CopyUserToWardrobeCmd { get; }
+    public ReactiveCommand<Unit, Unit> TradeUserCmd { get; }
+    public ReactiveCommand<string, Unit> CopyUserFieldCmd { get; }
+    public ReactiveCommand<string, Task> OpenUserProfileCmd { get; }
+
+    public ReactiveCommand<string, Task> MuteUsersCmd { get; }
+    public ReactiveCommand<Unit, Task> KickUsersCmd { get; }
+    public ReactiveCommand<BanDuration, Task> BanUsersCmd { get; }
+    public ReactiveCommand<Unit, Task> BounceUsersCmd { get; }
 
     public SelectionModel<ChatLogEntryViewModel> Selection { get; } = new SelectionModel<ChatLogEntryViewModel>()
     {
@@ -61,19 +91,31 @@ public class ChatPageViewModel : PageViewModel
 
     [DependencyInjectionConstructor]
     public ChatPageViewModel(
+        IExtension ext,
         IConfigProvider<AppConfig> settingsProvider,
+        IDialogService dialog,
         IClipboardService clipboard,
+        ILauncherService launcher,
         IGameStateService gameState,
         IFigureConverterService figureConverter,
         RoomManager roomManager,
-        ProfileManager profileManager)
+        ProfileManager profileManager,
+        RoomModerationController moderation,
+        TradeManager tradeManager,
+        WardrobePageViewModel wardrobe)
     {
+        _ext = ext;
         _settingsProvider = settingsProvider;
+        _dialog = dialog;
         _clipboard = clipboard;
+        _launcher = launcher;
         _gameState = gameState;
         _figureConverter = figureConverter;
         _roomManager = roomManager;
         _profileManager = profileManager;
+        _moderation = moderation;
+        _tradeManager = tradeManager;
+        _wardrobe = wardrobe;
 
         _roomManager.Entered += OnEnteredRoom;
         _roomManager.AvatarAdded += OnAvatarAdded;
@@ -83,11 +125,93 @@ public class ChatPageViewModel : PageViewModel
 
         VisibleCount = MaxVisible;
 
-        LoadHistoryCmd = ReactiveCommand.Create(() => 
+        LoadHistoryCmd = ReactiveCommand.Create(() =>
         {
             VisibleCount += PageSize;
             return PageSize;
         });
+
+        // Context selection observables for command can-execute
+        var hasSingleContextMessage = this
+            .WhenAnyValue(x => x.ContextSelection)
+            .Select(selection => selection is { Count: 1 })
+            .StartWith(false)
+            .ObserveOn(RxApp.MainThreadScheduler);
+
+        var hasAnyContextMessage = this
+            .WhenAnyValue(x => x.ContextSelection)
+            .Select(selection => selection is { Count: > 0 })
+            .StartWith(false)
+            .ObserveOn(RxApp.MainThreadScheduler);
+
+        _selectedUserName = this
+            .WhenAnyValue(x => x.ContextSelection)
+            .Select(selection => selection is [var msg] ? msg.Name : null)
+            .ToProperty(this, x => x.SelectedUserName);
+
+        var canTradeUser = Observable.CombineLatest(
+            hasSingleContextMessage,
+            _tradeManager.WhenAnyValue(x => x.IsTrading).StartWith(false),
+            this.WhenAnyValue(x => x.SelectedUserName).StartWith((string?)null),
+            _profileManager.WhenAnyValue(x => x.UserData!.Name).StartWith((string?)null),
+            (hasMessage, isTrading, selectedName, currentUserName) =>
+                hasMessage && !isTrading && selectedName != null && selectedName != currentUserName
+        ).ObserveOn(RxApp.MainThreadScheduler);
+
+        var canMuteUsers = Observable.CombineLatest(
+            hasAnyContextMessage,
+            _moderation.WhenAnyValue(
+                x => x.CurrentOperation,
+                x => x.CanMute,
+                (op, canMute) => op is RoomModerationController.ModerationType.None && canMute
+            ).StartWith(false),
+            (hasMessage, canModerate) => hasMessage && canModerate
+        ).ObserveOn(RxApp.MainThreadScheduler);
+
+        var canKickUsers = Observable.CombineLatest(
+            hasAnyContextMessage,
+            _moderation.WhenAnyValue(
+                x => x.CurrentOperation,
+                x => x.CanKick,
+                (op, canKick) => op is RoomModerationController.ModerationType.None && canKick
+            ).StartWith(false),
+            (hasMessage, canModerate) => hasMessage && canModerate
+        ).ObserveOn(RxApp.MainThreadScheduler);
+
+        var canBanUsers = Observable.CombineLatest(
+            hasAnyContextMessage,
+            _moderation.WhenAnyValue(
+                x => x.CurrentOperation,
+                x => x.CanBan,
+                (op, canBan) => op is RoomModerationController.ModerationType.None && canBan
+            ).StartWith(false),
+            (hasMessage, canModerate) => hasMessage && canModerate
+        ).ObserveOn(RxApp.MainThreadScheduler);
+
+        var canBounceUsers = Observable.CombineLatest(
+            hasAnyContextMessage,
+            _moderation.WhenAnyValue(
+                x => x.CurrentOperation,
+                x => x.RightsLevel,
+                x => x.IsOwner,
+                (op, rightsLevel, isOwner) =>
+                    op is RoomModerationController.ModerationType.None &&
+                    (rightsLevel is RightsLevel.Owner || isOwner)
+            ).StartWith(false),
+            (hasMessage, canModerate) => hasMessage && canModerate
+        ).ObserveOn(RxApp.MainThreadScheduler);
+
+        // Initialize commands
+        FindUserCmd = ReactiveCommand.Create(FindUser, hasSingleContextMessage);
+        CopyUserToWardrobeCmd = ReactiveCommand.Create(CopyUserToWardrobe, hasAnyContextMessage);
+        TradeUserCmd = ReactiveCommand.Create(TradeUser, canTradeUser);
+        CopyUserFieldCmd = ReactiveCommand.Create<string>(CopyUserField, hasSingleContextMessage);
+        OpenUserProfileCmd = ReactiveCommand.Create<string, Task>(OpenUserProfile, hasSingleContextMessage);
+
+        MuteUsersCmd = ReactiveCommand.Create<string, Task>(MuteUsersAsync, canMuteUsers);
+        KickUsersCmd = ReactiveCommand.Create<Task>(KickUsersAsync, canKickUsers);
+        BanUsersCmd = ReactiveCommand.Create<BanDuration, Task>(BanUsersAsync, canBanUsers);
+        BounceUsersCmd = ReactiveCommand.Create<Task>(BounceUsersAsync, canBounceUsers);
 
         // Filter have to calc again after each cache change
         // Observe FilterText, VisibleCount and cache changes
@@ -305,6 +429,130 @@ public class ChatPageViewModel : PageViewModel
         if (VisibleCount >= MaxVisible + BufferSize)
         {
             VisibleCount = MaxVisible;
+        }
+    }
+
+    // Context menu command implementations
+    private void FindUser()
+    {
+        if (ContextSelection is not [var message])
+            return;
+
+        if (_roomManager.Room?.TryGetUserByName(message.Name, out var user) == true)
+        {
+            _ext.Send(new AvatarWhisperMsg("(click here to find)", user.Index));
+        }
+    }
+
+    private void TradeUser()
+    {
+        if (ContextSelection is not [var message])
+            return;
+
+        if (_roomManager.Room?.TryGetUserByName(message.Name, out var user) == true)
+        {
+            _ext.Send(new TradeUserMsg(user.Index));
+        }
+    }
+
+    private void CopyUserToWardrobe()
+    {
+        if (ContextSelection is { } selection)
+        {
+            foreach (var message in selection)
+            {
+                if (!string.IsNullOrEmpty(message.FigureString))
+                {
+                    if (_roomManager.Room?.TryGetUserByName(message.Name, out var user) == true)
+                    {
+                        _wardrobe.AddFigure(user.Gender, user.Figure);
+                    }
+                }
+            }
+        }
+    }
+
+    private void CopyUserField(string field)
+    {
+        if (ContextSelection is not [var message])
+            return;
+
+        switch (field)
+        {
+            case "name":
+                _clipboard.SetText(message.Name);
+                break;
+            case "message":
+                _clipboard.SetText(message.Message);
+                break;
+            case "figure":
+                if (!string.IsNullOrEmpty(message.FigureString))
+                    _clipboard.SetText(message.FigureString);
+                break;
+        }
+    }
+
+    private async Task OpenUserProfile(string type)
+    {
+        if (ContextSelection is not [var message])
+            return;
+
+        switch (type)
+        {
+            case "game":
+                var profile = await _ext.RequestAsync(new GetProfileByNameMsg(message.Name), block: false);
+                if (!profile.DisplayInClient)
+                {
+                    var result = await _dialog.ShowContentDialogAsync(
+                        _dialog.CreateViewModel<MainViewModel>(),
+                        new HanumanInstitute.MvvmDialogs.Avalonia.Fluent.ContentDialogSettings
+                        {
+                            Title = "Failed to open profile",
+                            Content = $"{message.Name}'s profile is not visible.",
+                            PrimaryButtonText = "OK",
+                        }
+                    );
+                }
+                break;
+            case "web":
+                _launcher.Launch($"https://{_ext.Session.Hotel.WebHost}/profile/{HttpUtility.UrlEncode(message.Name)}");
+                break;
+            case "habbowidgets":
+                _launcher.Launch($"https://www.habbowidgets.com/habinfo/{_ext.Session.Hotel.Domain}/{HttpUtility.UrlEncode(message.Name)}");
+                break;
+        }
+    }
+
+    private IEnumerable<IUser> GetSelectedUsers()
+    {
+        if (ContextSelection is null || _roomManager.Room is null)
+            yield break;
+
+        foreach (var message in ContextSelection)
+        {
+            if (_roomManager.Room.TryGetUserByName(message.Name, out var user))
+                yield return user;
+        }
+    }
+
+    private Task MuteUsersAsync(string minutesStr) => TryModerate(() => _moderation.MuteUsersAsync(GetSelectedUsers(), int.Parse(minutesStr)));
+    private Task KickUsersAsync() => TryModerate(() => _moderation.KickUsersAsync(GetSelectedUsers()));
+    private Task BanUsersAsync(BanDuration duration) => TryModerate(() => _moderation.BanUsersAsync(GetSelectedUsers(), duration));
+    private Task BounceUsersAsync() => TryModerate(() => _moderation.BounceUsersAsync(GetSelectedUsers()));
+
+    private async Task TryModerate(Func<Task> moderate)
+    {
+        try
+        {
+            await moderate();
+        }
+        catch (OperationInProgressException ex)
+        {
+            await _dialog.ShowAsync("Error", ex.Message);
+        }
+        catch (Exception ex)
+        {
+            await _dialog.ShowAsync("Error", ex.Message);
         }
     }
 }
