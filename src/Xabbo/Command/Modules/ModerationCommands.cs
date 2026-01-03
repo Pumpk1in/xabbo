@@ -49,6 +49,11 @@ public sealed class ModerationCommands(RoomManager roomManager) : CommandModule
             Ext.Send(Out.UnbanUserFromRoom, userId, room.Id);
     }
 
+    public void AddToBanList(string userName, BanDuration duration)
+    {
+        _banList[userName] = duration;
+    }
+
     private void RoomManager_Left()
     {
         _muteList.Clear();

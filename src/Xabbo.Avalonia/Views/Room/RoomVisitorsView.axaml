@@ -5,6 +5,9 @@
   xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
   xmlns:v="using:Xabbo.Avalonia.Views"
   xmlns:vm="using:Xabbo.ViewModels"
+  xmlns:ui="using:FluentAvalonia.UI.Controls"
+  xmlns:icm="using:FluentIcons.Avalonia.Fluent.MarkupExtensions"
+  xmlns:xc="using:Xabbo.Core"
   mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
   x:Class="Xabbo.Avalonia.Views.RoomVisitorsView"
   x:DataType="vm:RoomVisitorsViewModel"
@@ -23,7 +26,32 @@
       CanUserSortColumns="False"
       CanUserReorderColumns="True"
       CanUserResizeColumns="True"
+      SelectionMode="Single"
+      ContextRequested="OnContextRequested"
     >
+      <DataGrid.ContextFlyout>
+        <ui:FAMenuFlyout>
+          <ui:MenuFlyoutSubItem
+            Classes="modern"
+            IsEnabled="{Binding OpenUserProfileCmd.CanExecute^}"
+            IconSource="{icm:SymbolIconSource Symbol=Person}"
+            Text="Open profile..."
+          >
+            <ui:MenuFlyoutItem Text="In-game" Command="{Binding OpenUserProfileCmd}" CommandParameter="game" />
+            <ui:MenuFlyoutItem Text="On the web" Command="{Binding OpenUserProfileCmd}" CommandParameter="web" />
+            <ui:MenuFlyoutItem Text="On HabboWidgets" Command="{Binding OpenUserProfileCmd}" CommandParameter="habbowidgets" />
+          </ui:MenuFlyoutSubItem>
+          <ui:MenuFlyoutSubItem
+            IconSource="{icm:SymbolIconSource Symbol=PersonProhibited}"
+            Text="Ban..."
+            IsEnabled="{Binding BanVisitorCmd.CanExecute^}"
+          >
+            <ui:MenuFlyoutItem Text="For an hour" Command="{Binding BanVisitorCmd}" CommandParameter="{x:Static xc:BanDuration.Hour}" />
+            <ui:MenuFlyoutItem Text="For a day" Command="{Binding BanVisitorCmd}" CommandParameter="{x:Static xc:BanDuration.Day}" />
+            <ui:MenuFlyoutItem Text="Permanently" Command="{Binding BanVisitorCmd}" CommandParameter="{x:Static xc:BanDuration.Permanent}" />
+          </ui:MenuFlyoutSubItem>
+        </ui:FAMenuFlyout>
+      </DataGrid.ContextFlyout>
       <DataGrid.Columns>
         <DataGridTemplateColumn Header="id" IsVisible="{DynamicResource IsModern}">
           <DataTemplate DataType="vm:VisitorViewModel">
