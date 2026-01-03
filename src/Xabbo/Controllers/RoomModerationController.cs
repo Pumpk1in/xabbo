@@ -67,7 +67,7 @@ public partial class RoomModerationController : ControllerBase
             ModerationType.Kick => CanKick && RightsLevel > user.RightsLevel && !user.IsStaff,
             ModerationType.Ban => CanBan && RightsLevel > user.RightsLevel && !user.IsStaff,
             ModerationType.Unban => RightsLevel >= RightsLevel.GroupAdmin,
-            ModerationType.Bounce => IsOwner && !user.IsStaff,
+            ModerationType.Bounce => CanBan && RightsLevel > user.RightsLevel && !user.IsStaff,
             _ => false,
         };
 

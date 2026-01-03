@@ -141,6 +141,11 @@
         <Style Selector="Run.username">
           <Setter Property="FontWeight" Value="Bold" />
         </Style>
+        <Style Selector="Run.username.whisper">
+          <Setter Property="FontStyle" Value="Normal" />
+          <Setter Property="Foreground" Value="#a495ff" />
+          <Setter Property="FontWeight" Value="Bold" />
+        </Style>
       </ListBox.Styles>
       <ListBox.KeyBindings>
         <KeyBinding Gesture="Ctrl+C" Command="{Binding CopySelectedEntriesCmd}" />
@@ -193,9 +198,8 @@
                 <Run
                   Classes="username privacy"
                   Classes.whisper="{Binding IsWhisper}"
-                  FontWeight="Bold"
                   Text="{Binding Name, Mode=OneWay}"
-                /><Run Text=":" />
+                /><Run Classes.whisper="{Binding IsWhisper}" Text=":" />
                 <Run
                   Classes.whisper="{Binding IsWhisper}"
                   Classes.privacy="{Binding IsWhisper}"
