@@ -16,6 +16,7 @@ public class AutoScrollBehavior : Behavior<ListBox>
     private bool _isLoadingHistory;
     private bool _shouldStayAtBottom;
     private bool _pendingScrollToBottom;
+    private bool _isProgrammaticScroll;
 
     [RequiresUnreferencedCode("override: This functionality is not compatible with trimming.")]
     protected override void OnAttached()
@@ -60,7 +61,8 @@ public class AutoScrollBehavior : Behavior<ListBox>
         bool isAtBottom = _scrollViewer.Offset.Y + _scrollViewer.Viewport.Height >= (_scrollViewer.Extent.Height - 10);
 
         // Update our flag - if user manually scrolls away from bottom, disable auto-scroll
-        if (Math.Abs(e.OffsetDelta.Y) > 0.1) // User initiated scroll (not programmatic)
+        // Ignore scroll events triggered by our own programmatic scrolls
+        if (!_isProgrammaticScroll && Math.Abs(e.OffsetDelta.Y) > 0.1)
         {
             _shouldStayAtBottom = isAtBottom;
         }
@@ -86,8 +88,10 @@ public class AutoScrollBehavior : Behavior<ListBox>
                 {
                     if (AssociatedObject is { Scroll: IScrollable scrollable })
                     {
+                        _isProgrammaticScroll = true;
                         var newOffset = scrollable.Extent.Height - scrollable.Viewport.Height;
                         scrollable.Offset = new Vector(scrollable.Offset.X, Math.Max(0, newOffset));
+                        _isProgrammaticScroll = false;
                     }
                 }, DispatcherPriority.ContextIdle);
             }
@@ -108,8 +112,10 @@ public class AutoScrollBehavior : Behavior<ListBox>
                     _pendingScrollToBottom = false;
                     if (AssociatedObject is { Scroll: IScrollable scrollable })
                     {
+                        _isProgrammaticScroll = true;
                         var newOffset = scrollable.Extent.Height - scrollable.Viewport.Height;
                         scrollable.Offset = new Vector(scrollable.Offset.X, Math.Max(0, newOffset));
+                        _isProgrammaticScroll = false;
                     }
                 }, DispatcherPriority.ContextIdle);
             }
@@ -132,8 +138,10 @@ public class AutoScrollBehavior : Behavior<ListBox>
             {
                 if (AssociatedObject is { Scroll: IScrollable scrollable })
                 {
+                    _isProgrammaticScroll = true;
                     var newOffset = scrollable.Extent.Height - scrollable.Viewport.Height;
                     scrollable.Offset = new Vector(scrollable.Offset.X, newOffset);
+                    _isProgrammaticScroll = false;
 
                     // Double-check after a short delay to handle multi-line messages whose height is still being calculated
                     DispatcherTimer.RunOnce(() =>
@@ -146,8 +154,10 @@ public class AutoScrollBehavior : Behavior<ListBox>
                             // If we're not at the bottom (with 10px tolerance), scroll again
                             if (currentBottom < expectedBottom - 10)
                             {
+                                _isProgrammaticScroll = true;
                                 var correctedOffset = scrollable2.Extent.Height - scrollable2.Viewport.Height;
                                 scrollable2.Offset = new Vector(scrollable2.Offset.X, correctedOffset);
+                                _isProgrammaticScroll = false;
                             }
                         }
                     }, TimeSpan.FromMilliseconds(100));
@@ -162,9 +172,11 @@ public class AutoScrollBehavior : Behavior<ListBox>
             {
                 if (AssociatedObject is { Scroll: IScrollable scrollable })
                 {
+                    _isProgrammaticScroll = true;
                     var heightDelta = scrollable.Extent.Height - _previousExtentHeight;
                     var newOffset = currentOffset + heightDelta;
                     scrollable.Offset = new Vector(scrollable.Offset.X, Math.Max(0, newOffset));
+                    _isProgrammaticScroll = false;
                     _isLoadingHistory = false;
                 }
             }, DispatcherPriority.ContextIdle);
