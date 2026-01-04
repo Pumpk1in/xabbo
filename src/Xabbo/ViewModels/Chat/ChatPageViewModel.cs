@@ -53,7 +53,6 @@ public class ChatPageViewModel : PageViewModel
 
     // Global counter for received messages
     private long _currentMessageId;
-    private const int BufferSize = 10;
     
     private readonly SourceCache<ChatLogEntryViewModel, long> _cache = new(x => x.EntryId);
 
@@ -66,7 +65,6 @@ public class ChatPageViewModel : PageViewModel
     public string? SelectedUserName => _selectedUserName.Value;
 
     public ReactiveCommand<Unit, Unit> CopySelectedEntriesCmd { get; }
-    public ReactiveCommand<Unit, int> LoadHistoryCmd { get; }
 
     public ReactiveCommand<Unit, Unit> FindUserCmd { get; }
     public ReactiveCommand<Unit, Unit> CopyUserToWardrobeCmd { get; }
@@ -85,9 +83,6 @@ public class ChatPageViewModel : PageViewModel
     };
 
     [Reactive] public string? FilterText { get; set; }
-    [Reactive] public int PageSize { get; set; } = 25;
-    [Reactive] public int MaxVisible { get; set; } = 50;
-    [Reactive] public int VisibleCount { get; set; }
 
     [DependencyInjectionConstructor]
     public ChatPageViewModel(
@@ -122,14 +117,6 @@ public class ChatPageViewModel : PageViewModel
         _roomManager.AvatarRemoved += OnAvatarRemoved;
         _roomManager.AvatarChat += RoomManager_AvatarChat;
         _roomManager.AvatarUpdated += RoomManager_AvatarUpdated;
-
-        VisibleCount = MaxVisible;
-
-        LoadHistoryCmd = ReactiveCommand.Create(() =>
-        {
-            VisibleCount += PageSize;
-            return PageSize;
-        });
 
         // Context selection observables for command can-execute
         var hasSingleContextMessage = this
@@ -213,14 +200,10 @@ public class ChatPageViewModel : PageViewModel
         BanUsersCmd = ReactiveCommand.Create<BanDuration, Task>(BanUsersAsync, canBanUsers);
         BounceUsersCmd = ReactiveCommand.Create<Task>(BounceUsersAsync, canBounceUsers);
 
-        // Filter have to calc again after each cache change
-        // Observe FilterText, VisibleCount and cache changes
-        var filterPredicate = Observable.CombineLatest(
-            this.WhenAnyValue(x => x.FilterText),
-            this.WhenAnyValue(x => x.VisibleCount),
-            _cache.CountChanged.StartWith(0), // Trigger on every add/delete
-            (filterText, visibleCount, _) => CreateHybridFilter(filterText, visibleCount)
-        );
+        // Filter by text search only
+        var filterPredicate = this
+            .WhenAnyValue(x => x.FilterText)
+            .Select(CreateTextFilter);
 
         _cache
             .Connect()
@@ -232,22 +215,16 @@ public class ChatPageViewModel : PageViewModel
         CopySelectedEntriesCmd = ReactiveCommand.Create(CopySelectedEntries);
     }
 
-    // Calc minAllowedId on every call
-    private Func<ChatLogEntryViewModel, bool> CreateHybridFilter(string? filterText, int visibleCount)
+    // Simple text filter - no pagination, all messages are always available
+    private Func<ChatLogEntryViewModel, bool> CreateTextFilter(string? filterText)
     {
-        // If active search/filter, always show everything
-        if (!string.IsNullOrWhiteSpace(filterText))
+        if (string.IsNullOrWhiteSpace(filterText))
         {
-            var keywords = ParseKeywords(filterText);
-            return (vm) => CheckKeywords(vm, keywords);
+            return _ => true; // Show all messages
         }
 
-        // Otherwise, paginate, keep only N messages
-        // Calc again minAllowedIdwith actual _currentMessageId
-        long currentMaxId = _currentMessageId;
-        long minAllowedId = Math.Max(1, currentMaxId - visibleCount + 1);
-        
-        return (vm) => vm.EntryId >= minAllowedId;
+        var keywords = ParseKeywords(filterText);
+        return vm => CheckKeywords(vm, keywords);
     }
 
     private bool CheckKeywords(ChatLogEntryViewModel vm, List<string> keywords)
@@ -322,13 +299,6 @@ public class ChatPageViewModel : PageViewModel
     private void AppendLog(ChatLogEntryViewModel vm)
     {
         vm.EntryId = NextEntryId();
-        
-        // Buffer to avoid brutal layout calc after each message
-        if (VisibleCount < MaxVisible + BufferSize) 
-        {
-            VisibleCount++;
-        }
-
         _cache.AddOrUpdate(vm);
     }
 
@@ -421,15 +391,6 @@ public class ChatPageViewModel : PageViewModel
             Message = H.RenderText(e.Message),
             FigureString = figureString,
         });
-    }
-
-    public void OnScrolledToBottom()
-    {
-        // Buffer to avoid brutal layout calc after each message
-        if (VisibleCount >= MaxVisible + BufferSize)
-        {
-            VisibleCount = MaxVisible;
-        }
     }
 
     // Context menu command implementations

@@ -35,7 +35,6 @@
       <Interaction.Behaviors>
         <behaviors:AutoScrollBehavior />
         <behaviors:ScrollToBottom />
-        <behaviors:InfiniteScrollBehavior Command="{Binding LoadHistoryCmd}" />
       </Interaction.Behaviors>
       <ListBox.ContextFlyout>
         <ui:FAMenuFlyout>
