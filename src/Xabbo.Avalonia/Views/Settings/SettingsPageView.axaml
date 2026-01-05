@@ -126,6 +126,34 @@
           Value="{Binding Config.View.Furni.RefreshIntervalMs}"
         />
       </ui:SettingsExpander>
+      <!-- Profanity Filter -->
+      <ui:SettingsExpander
+        Header="Profanity filter"
+        IconSource="{icm:SymbolIconSource Symbol=TextBulletListSquareWarning}"
+        Description="Custom words to detect in chat (one per line)"
+      >
+        <ui:SettingsExpanderItem>
+          <StackPanel Spacing="10">
+            <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+              Add custom words/phrases to detect in addition to the default list.
+              One word or phrase per line. Changes are applied when you click Apply.
+            </TextBlock>
+            <TextBox
+              AcceptsReturn="True"
+              TextWrapping="Wrap"
+              MinHeight="150"
+              MaxHeight="300"
+              Watermark="Enter custom words (one per line)..."
+              Text="{Binding CustomProfanityWordsText}"
+            />
+            <Button
+              Content="Apply"
+              Command="{Binding ApplyCustomWordsCmd}"
+              HorizontalAlignment="Right"
+            />
+          </StackPanel>
+        </ui:SettingsExpanderItem>
+      </ui:SettingsExpander>
       <ui:SettingsExpander
         Header="Debug"
         IsVisible="{DynamicResource IsDebug}"

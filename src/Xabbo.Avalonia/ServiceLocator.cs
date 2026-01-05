@@ -117,6 +117,7 @@ public static class ViewModelLocator
         Splatr.RegisterLazySingleton<IGameStateService, GameStateService>();
         Splatr.RegisterLazySingleton<IOperationManager, OperationManager>();
         Splatr.RegisterLazySingleton<IPlacementFactory, PlacementFactory>();
+        Splatr.RegisterLazySingleton<IProfanityFilterService, ProfanityFilterService>();
 
         // Xabbo core components
         Splatr.RegisterLazySingleton<ProfileManager>();

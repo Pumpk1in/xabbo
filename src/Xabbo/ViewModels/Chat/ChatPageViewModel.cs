@@ -21,8 +21,12 @@ using Xabbo.Configuration;
 using Xabbo.Controllers;
 using Xabbo.Exceptions;
 using Xabbo.Extension;
+using Xabbo.Services;
 using Xabbo.Services.Abstractions;
 using Xabbo.Utility;
+using Xabbo.Command;
+using Xabbo.Command.Modules;
+using Xabbo.Components;
 
 using IconSource = FluentAvalonia.UI.Controls.IconSource;
 
@@ -42,12 +46,15 @@ public class ChatPageViewModel : PageViewModel
     private readonly ILauncherService _launcher;
     private readonly IGameStateService _gameState;
     private readonly IFigureConverterService _figureConverter;
+    private readonly IProfanityFilterService _profanityFilter;
 
     private readonly RoomManager _roomManager;
     private readonly ProfileManager _profileManager;
     private readonly RoomModerationController _moderation;
     private readonly TradeManager _tradeManager;
     private readonly WardrobePageViewModel _wardrobe;
+    private readonly XabbotComponent _xabbot;
+    private ModerationCommands? _moderationCommands;
 
     public ChatLogConfig Config => Settings.Chat.Log;
 
@@ -77,6 +84,9 @@ public class ChatPageViewModel : PageViewModel
     public ReactiveCommand<BanDuration, Task> BanUsersCmd { get; }
     public ReactiveCommand<Unit, Task> BounceUsersCmd { get; }
 
+    public ReactiveCommand<Unit, Task> AddToProfanityFilterCmd { get; }
+    public ReactiveCommand<string, Unit> RemoveFromProfanityFilterCmd { get; }
+
     public SelectionModel<ChatLogEntryViewModel> Selection { get; } = new SelectionModel<ChatLogEntryViewModel>()
     {
         SingleSelect = false
@@ -93,11 +103,13 @@ public class ChatPageViewModel : PageViewModel
         ILauncherService launcher,
         IGameStateService gameState,
         IFigureConverterService figureConverter,
+        IProfanityFilterService profanityFilter,
         RoomManager roomManager,
         ProfileManager profileManager,
         RoomModerationController moderation,
         TradeManager tradeManager,
-        WardrobePageViewModel wardrobe)
+        WardrobePageViewModel wardrobe,
+        XabbotComponent xabbot)
     {
         _ext = ext;
         _settingsProvider = settingsProvider;
@@ -106,11 +118,13 @@ public class ChatPageViewModel : PageViewModel
         _launcher = launcher;
         _gameState = gameState;
         _figureConverter = figureConverter;
+        _profanityFilter = profanityFilter;
         _roomManager = roomManager;
         _profileManager = profileManager;
         _moderation = moderation;
         _tradeManager = tradeManager;
         _wardrobe = wardrobe;
+        _xabbot = xabbot;
 
         _roomManager.Entered += OnEnteredRoom;
         _roomManager.AvatarAdded += OnAvatarAdded;
@@ -131,6 +145,15 @@ public class ChatPageViewModel : PageViewModel
             .StartWith(false)
             .ObserveOn(RxApp.MainThreadScheduler);
 
+        // Check if selection contains at least one user other than self (for moderation)
+        var hasOtherUsers = Observable.CombineLatest(
+            this.WhenAnyValue(x => x.ContextSelection),
+            _profileManager.WhenAnyValue(x => x.UserData),
+            (selection, userData) =>
+                selection is { Count: > 0 } &&
+                selection.Any(m => m.Name != userData?.Name)
+        ).StartWith(false).ObserveOn(RxApp.MainThreadScheduler);
+
         _selectedUserName = this
             .WhenAnyValue(x => x.ContextSelection)
             .Select(selection => selection is [var msg] ? msg.Name : null)
@@ -146,37 +169,37 @@ public class ChatPageViewModel : PageViewModel
         ).ObserveOn(RxApp.MainThreadScheduler);
 
         var canMuteUsers = Observable.CombineLatest(
-            hasAnyContextMessage,
+            hasOtherUsers,
             _moderation.WhenAnyValue(
                 x => x.CurrentOperation,
                 x => x.CanMute,
                 (op, canMute) => op is RoomModerationController.ModerationType.None && canMute
             ).StartWith(false),
-            (hasMessage, canModerate) => hasMessage && canModerate
+            (hasOthers, canModerate) => hasOthers && canModerate
         ).ObserveOn(RxApp.MainThreadScheduler);
 
         var canKickUsers = Observable.CombineLatest(
-            hasAnyContextMessage,
+            hasOtherUsers,
             _moderation.WhenAnyValue(
                 x => x.CurrentOperation,
                 x => x.CanKick,
                 (op, canKick) => op is RoomModerationController.ModerationType.None && canKick
             ).StartWith(false),
-            (hasMessage, canModerate) => hasMessage && canModerate
+            (hasOthers, canModerate) => hasOthers && canModerate
         ).ObserveOn(RxApp.MainThreadScheduler);
 
         var canBanUsers = Observable.CombineLatest(
-            hasAnyContextMessage,
+            hasOtherUsers,
             _moderation.WhenAnyValue(
                 x => x.CurrentOperation,
                 x => x.CanBan,
                 (op, canBan) => op is RoomModerationController.ModerationType.None && canBan
             ).StartWith(false),
-            (hasMessage, canModerate) => hasMessage && canModerate
+            (hasOthers, canModerate) => hasOthers && canModerate
         ).ObserveOn(RxApp.MainThreadScheduler);
 
         var canBounceUsers = Observable.CombineLatest(
-            hasAnyContextMessage,
+            hasOtherUsers,
             _moderation.WhenAnyValue(
                 x => x.CurrentOperation,
                 x => x.RightsLevel,
@@ -185,7 +208,7 @@ public class ChatPageViewModel : PageViewModel
                     op is RoomModerationController.ModerationType.None &&
                     (rightsLevel is RightsLevel.Owner || isOwner)
             ).StartWith(false),
-            (hasMessage, canModerate) => hasMessage && canModerate
+            (hasOthers, canModerate) => hasOthers && canModerate
         ).ObserveOn(RxApp.MainThreadScheduler);
 
         // Initialize commands
@@ -199,6 +222,9 @@ public class ChatPageViewModel : PageViewModel
         KickUsersCmd = ReactiveCommand.Create<Task>(KickUsersAsync, canKickUsers);
         BanUsersCmd = ReactiveCommand.Create<BanDuration, Task>(BanUsersAsync, canBanUsers);
         BounceUsersCmd = ReactiveCommand.Create<Task>(BounceUsersAsync, canBounceUsers);
+
+        AddToProfanityFilterCmd = ReactiveCommand.Create<Task>(AddToProfanityFilterAsync, hasSingleContextMessage);
+        RemoveFromProfanityFilterCmd = ReactiveCommand.Create<string>(RemoveFromProfanityFilter);
 
         // Filter by text search only
         var filterPredicate = this
@@ -383,14 +409,68 @@ public class ChatPageViewModel : PageViewModel
             }
         }
 
+        var renderedMessage = H.RenderText(e.Message);
+        var (hasProfanity, segments, matchedWords) = AnalyzeProfanity(renderedMessage);
+
         AppendLog(new ChatMessageViewModel
         {
             Type = e.ChatType,
             BubbleStyle = e.BubbleStyle,
             Name = e.Avatar.Name,
-            Message = H.RenderText(e.Message),
+            Message = renderedMessage,
             FigureString = figureString,
+            HasProfanity = hasProfanity,
+            MessageSegments = segments,
+            MatchedWords = matchedWords,
         });
+    }
+
+    /// <summary>
+    /// Analyzes a message for profanity and returns segments for highlighting.
+    /// </summary>
+    private (bool HasProfanity, IReadOnlyList<MessageSegment>? Segments, IReadOnlyList<string>? MatchedWords) AnalyzeProfanity(string message)
+    {
+        var matches = _profanityFilter.FindMatches(message);
+        if (matches.Count == 0)
+            return (false, null, null);
+
+        var segments = new List<MessageSegment>();
+        var matchedWords = matches.Select(m => m.MatchedWord).Distinct().ToList();
+        int currentIndex = 0;
+
+        foreach (var match in matches)
+        {
+            // Add text before the match
+            if (match.Start > currentIndex)
+            {
+                segments.Add(new MessageSegment
+                {
+                    Text = message[currentIndex..match.Start],
+                    IsProfanity = false
+                });
+            }
+
+            // Add the profanity match
+            segments.Add(new MessageSegment
+            {
+                Text = message.Substring(match.Start, match.Length),
+                IsProfanity = true
+            });
+
+            currentIndex = match.Start + match.Length;
+        }
+
+        // Add remaining text after last match
+        if (currentIndex < message.Length)
+        {
+            segments.Add(new MessageSegment
+            {
+                Text = message[currentIndex..],
+                IsProfanity = false
+            });
+        }
+
+        return (true, segments, matchedWords);
     }
 
     // Context menu command implementations
@@ -453,6 +533,63 @@ public class ChatPageViewModel : PageViewModel
         }
     }
 
+    private async Task AddToProfanityFilterAsync()
+    {
+        if (ContextSelection is not [var message])
+            return;
+
+        // Create a TextBox for the dialog
+        var textBox = new Avalonia.Controls.TextBox
+        {
+            Text = "",
+            Watermark = "Enter word to add...",
+            Width = 300
+        };
+
+        var stackPanel = new Avalonia.Controls.StackPanel
+        {
+            Spacing = 10,
+            Children =
+            {
+                new Avalonia.Controls.TextBlock
+                {
+                    Text = $"Message: \"{message.Message}\"",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                    MaxWidth = 300
+                },
+                textBox
+            }
+        };
+
+        var result = await _dialog.ShowContentDialogAsync(
+            _dialog.CreateViewModel<MainViewModel>(),
+            new HanumanInstitute.MvvmDialogs.Avalonia.Fluent.ContentDialogSettings
+            {
+                Title = "Add to profanity filter",
+                Content = stackPanel,
+                PrimaryButtonText = "Add",
+                CloseButtonText = "Cancel",
+            }
+        );
+
+        if (result == FluentAvalonia.UI.Controls.ContentDialogResult.Primary)
+        {
+            var word = textBox.Text?.Trim();
+            if (!string.IsNullOrWhiteSpace(word))
+            {
+                _profanityFilter.AddWord(word);
+            }
+        }
+    }
+
+    private void RemoveFromProfanityFilter(string word)
+    {
+        if (!string.IsNullOrWhiteSpace(word))
+        {
+            _profanityFilter.RemoveWord(word);
+        }
+    }
+
     private async Task OpenUserProfile(string type)
     {
         if (ContextSelection is not [var message])
@@ -498,8 +635,65 @@ public class ChatPageViewModel : PageViewModel
 
     private Task MuteUsersAsync(string minutesStr) => TryModerate(() => _moderation.MuteUsersAsync(GetSelectedUsers(), int.Parse(minutesStr)));
     private Task KickUsersAsync() => TryModerate(() => _moderation.KickUsersAsync(GetSelectedUsers()));
-    private Task BanUsersAsync(BanDuration duration) => TryModerate(() => _moderation.BanUsersAsync(GetSelectedUsers(), duration));
+    private Task BanUsersAsync(BanDuration duration) => TryModerate(() => BanSelectedUsersAsync(duration));
     private Task BounceUsersAsync() => TryModerate(() => _moderation.BounceUsersAsync(GetSelectedUsers()));
+
+    private async Task BanSelectedUsersAsync(BanDuration duration)
+    {
+        if (ContextSelection is null)
+            return;
+
+        var durationText = duration switch
+        {
+            BanDuration.Hour => "for an hour",
+            BanDuration.Day => "for a day",
+            BanDuration.Permanent => "permanently",
+            _ => ""
+        };
+
+        var usersInRoom = new List<IUser>();
+        var usersNotInRoom = new List<string>();
+
+        foreach (var message in ContextSelection)
+        {
+            if (_roomManager.Room is not null &&
+                _roomManager.Room.TryGetUserByName(message.Name, out IUser? user))
+            {
+                usersInRoom.Add(user);
+            }
+            else
+            {
+                usersNotInRoom.Add(message.Name);
+            }
+        }
+
+        // Ban users currently in the room
+        if (usersInRoom.Count > 0)
+        {
+            await _moderation.BanUsersAsync(usersInRoom, duration);
+            foreach (var user in usersInRoom)
+            {
+                _xabbot.ShowMessage($"Banned user '{user.Name}' {durationText}");
+            }
+        }
+
+        // Add users not in the room to the deferred ban list
+        if (usersNotInRoom.Count > 0)
+        {
+            _moderationCommands ??= Locator.Current.GetService<IEnumerable<CommandModule>>()
+                ?.OfType<ModerationCommands>()
+                .FirstOrDefault();
+
+            if (_moderationCommands is not null)
+            {
+                foreach (var userName in usersNotInRoom)
+                {
+                    _moderationCommands.AddToBanList(userName, duration);
+                    _xabbot.ShowMessage($"User '{userName}' not found, will be banned {durationText} upon next entry to this room.");
+                }
+            }
+        }
+    }
 
     private async Task TryModerate(Func<Task> moderate)
     {

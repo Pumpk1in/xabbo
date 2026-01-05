@@ -116,6 +116,11 @@
                   <Binding Path="BounceUsersCmd.CanExecute^" />
                 </MultiBinding>
               </ui:MenuFlyoutSubItem.IsEnabled>
+              <ui:MenuFlyoutItem
+                Text="Kick"
+                IconSource="{icm:SymbolIconSource Symbol=SignOut}"
+                Command="{Binding KickUsersCmd}"
+              />
               <ui:MenuFlyoutSubItem
                 Classes="modern"
                 Text="Mute"
@@ -138,11 +143,6 @@
                 IconSource="{icm:SymbolIconSource Symbol=Chat}"
                 Command="{Binding MuteUsersCmd}"
                 CommandParameter="0"
-              />
-              <ui:MenuFlyoutItem
-                Text="Kick"
-                IconSource="{icm:SymbolIconSource Symbol=SignOut}"
-                Command="{Binding KickUsersCmd}"
               />
               <ui:MenuFlyoutSubItem
                 IsEnabled="{Binding BanUsersCmd.CanExecute^}"
