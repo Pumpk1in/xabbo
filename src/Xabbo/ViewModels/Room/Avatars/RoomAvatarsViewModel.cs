@@ -18,6 +18,7 @@ using Xabbo.Exceptions;
 using Xabbo.Extension;
 using Xabbo.Services.Abstractions;
 using Xabbo.Utility;
+using Xabbo.Components;
 
 namespace Xabbo.ViewModels;
 
@@ -36,6 +37,7 @@ public class RoomAvatarsViewModel : ViewModelBase
     private readonly ProfileManager _profileManager;
     private readonly RoomManager _roomManager;
     private readonly TradeManager _tradeManager;
+    private readonly XabbotComponent _xabbot;
 
     private readonly SourceCache<AvatarViewModel, int> _avatarCache = new(x => x.Index);
 
@@ -85,7 +87,8 @@ public class RoomAvatarsViewModel : ViewModelBase
         WardrobePageViewModel wardrobe,
         ProfileManager profileManager,
         RoomManager roomManager,
-        TradeManager tradeManager)
+        TradeManager tradeManager,
+        XabbotComponent xabbot)
     {
         _ext = ext;
         _config = config;
@@ -98,6 +101,7 @@ public class RoomAvatarsViewModel : ViewModelBase
         _wardrobe = wardrobe;
         _moderation = moderation;
         _profileManager = profileManager;
+        _xabbot = xabbot;
         _roomManager = roomManager;
         _tradeManager = tradeManager;
 
@@ -355,10 +359,23 @@ public class RoomAvatarsViewModel : ViewModelBase
         }
     }
 
-    private Task MuteUsersAsync(string minutesStr) => TryModerate(() => _moderation.MuteUsersAsync(SelectedUsers, int.Parse(minutesStr)));
+    private Task MuteUsersAsync(string minutesStr) => TryModerate(() => MuteSelectedUsersAsync(int.Parse(minutesStr)));
     private Task KickUsersAsync() => TryModerate(() => _moderation.KickUsersAsync(SelectedUsers));
     private Task BanUsersAsync(BanDuration duration) => TryModerate(() => _moderation.BanUsersAsync(SelectedUsers, duration));
     private Task BounceUsersAsync() => TryModerate(() => _moderation.BounceUsersAsync(SelectedUsers));
+
+    private async Task MuteSelectedUsersAsync(int minutes)
+    {
+        var users = SelectedUsers.ToList();
+        if (users.Count == 0)
+            return;
+
+        await _moderation.MuteUsersAsync(users, minutes);
+        foreach (var user in users)
+        {
+            _xabbot.ShowMessage($"Muting user '{user.Name}' for {minutes} minute(s)");
+        }
+    }
 
     private async Task TryModerate(Func<Task> moderate)
     {

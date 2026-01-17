@@ -93,6 +93,7 @@ public class ChatPageViewModel : PageViewModel
     };
 
     [Reactive] public string? FilterText { get; set; }
+    [Reactive] public bool WhispersOnly { get; set; }
 
     [DependencyInjectionConstructor]
     public ChatPageViewModel(
@@ -226,10 +227,10 @@ public class ChatPageViewModel : PageViewModel
         AddToProfanityFilterCmd = ReactiveCommand.Create<Task>(AddToProfanityFilterAsync, hasSingleContextMessage);
         RemoveFromProfanityFilterCmd = ReactiveCommand.Create<string>(RemoveFromProfanityFilter);
 
-        // Filter by text search only
+        // Filter by text search and whispers only
         var filterPredicate = this
-            .WhenAnyValue(x => x.FilterText)
-            .Select(CreateTextFilter);
+            .WhenAnyValue(x => x.FilterText, x => x.WhispersOnly)
+            .Select(tuple => CreateCombinedFilter(tuple.Item1, tuple.Item2));
 
         _cache
             .Connect()
@@ -241,16 +242,29 @@ public class ChatPageViewModel : PageViewModel
         CopySelectedEntriesCmd = ReactiveCommand.Create(CopySelectedEntries);
     }
 
-    // Simple text filter - no pagination, all messages are always available
-    private Func<ChatLogEntryViewModel, bool> CreateTextFilter(string? filterText)
+    // Combined filter for text search and whispers only
+    private Func<ChatLogEntryViewModel, bool> CreateCombinedFilter(string? filterText, bool whispersOnly)
     {
-        if (string.IsNullOrWhiteSpace(filterText))
-        {
-            return _ => true; // Show all messages
-        }
+        var hasTextFilter = !string.IsNullOrWhiteSpace(filterText);
+        var keywords = hasTextFilter ? ParseKeywords(filterText!) : null;
 
-        var keywords = ParseKeywords(filterText);
-        return vm => CheckKeywords(vm, keywords);
+        return vm =>
+        {
+            // Whispers only filter
+            if (whispersOnly)
+            {
+                if (vm is not ChatMessageViewModel chatMsg || !chatMsg.IsWhisper)
+                    return false;
+            }
+
+            // Text filter
+            if (hasTextFilter && keywords is not null)
+            {
+                return CheckKeywords(vm, keywords);
+            }
+
+            return true;
+        };
     }
 
     private bool CheckKeywords(ChatLogEntryViewModel vm, List<string> keywords)
@@ -633,10 +647,48 @@ public class ChatPageViewModel : PageViewModel
         }
     }
 
-    private Task MuteUsersAsync(string minutesStr) => TryModerate(() => _moderation.MuteUsersAsync(GetSelectedUsers(), int.Parse(minutesStr)));
+    private Task MuteUsersAsync(string minutesStr) => TryModerate(() => MuteSelectedUsersAsync(int.Parse(minutesStr)));
     private Task KickUsersAsync() => TryModerate(() => _moderation.KickUsersAsync(GetSelectedUsers()));
     private Task BanUsersAsync(BanDuration duration) => TryModerate(() => BanSelectedUsersAsync(duration));
     private Task BounceUsersAsync() => TryModerate(() => _moderation.BounceUsersAsync(GetSelectedUsers()));
+
+    private async Task MuteSelectedUsersAsync(int minutes)
+    {
+        if (ContextSelection is null)
+            return;
+
+        var usersInRoom = new List<IUser>();
+        var usersNotInRoom = new List<string>();
+
+        foreach (var message in ContextSelection)
+        {
+            if (_roomManager.Room is not null &&
+                _roomManager.Room.TryGetUserByName(message.Name, out IUser? user))
+            {
+                usersInRoom.Add(user);
+            }
+            else
+            {
+                usersNotInRoom.Add(message.Name);
+            }
+        }
+
+        // Mute users currently in the room
+        if (usersInRoom.Count > 0)
+        {
+            await _moderation.MuteUsersAsync(usersInRoom, minutes);
+            foreach (var user in usersInRoom)
+            {
+                _xabbot.ShowMessage($"Muting user '{user.Name}' for {minutes} minute(s)");
+            }
+        }
+
+        // Notify about users not in the room
+        foreach (var userName in usersNotInRoom)
+        {
+            _xabbot.ShowMessage($"User '{userName}' not found");
+        }
+    }
 
     private async Task BanSelectedUsersAsync(BanDuration duration)
     {
