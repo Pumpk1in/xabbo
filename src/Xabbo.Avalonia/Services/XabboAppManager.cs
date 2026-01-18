@@ -271,6 +271,12 @@ public sealed class XabboAppManager : IApplicationManager
 
     public void FlashWindow() { }
 
+    public void ShowNotification(string title, string message)
+    {
+        // Not implemented - would require platform-specific notification APIs
+        BringToFront();
+    }
+
     private void SetStatus(string status)
     {
         _uiContext.Invoke(() => _application.Resources["AppStatus"] = status);

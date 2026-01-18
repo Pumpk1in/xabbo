@@ -12,6 +12,14 @@ public partial class ChatPage : UserControl
     public ChatPage()
     {
         InitializeComponent();
+
+        DataContextChanged += (s, e) =>
+        {
+            if (DataContext is ChatPageViewModel vm)
+            {
+                vm.CloseHistoryFlyoutAction = () => HistoryButton?.Flyout?.Hide();
+            }
+        };
     }
 
     private void OnContextRequested(object? sender, ContextRequestedEventArgs e)

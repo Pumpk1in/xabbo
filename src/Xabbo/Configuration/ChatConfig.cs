@@ -13,4 +13,5 @@ public sealed class ChatConfig : ReactiveObject
     [Reactive] public bool MuteRespects { get; set; }
     [Reactive] public bool MuteScratches { get; set; }
     [Reactive] public ChatLogConfig Log { get; set; } = new();
+    [Reactive] public ProfanityConfig Profanity { get; set; } = new();
 }

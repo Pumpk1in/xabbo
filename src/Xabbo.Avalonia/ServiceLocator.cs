@@ -98,6 +98,7 @@ public static class ViewModelLocator
         Splatr.RegisterLazySingleton<IUiContext, AvaloniaUiContext>();
         Splatr.RegisterLazySingleton<IClipboardService, ClipboardService>();
         Splatr.RegisterLazySingleton<ILauncherService, LauncherService>();
+        Splatr.RegisterLazySingleton<IFileExportService, FileExportService>();
         Splatr.RegisterLazySingleton<GlobalExceptionHandler>();
 
         // Configuration
@@ -118,6 +119,7 @@ public static class ViewModelLocator
         Splatr.RegisterLazySingleton<IOperationManager, OperationManager>();
         Splatr.RegisterLazySingleton<IPlacementFactory, PlacementFactory>();
         Splatr.RegisterLazySingleton<IProfanityFilterService, ProfanityFilterService>();
+        Splatr.RegisterLazySingleton<IChatHistoryService, ChatHistoryService>();
 
         // Xabbo core components
         Splatr.RegisterLazySingleton<ProfileManager>();

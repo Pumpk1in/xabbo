@@ -5,4 +5,5 @@ public enum AppPathKind
     Settings,
     Wardrobe,
     RoomPasswords,
+    ChatHistory,
 }

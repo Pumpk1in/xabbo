@@ -130,7 +130,7 @@
       <ui:SettingsExpander
         Header="Profanity filter"
         IconSource="{icm:SymbolIconSource Symbol=TextBulletListSquareWarning}"
-        Description="Custom words to detect in chat (one per line)"
+        Description="Detect profanity in chat messages"
       >
         <ui:SettingsExpanderItem>
           <StackPanel Spacing="10">

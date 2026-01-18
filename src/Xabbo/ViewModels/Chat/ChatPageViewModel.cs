@@ -3,6 +3,7 @@ using System.Reactive;
 using System.Reactive.Linq;
 using System.Text;
 using System.Web;
+using System.Windows.Input;
 using DynamicData;
 using DynamicData.Binding;
 using ReactiveUI;
@@ -21,6 +22,7 @@ using Xabbo.Configuration;
 using Xabbo.Controllers;
 using Xabbo.Exceptions;
 using Xabbo.Extension;
+using Xabbo.Models;
 using Xabbo.Services;
 using Xabbo.Services.Abstractions;
 using Xabbo.Utility;
@@ -47,6 +49,8 @@ public class ChatPageViewModel : PageViewModel
     private readonly IGameStateService _gameState;
     private readonly IFigureConverterService _figureConverter;
     private readonly IProfanityFilterService _profanityFilter;
+    private readonly IFileExportService _fileExport;
+    private readonly IChatHistoryService _chatHistory;
 
     private readonly RoomManager _roomManager;
     private readonly ProfileManager _profileManager;
@@ -87,6 +91,8 @@ public class ChatPageViewModel : PageViewModel
     public ReactiveCommand<Unit, Task> AddToProfanityFilterCmd { get; }
     public ReactiveCommand<string, Unit> RemoveFromProfanityFilterCmd { get; }
 
+    public ReactiveCommand<string, Task> ExportChatCmd { get; }
+
     public SelectionModel<ChatLogEntryViewModel> Selection { get; } = new SelectionModel<ChatLogEntryViewModel>()
     {
         SingleSelect = false
@@ -94,6 +100,45 @@ public class ChatPageViewModel : PageViewModel
 
     [Reactive] public string? FilterText { get; set; }
     [Reactive] public bool WhispersOnly { get; set; }
+    [Reactive] public bool ProfanityOnly { get; set; }
+
+    // History search properties
+    [Reactive] public string? HistorySearchUser { get; set; }
+    [Reactive] public string? HistorySearchKeyword { get; set; }
+    [Reactive] public bool HistorySearchProfanityOnly { get; set; }
+    [Reactive] public DateTime? HistorySearchFromDate { get; set; }
+    [Reactive] public DateTime? HistorySearchToDate { get; set; }
+
+    private readonly ObservableCollection<ChatHistoryEntry> _historyResults = [];
+    public ObservableCollection<ChatHistoryEntry> HistoryResults => _historyResults;
+
+    [Reactive] public int HistoryEntryCount { get; set; }
+    [Reactive] public int HistoryResultsTotal { get; set; }
+    [Reactive] public string? HistoryErrorMessage { get; set; }
+    [Reactive] public string HistoryResultsText { get; set; } = "Results: 0";
+
+    // Current search parameters (for export)
+    private string? _lastSearchUser;
+    private string? _lastSearchKeyword;
+    private bool _lastSearchProfanityOnly;
+    private DateTime? _lastSearchFromDate;
+    private DateTime? _lastSearchToDate;
+
+    public ReactiveCommand<Unit, Unit> SearchHistoryCmd { get; }
+    public ReactiveCommand<Unit, Unit> ClearHistoryCmd { get; }
+    public ReactiveCommand<string, Task> ExportHistoryCmd { get; }
+    public ReactiveCommand<Unit, Unit> CopyHistoryEntriesCmd { get; }
+
+    public SelectionModel<ChatHistoryEntry> HistorySelection { get; } = new SelectionModel<ChatHistoryEntry>()
+    {
+        SingleSelect = false
+    };
+
+    // Scroll to bottom command - will be set from view
+    [Reactive] public ICommand? ScrollToBottomCmd { get; set; }
+
+    // Action to close the history flyout - set from view
+    public Action? CloseHistoryFlyoutAction { get; set; }
 
     [DependencyInjectionConstructor]
     public ChatPageViewModel(
@@ -105,6 +150,8 @@ public class ChatPageViewModel : PageViewModel
         IGameStateService gameState,
         IFigureConverterService figureConverter,
         IProfanityFilterService profanityFilter,
+        IFileExportService fileExport,
+        IChatHistoryService chatHistory,
         RoomManager roomManager,
         ProfileManager profileManager,
         RoomModerationController moderation,
@@ -120,6 +167,8 @@ public class ChatPageViewModel : PageViewModel
         _gameState = gameState;
         _figureConverter = figureConverter;
         _profanityFilter = profanityFilter;
+        _fileExport = fileExport;
+        _chatHistory = chatHistory;
         _roomManager = roomManager;
         _profileManager = profileManager;
         _moderation = moderation;
@@ -227,10 +276,34 @@ public class ChatPageViewModel : PageViewModel
         AddToProfanityFilterCmd = ReactiveCommand.Create<Task>(AddToProfanityFilterAsync, hasSingleContextMessage);
         RemoveFromProfanityFilterCmd = ReactiveCommand.Create<string>(RemoveFromProfanityFilter);
 
-        // Filter by text search and whispers only
+        ExportChatCmd = ReactiveCommand.Create<string, Task>(ExportChatAsync);
+
+        // History commands
+        SearchHistoryCmd = ReactiveCommand.Create(SearchHistory);
+        ClearHistoryCmd = ReactiveCommand.Create(ClearHistory);
+        ExportHistoryCmd = ReactiveCommand.Create<string, Task>(ExportHistoryAsync);
+        CopyHistoryEntriesCmd = ReactiveCommand.Create(CopyHistoryEntries);
+
+        // Update history entry count
+        HistoryEntryCount = _chatHistory.GetEntryCount();
+
+        // Scroll to bottom when unchecking a filter
+        this.WhenAnyValue(x => x.WhispersOnly)
+            .Skip(1)
+            .Where(v => !v)
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(_ => ScrollToBottomCmd?.Execute(null));
+
+        this.WhenAnyValue(x => x.ProfanityOnly)
+            .Skip(1)
+            .Where(v => !v)
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(_ => ScrollToBottomCmd?.Execute(null));
+
+        // Filter by text search, whispers only, and profanity only
         var filterPredicate = this
-            .WhenAnyValue(x => x.FilterText, x => x.WhispersOnly)
-            .Select(tuple => CreateCombinedFilter(tuple.Item1, tuple.Item2));
+            .WhenAnyValue(x => x.FilterText, x => x.WhispersOnly, x => x.ProfanityOnly)
+            .Select(tuple => CreateCombinedFilter(tuple.Item1, tuple.Item2, tuple.Item3));
 
         _cache
             .Connect()
@@ -242,8 +315,8 @@ public class ChatPageViewModel : PageViewModel
         CopySelectedEntriesCmd = ReactiveCommand.Create(CopySelectedEntries);
     }
 
-    // Combined filter for text search and whispers only
-    private Func<ChatLogEntryViewModel, bool> CreateCombinedFilter(string? filterText, bool whispersOnly)
+    // Combined filter for text search, whispers only, and profanity only
+    private Func<ChatLogEntryViewModel, bool> CreateCombinedFilter(string? filterText, bool whispersOnly, bool profanityOnly)
     {
         var hasTextFilter = !string.IsNullOrWhiteSpace(filterText);
         var keywords = hasTextFilter ? ParseKeywords(filterText!) : null;
@@ -254,6 +327,13 @@ public class ChatPageViewModel : PageViewModel
             if (whispersOnly)
             {
                 if (vm is not ChatMessageViewModel chatMsg || !chatMsg.IsWhisper)
+                    return false;
+            }
+
+            // Profanity only filter
+            if (profanityOnly)
+            {
+                if (vm is not ChatMessageViewModel chatMsg || !chatMsg.HasProfanity)
                     return false;
             }
 
@@ -288,6 +368,235 @@ public class ChatPageViewModel : PageViewModel
     private void CopySelectedEntries()
     {
         _clipboard.SetText(string.Join("\n", Selection.SelectedItems));
+    }
+
+    private async Task ExportChatAsync(string format)
+    {
+        var messages = Messages.ToList();
+        if (messages.Count == 0)
+        {
+            await _dialog.ShowAsync("Export", "No messages to export.");
+            return;
+        }
+
+        var timestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
+        string? filePath;
+
+        if (format == "json")
+        {
+            var exportData = messages.Select(vm => vm switch
+            {
+                ChatMessageViewModel chat => new
+                {
+                    Type = "message",
+                    chat.Timestamp,
+                    chat.Name,
+                    chat.Message,
+                    ChatType = chat.Type.ToString(),
+                    chat.IsWhisper,
+                    chat.HasProfanity
+                } as object,
+                ChatLogAvatarActionViewModel action => new
+                {
+                    Type = "action",
+                    action.Timestamp,
+                    action.UserName,
+                    action.Action
+                },
+                ChatLogRoomEntryViewModel room => new
+                {
+                    Type = "room",
+                    room.Timestamp,
+                    room.RoomName,
+                    room.RoomOwner
+                },
+                _ => null
+            }).Where(x => x is not null).ToList();
+
+            filePath = await _fileExport.ExportJsonAsync($"chat_export_{timestamp}.json", exportData);
+        }
+        else
+        {
+            var sb = new StringBuilder();
+            foreach (var vm in messages)
+            {
+                sb.AppendLine(vm.ToString());
+            }
+            filePath = await _fileExport.ExportTextAsync($"chat_export_{timestamp}.txt", sb.ToString());
+        }
+
+        if (filePath is not null)
+        {
+            _xabbot.ShowMessage($"Chat exported to {Path.GetFileName(filePath)}");
+        }
+    }
+
+    private void SearchHistory()
+    {
+        HistoryErrorMessage = null;
+        _historyResults.Clear();
+
+        // Store search parameters for export
+        _lastSearchUser = string.IsNullOrWhiteSpace(HistorySearchUser) ? null : HistorySearchUser;
+        _lastSearchKeyword = string.IsNullOrWhiteSpace(HistorySearchKeyword) ? null : HistorySearchKeyword;
+        _lastSearchProfanityOnly = HistorySearchProfanityOnly;
+        _lastSearchFromDate = HistorySearchFromDate;
+        _lastSearchToDate = HistorySearchToDate;
+
+        var (results, totalCount) = _chatHistory.SearchWithCount(
+            userName: _lastSearchUser,
+            keyword: _lastSearchKeyword,
+            profanityOnly: _lastSearchProfanityOnly ? true : null,
+            fromDate: _lastSearchFromDate,
+            toDate: _lastSearchToDate,
+            limit: 500
+        );
+
+        foreach (var entry in results)
+        {
+            _historyResults.Add(entry);
+        }
+
+        HistoryEntryCount = _chatHistory.GetEntryCount();
+        HistoryResultsTotal = totalCount;
+
+        // Update results text
+        if (totalCount > _historyResults.Count)
+        {
+            HistoryResultsText = $"Results: {totalCount} ({_historyResults.Count} loaded)";
+        }
+        else
+        {
+            HistoryResultsText = $"Results: {totalCount}";
+        }
+
+        if (_historyResults.Count == 0)
+        {
+            HistoryErrorMessage = "No results found for the specified criteria.";
+        }
+    }
+
+    private void CopyHistoryEntries()
+    {
+        var selectedItems = HistorySelection.SelectedItems
+            .Where(e => e is not null)
+            .Cast<ChatHistoryEntry>()
+            .OrderBy(e => e.Timestamp)
+            .ToList();
+
+        if (selectedItems.Count == 0)
+            return;
+
+        var sb = new StringBuilder();
+        foreach (var entry in selectedItems)
+        {
+            var timestamp = entry.Timestamp.ToString("g"); // Short date + short time (locale-aware)
+            var line = entry.Type switch
+            {
+                "message" => $"[{timestamp}] {entry.Name}: {entry.Message}",
+                "action" => $"[{timestamp}] {entry.UserName} {entry.Action}",
+                "room" => $"[{timestamp}] Entered room: {entry.RoomName} by {entry.RoomOwner}",
+                _ => entry.DisplayText
+            };
+            sb.AppendLine(line);
+        }
+
+        _clipboard.SetText(sb.ToString().TrimEnd());
+    }
+
+    private async void ClearHistory()
+    {
+        // Close the flyout first so the dialog appears in front
+        CloseHistoryFlyoutAction?.Invoke();
+
+        var result = await _dialog.ShowContentDialogAsync(
+            _dialog.CreateViewModel<MainViewModel>(),
+            new HanumanInstitute.MvvmDialogs.Avalonia.Fluent.ContentDialogSettings
+            {
+                Title = "Clear history",
+                Content = $"Are you sure you want to clear all {HistoryEntryCount} chat history entries? This cannot be undone.",
+                PrimaryButtonText = "Clear",
+                CloseButtonText = "Cancel",
+            }
+        );
+
+        if (result == FluentAvalonia.UI.Controls.ContentDialogResult.Primary)
+        {
+            _chatHistory.Clear();
+            _historyResults.Clear();
+            HistoryEntryCount = 0;
+            await _chatHistory.SaveAsync();
+            _xabbot.ShowMessage("Chat history cleared");
+        }
+    }
+
+    private async Task ExportHistoryAsync(string format)
+    {
+        // Clear any previous error
+        HistoryErrorMessage = null;
+
+        if (HistoryResultsTotal == 0)
+        {
+            // Show error inside the flyout instead of a dialog
+            HistoryErrorMessage = "No history entries to export. Run a search first.";
+            return;
+        }
+
+        // Get ALL results (no limit) for export using the same search parameters
+        var entries = _chatHistory.Search(
+            userName: _lastSearchUser,
+            keyword: _lastSearchKeyword,
+            profanityOnly: _lastSearchProfanityOnly ? true : null,
+            fromDate: _lastSearchFromDate,
+            toDate: _lastSearchToDate,
+            limit: null // No limit for export
+        ).ToList();
+
+        var timestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
+        string? filePath;
+
+        if (format == "json")
+        {
+            filePath = await _fileExport.ExportJsonAsync($"chat_history_{timestamp}.json", entries);
+        }
+        else
+        {
+            var sb = new StringBuilder();
+            DateTime? currentDate = null;
+
+            // Entries are ordered by timestamp descending, so reverse for chronological export
+            foreach (var entry in entries.OrderBy(e => e.Timestamp))
+            {
+                var entryDate = entry.Timestamp.Date;
+
+                // Add date separator when date changes
+                if (currentDate != entryDate)
+                {
+                    if (currentDate.HasValue)
+                    {
+                        sb.AppendLine();
+                    }
+                    sb.AppendLine($"=== {entryDate:dddd, dd MMMM yyyy} ===");
+                    sb.AppendLine();
+                    currentDate = entryDate;
+                }
+
+                var line = entry.Type switch
+                {
+                    "message" => $"[{entry.Timestamp:HH:mm:ss}] {entry.Name}: {entry.Message}",
+                    "action" => $"[{entry.Timestamp:HH:mm:ss}] {entry.UserName} {entry.Action}",
+                    "room" => $"[{entry.Timestamp:HH:mm:ss}] Entered room: {entry.RoomName} by {entry.RoomOwner}",
+                    _ => entry.ToString()
+                };
+                sb.AppendLine(line);
+            }
+            filePath = await _fileExport.ExportTextAsync($"chat_history_{timestamp}.txt", sb.ToString());
+        }
+
+        if (filePath is not null)
+        {
+            _xabbot.ShowMessage($"History exported to {Path.GetFileName(filePath)}");
+        }
     }
 
     private long NextEntryId() => Interlocked.Increment(ref _currentMessageId);
@@ -347,8 +656,18 @@ public class ChatPageViewModel : PageViewModel
         if (_roomManager.IsLoadingRoom || !Config.UserEntry || e.Avatar.Type is not AvatarType.User)
             return;
 
-        AppendLog(new ChatLogAvatarActionViewModel
+        var vm = new ChatLogAvatarActionViewModel
         {
+            UserName = e.Avatar.Name,
+            Action = "entered the room"
+        };
+        AppendLog(vm);
+
+        // Save to history
+        _chatHistory.AddEntry(new ChatHistoryEntry
+        {
+            Timestamp = vm.Timestamp,
+            Type = "action",
             UserName = e.Avatar.Name,
             Action = "entered the room"
         });
@@ -359,9 +678,20 @@ public class ChatPageViewModel : PageViewModel
         if (_roomManager.IsLoadingRoom || !Config.UserEntry || e.Avatar.Type is not AvatarType.User)
             return;
 
-        AppendLog(new ChatLogAvatarActionViewModel
+        var displayName = e.Avatar.Name.Equals(_profileManager.UserData?.Name) ? "You" : e.Avatar.Name;
+        var vm = new ChatLogAvatarActionViewModel
         {
-            UserName = e.Avatar.Name.Equals(_profileManager.UserData?.Name) ? "You" : e.Avatar.Name,
+            UserName = displayName,
+            Action = "left the room"
+        };
+        AppendLog(vm);
+
+        // Save to history (use actual name, not "You")
+        _chatHistory.AddEntry(new ChatHistoryEntry
+        {
+            Timestamp = vm.Timestamp,
+            Type = "action",
+            UserName = e.Avatar.Name,
             Action = "left the room"
         });
     }
@@ -373,30 +703,45 @@ public class ChatPageViewModel : PageViewModel
             e.Avatar.CurrentUpdate is { IsTrading: bool isTrading } &&
             isTrading != wasTrading)
         {
-            if (isTrading)
+            var action = isTrading ? "started trading" : "stopped trading";
+            var vm = new ChatLogAvatarActionViewModel
             {
-                AppendLog(new ChatLogAvatarActionViewModel
-                {
-                    UserName = e.Avatar.Name,
-                    Action = "started trading"
-                });
-            }
-            else
+                UserName = e.Avatar.Name,
+                Action = action
+            };
+            AppendLog(vm);
+
+            // Save to history
+            _chatHistory.AddEntry(new ChatHistoryEntry
             {
-                AppendLog(new ChatLogAvatarActionViewModel
-                {
-                    UserName = e.Avatar.Name,
-                    Action = "stopped trading"
-                });
-            }
+                Timestamp = vm.Timestamp,
+                Type = "action",
+                UserName = e.Avatar.Name,
+                Action = action
+            });
         }
     }
 
-    private void OnEnteredRoom(RoomEventArgs e) => AppendLog(new ChatLogRoomEntryViewModel
+    private void OnEnteredRoom(RoomEventArgs e)
     {
-        RoomName = e.Room.Data?.Name ?? "?",
-        RoomOwner = e.Room.Data?.OwnerName ?? "?"
-    });
+        var roomName = e.Room.Data?.Name ?? "?";
+        var roomOwner = e.Room.Data?.OwnerName ?? "?";
+        var vm = new ChatLogRoomEntryViewModel
+        {
+            RoomName = roomName,
+            RoomOwner = roomOwner
+        };
+        AppendLog(vm);
+
+        // Save to history
+        _chatHistory.AddEntry(new ChatHistoryEntry
+        {
+            Timestamp = vm.Timestamp,
+            Type = "room",
+            RoomName = roomName,
+            RoomOwner = roomOwner
+        });
+    }
 
     private void RoomManager_AvatarChat(AvatarChatEventArgs e)
     {
@@ -426,7 +771,7 @@ public class ChatPageViewModel : PageViewModel
         var renderedMessage = H.RenderText(e.Message);
         var (hasProfanity, segments, matchedWords) = AnalyzeProfanity(renderedMessage);
 
-        AppendLog(new ChatMessageViewModel
+        var vm = new ChatMessageViewModel
         {
             Type = e.ChatType,
             BubbleStyle = e.BubbleStyle,
@@ -436,6 +781,21 @@ public class ChatPageViewModel : PageViewModel
             HasProfanity = hasProfanity,
             MessageSegments = segments,
             MatchedWords = matchedWords,
+        };
+        AppendLog(vm);
+
+        // Save to history
+        var isWhisper = e.ChatType == ChatType.Whisper && e.BubbleStyle != 34;
+        _chatHistory.AddEntry(new ChatHistoryEntry
+        {
+            Timestamp = vm.Timestamp,
+            Type = "message",
+            Name = e.Avatar.Name,
+            Message = renderedMessage,
+            ChatType = e.ChatType.ToString(),
+            IsWhisper = isWhisper,
+            HasProfanity = hasProfanity,
+            MatchedWords = matchedWords?.ToList()
         });
     }
 

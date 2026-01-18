@@ -9,6 +9,7 @@
   xmlns:controls="using:Xabbo.Avalonia.Controls"
   xmlns:behaviors="using:Xabbo.Avalonia.Behaviors"
   xmlns:vm="using:Xabbo.ViewModels"
+  xmlns:models="using:Xabbo.Models"
   xmlns:xc="using:Xabbo.Core"
   x:DataType="vm:ChatPageViewModel"
   mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
@@ -19,7 +20,7 @@
     <vm:ChatPageViewModel />
   </Design.DataContext>
   <Grid RowDefinitions="Auto,*">
-    <Grid ColumnDefinitions="*,Auto" Margin="10,10,10,0">
+    <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" Margin="10,10,10,0">
       <TextBox
         Grid.Column="0"
         Classes="clearButton"
@@ -30,6 +31,115 @@
         <TextBlock Text="Whispers" FontSize="11" HorizontalAlignment="Center" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
         <CheckBox IsChecked="{Binding WhispersOnly}" HorizontalAlignment="Center" Margin="0,-5,0,0" Padding="0" MinWidth="0" />
       </StackPanel>
+      <StackPanel Grid.Column="2" Margin="10,0,0,0" VerticalAlignment="Center">
+        <TextBlock Text="Profanity" FontSize="11" HorizontalAlignment="Center" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+        <CheckBox IsChecked="{Binding ProfanityOnly}" HorizontalAlignment="Center" Margin="0,-5,0,0" Padding="0" MinWidth="0" />
+      </StackPanel>
+      <Button Grid.Column="3" Margin="10,0,0,0" VerticalAlignment="Center" Padding="8" ToolTip.Tip="Export chat">
+        <Button.Flyout>
+          <ui:FAMenuFlyout>
+            <ui:MenuFlyoutItem Text="Export as TXT" Command="{Binding ExportChatCmd}" CommandParameter="txt" IconSource="{icm:SymbolIconSource Symbol=Document}" />
+            <ui:MenuFlyoutItem Text="Export as JSON" Command="{Binding ExportChatCmd}" CommandParameter="json" IconSource="{icm:SymbolIconSource Symbol=Code}" />
+          </ui:FAMenuFlyout>
+        </Button.Flyout>
+        <ic:SymbolIcon Symbol="ArrowDownload" FontSize="16" />
+      </Button>
+      <Button x:Name="HistoryButton" Grid.Column="4" Margin="10,0,0,0" VerticalAlignment="Center" Padding="8" ToolTip.Tip="Search history">
+        <Button.Flyout>
+          <Flyout Placement="BottomEdgeAlignedRight">
+            <StackPanel Width="420" Spacing="10" x:DataType="vm:ChatPageViewModel" DataContext="{Binding #ChatPageRoot.DataContext}">
+              <TextBlock Text="Chat History Search" FontWeight="Bold" FontSize="16" />
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Grid.Column="0" Text="{Binding HistoryEntryCount, StringFormat='Total entries: {0}'}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                <Button Grid.Column="1" Content="Clear History" Command="{Binding ClearHistoryCmd}" Padding="8,4" />
+              </Grid>
+              <Separator />
+              <StackPanel Spacing="8">
+                <Grid ColumnDefinitions="70,*">
+                  <TextBlock Grid.Column="0" Text="User:" VerticalAlignment="Center" />
+                  <TextBox x:Name="HistorySearchUserTextBox" Grid.Column="1" Text="{Binding HistorySearchUser}" Watermark="Username..." />
+                </Grid>
+                <Grid ColumnDefinitions="70,*">
+                  <TextBlock Grid.Column="0" Text="Keyword:" VerticalAlignment="Center" />
+                  <TextBox Grid.Column="1" Text="{Binding HistorySearchKeyword}" Watermark="Search text..." />
+                </Grid>
+                <Grid ColumnDefinitions="70,Auto,10,Auto,Auto">
+                  <TextBlock Grid.Column="0" Text="From:" VerticalAlignment="Center" />
+                  <CalendarDatePicker Grid.Column="1" SelectedDate="{Binding HistorySearchFromDate}" FontSize="12" />
+                  <TextBlock Grid.Column="3" Text="To:" VerticalAlignment="Center" />
+                  <CalendarDatePicker Grid.Column="4" SelectedDate="{Binding HistorySearchToDate}" FontSize="12" />
+                </Grid>
+              </StackPanel>
+              <CheckBox IsChecked="{Binding HistorySearchProfanityOnly}" Content="Profanity only" />
+              <Button Content="Search" Command="{Binding SearchHistoryCmd}" HorizontalAlignment="Right" />
+              <Separator />
+              <TextBlock Text="{Binding HistoryResultsText}" FontWeight="SemiBold" />
+              <ListBox x:Name="HistoryResultsListBox"
+                       ItemsSource="{Binding HistoryResults}"
+                       Selection="{Binding HistorySelection}"
+                       SelectionMode="Multiple"
+                       MaxHeight="300" MinHeight="100"
+                       ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListBox.KeyBindings>
+                  <KeyBinding Gesture="Ctrl+C" Command="{Binding CopyHistoryEntriesCmd}" />
+                </ListBox.KeyBindings>
+                <ListBox.ItemContainerTheme>
+                  <ControlTheme TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+                    <Setter Property="Padding" Value="8,6" />
+                    <Setter Property="Margin" Value="0,1" />
+                    <Setter Property="CornerRadius" Value="4" />
+                    <Setter Property="Background" Value="{DynamicResource SolidBackgroundFillColorBase}" />
+                  </ControlTheme>
+                </ListBox.ItemContainerTheme>
+                <ListBox.ItemTemplate>
+                  <DataTemplate DataType="models:ChatHistoryEntry">
+                    <StackPanel Spacing="3">
+                      <StackPanel Orientation="Horizontal" Spacing="5">
+                        <TextBlock FontSize="10" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="{Binding Timestamp, StringFormat='{}{0:g}'}" />
+                        <TextBlock FontSize="10" Opacity="0.5" Text="{Binding Type, StringFormat='({0})'}" />
+                        <ic:SymbolIcon Symbol="Warning" IconVariant="Filled" Foreground="#FFAA00" FontSize="10" IsVisible="{Binding HasProfanity}" />
+                      </StackPanel>
+                      <controls:HighlightedTextBlock
+                        TextWrapping="Wrap"
+                        FontSize="12"
+                        Text="{Binding DisplayText}"
+                        HighlightWords="{Binding MatchedWords}"
+                        HighlightForeground="#FF6B6B" />
+                    </StackPanel>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+              <!-- Error message displayed inline -->
+              <Border
+                IsVisible="{Binding HistoryErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                Background="#44FF6B6B"
+                CornerRadius="4"
+                Padding="10,8"
+              >
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <ic:SymbolIcon Symbol="Warning" Foreground="#FF6B6B" FontSize="14" />
+                  <TextBlock Text="{Binding HistoryErrorMessage}" Foreground="#FF6B6B" TextWrapping="Wrap" />
+                </StackPanel>
+              </Border>
+              <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right">
+                <Button Command="{Binding ExportHistoryCmd}" CommandParameter="txt">
+                  <StackPanel Orientation="Horizontal" Spacing="5">
+                    <ic:SymbolIcon Symbol="Document" FontSize="12" />
+                    <TextBlock Text="Export TXT" />
+                  </StackPanel>
+                </Button>
+                <Button Command="{Binding ExportHistoryCmd}" CommandParameter="json">
+                  <StackPanel Orientation="Horizontal" Spacing="5">
+                    <ic:SymbolIcon Symbol="Code" FontSize="12" />
+                    <TextBlock Text="Export JSON" />
+                  </StackPanel>
+                </Button>
+              </StackPanel>
+            </StackPanel>
+          </Flyout>
+        </Button.Flyout>
+        <ic:SymbolIcon Symbol="History" FontSize="16" />
+      </Button>
     </Grid>
     <ListBox Grid.Row="1" Name="ListBoxMessages"
          ItemsSource="{Binding Messages}"
@@ -37,7 +147,8 @@
          Padding="10"
          SelectionMode="Multiple"
          x:DataType="vm:ChatPageViewModel"
-         ContextRequested="OnContextRequested">
+         ContextRequested="OnContextRequested"
+         behaviors:ScrollToBottom.Command="{Binding ScrollToBottomCmd, Mode=OneWayToSource}">
       <Interaction.Behaviors>
         <behaviors:AutoScrollBehavior />
         <behaviors:ScrollToBottom />
