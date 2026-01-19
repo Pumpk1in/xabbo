@@ -65,15 +65,17 @@
                   <CalendarDatePicker Grid.Column="4" SelectedDate="{Binding HistorySearchToDate}" FontSize="12" />
                 </Grid>
               </StackPanel>
-              <CheckBox IsChecked="{Binding HistorySearchProfanityOnly}" Content="Profanity only" />
-              <Button Content="Search" Command="{Binding SearchHistoryCmd}" HorizontalAlignment="Right" />
+              <Grid>
+                <CheckBox IsChecked="{Binding HistorySearchProfanityOnly}" Content="Profanity only" HorizontalAlignment="Left" />
+                <Button Content="Search" Command="{Binding SearchHistoryCmd}" HorizontalAlignment="Right" />
+              </Grid>
               <Separator />
               <TextBlock Text="{Binding HistoryResultsText}" FontWeight="SemiBold" />
               <ListBox x:Name="HistoryResultsListBox"
                        ItemsSource="{Binding HistoryResults}"
                        Selection="{Binding HistorySelection}"
                        SelectionMode="Multiple"
-                       MaxHeight="300" MinHeight="100"
+                       MaxHeight="350" MinHeight="100"
                        ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                 <ListBox.KeyBindings>
                   <KeyBinding Gesture="Ctrl+C" Command="{Binding CopyHistoryEntriesCmd}" />
