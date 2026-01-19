@@ -39,6 +39,16 @@
             </WrapPanel>
           </StackPanel>
         </ui:SettingsExpanderItem>
+        <ui:SettingsExpanderItem>
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <TextBlock VerticalAlignment="Center">
+              <Run Text="History:" />
+              <Run Text="{Binding HistoryEntryCount}" />
+              <Run Text="entries" />
+            </TextBlock>
+            <Button Content="Clear History" Command="{Binding ClearHistoryCmd}" />
+          </StackPanel>
+        </ui:SettingsExpanderItem>
       </ui:SettingsExpander>
       <!-- Timing (modern) -->
       <ui:SettingsExpander

@@ -49,11 +49,6 @@
           <Flyout Placement="BottomEdgeAlignedRight">
             <StackPanel Width="420" Spacing="10" x:DataType="vm:ChatPageViewModel" DataContext="{Binding #ChatPageRoot.DataContext}">
               <TextBlock Text="Chat History Search" FontWeight="Bold" FontSize="16" />
-              <Grid ColumnDefinitions="*,Auto">
-                <TextBlock Grid.Column="0" Text="{Binding HistoryEntryCount, StringFormat='Total entries: {0}'}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
-                <Button Grid.Column="1" Content="Clear History" Command="{Binding ClearHistoryCmd}" Padding="8,4" />
-              </Grid>
-              <Separator />
               <StackPanel Spacing="8">
                 <Grid ColumnDefinitions="70,*">
                   <TextBlock Grid.Column="0" Text="User:" VerticalAlignment="Center" />
@@ -95,9 +90,9 @@
                   <DataTemplate DataType="models:ChatHistoryEntry">
                     <StackPanel Spacing="3">
                       <StackPanel Orientation="Horizontal" Spacing="5">
-                        <TextBlock FontSize="10" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="{Binding Timestamp, StringFormat='{}{0:g}'}" />
-                        <TextBlock FontSize="10" Opacity="0.5" Text="{Binding Type, StringFormat='({0})'}" />
-                        <ic:SymbolIcon Symbol="Warning" IconVariant="Filled" Foreground="#FFAA00" FontSize="10" IsVisible="{Binding HasProfanity}" />
+                        <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="{Binding Timestamp, StringFormat='{}{0:g}'}" />
+                        <TextBlock FontSize="11" Opacity="0.5" Text="{Binding Type, StringFormat='({0})'}" />
+                        <ic:SymbolIcon Symbol="Warning" IconVariant="Filled" Foreground="#FFAA00" FontSize="13" IsVisible="{Binding HasProfanity}" />
                       </StackPanel>
                       <controls:HighlightedTextBlock
                         TextWrapping="Wrap"
@@ -152,6 +147,7 @@
       <Interaction.Behaviors>
         <behaviors:AutoScrollBehavior />
         <behaviors:ScrollToBottom />
+        <behaviors:ScrollThrottleBehavior />
       </Interaction.Behaviors>
       <ListBox.ContextFlyout>
         <ui:FAMenuFlyout>
@@ -160,14 +156,15 @@
             Text="Find" Command="{Binding FindUserCmd}"
           />
           <ui:MenuFlyoutItem
-            IconSource="{icm:SymbolIconSource Symbol=BackpackAdd}"
-            Text="Add to wardrobe"
-            Command="{Binding CopyUserToWardrobeCmd}"
+            IconSource="{icm:SymbolIconSource Symbol=History}"
+            Text="Search in history"
+            Command="{Binding SearchUserInHistoryCmd}"
           />
           <ui:MenuFlyoutItem
-            IconSource="{icm:SymbolIconSource Symbol=Handshake}"
-            Text="Trade user"
-            Command="{Binding TradeUserCmd}"
+            IconSource="{icm:SymbolIconSource Symbol=ArrowRight}"
+            Text="Go to message"
+            Command="{Binding GoToMessageCmd}"
+            IsVisible="{Binding HasActiveFilter}"
           />
           <ui:MenuFlyoutSubItem
             IsEnabled="{Binding CopyUserFieldCmd.CanExecute^}"
@@ -301,7 +298,7 @@
         </DataTemplate>
         <DataTemplate DataType="vm:ChatMessageViewModel">
           <Border>
-            <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+            <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto,Auto">
               <TextBlock
                 Grid.Column="0"
                 VerticalAlignment="Center"
@@ -321,6 +318,7 @@
                 Grid.Column="2"
                 VerticalAlignment="Center"
                 TextWrapping="Wrap"
+                FontSize="15"
                 Segments="{Binding MessageSegments}"
                 FallbackText="{Binding Message}"
                 IsWhisper="{Binding IsWhisper}"
@@ -337,6 +335,70 @@
                 IsVisible="{Binding HasProfanity}"
                 ToolTip.Tip="This message contains flagged words"
               />
+              <!-- Quick Kick button for profanity messages (not on own messages, hidden during fast scroll) -->
+              <Button
+                Grid.Column="4"
+                Padding="4"
+                Margin="2,0,0,0"
+                VerticalAlignment="Center"
+                ToolTip.Tip="Kick user"
+                Command="{Binding #ChatPageRoot.((vm:ChatPageViewModel)DataContext).KickUserByNameCmd}"
+                CommandParameter="{Binding Name}">
+                <Button.IsVisible>
+                  <MultiBinding Converter="{x:Static BoolConverters.And}">
+                    <Binding Path="ShowModerationButtons" />
+                    <Binding Path="!#ListBoxMessages.(behaviors:ScrollThrottleBehavior.IsThrottled)" />
+                  </MultiBinding>
+                </Button.IsVisible>
+                <ic:SymbolIcon Symbol="PersonDelete" FontSize="12" />
+              </Button>
+              <!-- Quick Mute button for profanity messages (not on own messages, hidden during fast scroll) -->
+              <Button
+                Grid.Column="5"
+                Padding="4"
+                Margin="2,0,0,0"
+                VerticalAlignment="Center"
+                ToolTip.Tip="Mute user">
+                <Button.IsVisible>
+                  <MultiBinding Converter="{x:Static BoolConverters.And}">
+                    <Binding Path="ShowModerationButtons" />
+                    <Binding Path="!#ListBoxMessages.(behaviors:ScrollThrottleBehavior.IsThrottled)" />
+                  </MultiBinding>
+                </Button.IsVisible>
+                <Button.Flyout>
+                  <ui:FAMenuFlyout>
+                    <ui:MenuFlyoutItem Text="2 mins" Command="{Binding #ChatPageRoot.((vm:ChatPageViewModel)DataContext).MuteUserByNameCmd}" CommandParameter="{Binding MuteParam2}" />
+                    <ui:MenuFlyoutItem Text="5 mins" Command="{Binding #ChatPageRoot.((vm:ChatPageViewModel)DataContext).MuteUserByNameCmd}" CommandParameter="{Binding MuteParam5}" />
+                    <ui:MenuFlyoutItem Text="10 mins" Command="{Binding #ChatPageRoot.((vm:ChatPageViewModel)DataContext).MuteUserByNameCmd}" CommandParameter="{Binding MuteParam10}" />
+                    <ui:MenuFlyoutItem Text="15 mins" Command="{Binding #ChatPageRoot.((vm:ChatPageViewModel)DataContext).MuteUserByNameCmd}" CommandParameter="{Binding MuteParam15}" />
+                    <ui:MenuFlyoutItem Text="30 mins" Command="{Binding #ChatPageRoot.((vm:ChatPageViewModel)DataContext).MuteUserByNameCmd}" CommandParameter="{Binding MuteParam30}" />
+                    <ui:MenuFlyoutItem Text="1 hour" Command="{Binding #ChatPageRoot.((vm:ChatPageViewModel)DataContext).MuteUserByNameCmd}" CommandParameter="{Binding MuteParam60}" />
+                  </ui:FAMenuFlyout>
+                </Button.Flyout>
+                <ic:SymbolIcon Symbol="ChatOff" FontSize="12" />
+              </Button>
+              <!-- Quick Ban button for profanity messages (not on own messages, hidden during fast scroll) -->
+              <Button
+                Grid.Column="6"
+                Padding="4"
+                Margin="2,0,0,0"
+                VerticalAlignment="Center"
+                ToolTip.Tip="Ban user">
+                <Button.IsVisible>
+                  <MultiBinding Converter="{x:Static BoolConverters.And}">
+                    <Binding Path="ShowModerationButtons" />
+                    <Binding Path="!#ListBoxMessages.(behaviors:ScrollThrottleBehavior.IsThrottled)" />
+                  </MultiBinding>
+                </Button.IsVisible>
+                <Button.Flyout>
+                  <ui:FAMenuFlyout>
+                    <ui:MenuFlyoutItem Text="For an hour" Command="{Binding #ChatPageRoot.((vm:ChatPageViewModel)DataContext).BanUserByNameCmd}" CommandParameter="{Binding BanParamHour}" />
+                    <ui:MenuFlyoutItem Text="For a day" Command="{Binding #ChatPageRoot.((vm:ChatPageViewModel)DataContext).BanUserByNameCmd}" CommandParameter="{Binding BanParamDay}" />
+                    <ui:MenuFlyoutItem Text="Permanently" Command="{Binding #ChatPageRoot.((vm:ChatPageViewModel)DataContext).BanUserByNameCmd}" CommandParameter="{Binding BanParamPermanent}" />
+                  </ui:FAMenuFlyout>
+                </Button.Flyout>
+                <ic:SymbolIcon Symbol="PersonProhibited" FontSize="12" />
+              </Button>
             </Grid>
           </Border>
         </DataTemplate>

@@ -15,8 +15,8 @@ public sealed class ChatHistoryEntry
     public string? Message { get; init; }
     public string? ChatType { get; init; }
     public bool IsWhisper { get; init; }
-    public bool HasProfanity { get; init; }
-    public List<string>? MatchedWords { get; init; }
+    public bool HasProfanity { get; set; }
+    public List<string>? MatchedWords { get; set; }
 
     // For action type
     public string? UserName { get; init; }
@@ -40,6 +40,7 @@ public sealed class ChatHistoryEntry
 }
 
 [JsonSerializable(typeof(List<ChatHistoryEntry>))]
+[JsonSerializable(typeof(List<string>))]
 [JsonSourceGenerationOptions(WriteIndented = false)]
 internal partial class ChatHistoryJsonContext : JsonSerializerContext
 {

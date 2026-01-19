@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using Avalonia.Controls;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using FluentAvalonia.UI.Controls;
 using Xabbo.ViewModels;
@@ -17,9 +18,19 @@ public partial class ChatPage : UserControl
         {
             if (DataContext is ChatPageViewModel vm)
             {
-                vm.CloseHistoryFlyoutAction = () => HistoryButton?.Flyout?.Hide();
+                vm.OpenHistoryFlyoutAction = () => HistoryButton?.Flyout?.ShowAt(HistoryButton);
+                vm.ScrollToMessageAction = ScrollToMessage;
             }
         };
+    }
+
+    private void ScrollToMessage(ChatLogEntryViewModel message)
+    {
+        // Wait for filters to be applied before scrolling
+        Dispatcher.UIThread.Post(() =>
+        {
+            ListBoxMessages?.ScrollIntoView(message);
+        }, DispatcherPriority.Background);
     }
 
     private void OnContextRequested(object? sender, ContextRequestedEventArgs e)

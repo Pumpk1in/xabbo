@@ -16,15 +16,19 @@ public sealed class SettingsPageViewModel : PageViewModel
     public override IconSource? Icon { get; } = new SymbolIconSource { Symbol = Symbol.Settings };
 
     private readonly IConfigProvider<AppConfig> _config;
+    private readonly IChatHistoryService _chatHistory;
     public AppConfig Config => _config.Value;
 
     [Reactive] public string CustomProfanityWordsText { get; set; } = string.Empty;
+    [Reactive] public int HistoryEntryCount { get; set; }
 
     public ReactiveCommand<Unit, Unit> ApplyCustomWordsCmd { get; }
+    public ReactiveCommand<Unit, Unit> ClearHistoryCmd { get; }
 
-    public SettingsPageViewModel(IConfigProvider<AppConfig> config)
+    public SettingsPageViewModel(IConfigProvider<AppConfig> config, IChatHistoryService chatHistory)
     {
         _config = config;
+        _chatHistory = chatHistory;
 
         // Initialize text from current custom words
         RefreshCustomWordsText();
@@ -39,7 +43,22 @@ public sealed class SettingsPageViewModel : PageViewModel
             RefreshCustomWordsText();
         };
 
+        // Initialize history count
+        HistoryEntryCount = _chatHistory.GetEntryCount();
+
         ApplyCustomWordsCmd = ReactiveCommand.Create(ApplyCustomWords);
+        ClearHistoryCmd = ReactiveCommand.Create(ClearHistory);
+    }
+
+    private void ClearHistory()
+    {
+        _chatHistory.Clear();
+        HistoryEntryCount = 0;
+    }
+
+    public void RefreshHistoryCount()
+    {
+        HistoryEntryCount = _chatHistory.GetEntryCount();
     }
 
     private System.Collections.ObjectModel.ObservableCollection<string>? _subscribedCollection;

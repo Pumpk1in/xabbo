@@ -55,8 +55,6 @@ public class ChatPageViewModel : PageViewModel
     private readonly RoomManager _roomManager;
     private readonly ProfileManager _profileManager;
     private readonly RoomModerationController _moderation;
-    private readonly TradeManager _tradeManager;
-    private readonly WardrobePageViewModel _wardrobe;
     private readonly XabbotComponent _xabbot;
     private ModerationCommands? _moderationCommands;
 
@@ -78,15 +76,19 @@ public class ChatPageViewModel : PageViewModel
     public ReactiveCommand<Unit, Unit> CopySelectedEntriesCmd { get; }
 
     public ReactiveCommand<Unit, Unit> FindUserCmd { get; }
-    public ReactiveCommand<Unit, Unit> CopyUserToWardrobeCmd { get; }
-    public ReactiveCommand<Unit, Unit> TradeUserCmd { get; }
     public ReactiveCommand<string, Unit> CopyUserFieldCmd { get; }
+    public ReactiveCommand<Unit, Unit> GoToMessageCmd { get; }
     public ReactiveCommand<string, Task> OpenUserProfileCmd { get; }
 
     public ReactiveCommand<string, Task> MuteUsersCmd { get; }
     public ReactiveCommand<Unit, Task> KickUsersCmd { get; }
     public ReactiveCommand<BanDuration, Task> BanUsersCmd { get; }
     public ReactiveCommand<Unit, Task> BounceUsersCmd { get; }
+
+    // Quick mute/kick/ban by username (for profanity message buttons)
+    public ReactiveCommand<string, Task> KickUserByNameCmd { get; }
+    public ReactiveCommand<(string Name, int Minutes), Task> MuteUserByNameCmd { get; }
+    public ReactiveCommand<(string Name, BanDuration Duration), Task> BanUserByNameCmd { get; }
 
     public ReactiveCommand<Unit, Task> AddToProfanityFilterCmd { get; }
     public ReactiveCommand<string, Unit> RemoveFromProfanityFilterCmd { get; }
@@ -102,6 +104,12 @@ public class ChatPageViewModel : PageViewModel
     [Reactive] public bool WhispersOnly { get; set; }
     [Reactive] public bool ProfanityOnly { get; set; }
 
+    private readonly ObservableAsPropertyHelper<bool> _hasActiveFilter;
+    public bool HasActiveFilter => _hasActiveFilter.Value;
+
+    // Action to scroll to a specific message - set from view
+    public Action<ChatLogEntryViewModel>? ScrollToMessageAction { get; set; }
+
     // History search properties
     [Reactive] public string? HistorySearchUser { get; set; }
     [Reactive] public string? HistorySearchKeyword { get; set; }
@@ -112,7 +120,6 @@ public class ChatPageViewModel : PageViewModel
     private readonly ObservableCollection<ChatHistoryEntry> _historyResults = [];
     public ObservableCollection<ChatHistoryEntry> HistoryResults => _historyResults;
 
-    [Reactive] public int HistoryEntryCount { get; set; }
     [Reactive] public int HistoryResultsTotal { get; set; }
     [Reactive] public string? HistoryErrorMessage { get; set; }
     [Reactive] public string HistoryResultsText { get; set; } = "Results: 0";
@@ -125,7 +132,6 @@ public class ChatPageViewModel : PageViewModel
     private DateTime? _lastSearchToDate;
 
     public ReactiveCommand<Unit, Unit> SearchHistoryCmd { get; }
-    public ReactiveCommand<Unit, Unit> ClearHistoryCmd { get; }
     public ReactiveCommand<string, Task> ExportHistoryCmd { get; }
     public ReactiveCommand<Unit, Unit> CopyHistoryEntriesCmd { get; }
 
@@ -137,8 +143,10 @@ public class ChatPageViewModel : PageViewModel
     // Scroll to bottom command - will be set from view
     [Reactive] public ICommand? ScrollToBottomCmd { get; set; }
 
-    // Action to close the history flyout - set from view
-    public Action? CloseHistoryFlyoutAction { get; set; }
+    // Action to open history flyout - set from view
+    public Action? OpenHistoryFlyoutAction { get; set; }
+
+    public ReactiveCommand<Unit, Unit> SearchUserInHistoryCmd { get; }
 
     [DependencyInjectionConstructor]
     public ChatPageViewModel(
@@ -155,8 +163,6 @@ public class ChatPageViewModel : PageViewModel
         RoomManager roomManager,
         ProfileManager profileManager,
         RoomModerationController moderation,
-        TradeManager tradeManager,
-        WardrobePageViewModel wardrobe,
         XabbotComponent xabbot)
     {
         _ext = ext;
@@ -172,8 +178,6 @@ public class ChatPageViewModel : PageViewModel
         _roomManager = roomManager;
         _profileManager = profileManager;
         _moderation = moderation;
-        _tradeManager = tradeManager;
-        _wardrobe = wardrobe;
         _xabbot = xabbot;
 
         _roomManager.Entered += OnEnteredRoom;
@@ -209,13 +213,17 @@ public class ChatPageViewModel : PageViewModel
             .Select(selection => selection is [var msg] ? msg.Name : null)
             .ToProperty(this, x => x.SelectedUserName);
 
-        var canTradeUser = Observable.CombineLatest(
+        // HasActiveFilter: true when any filter is active
+        _hasActiveFilter = this
+            .WhenAnyValue(x => x.FilterText, x => x.WhispersOnly, x => x.ProfanityOnly)
+            .Select(t => !string.IsNullOrWhiteSpace(t.Item1) || t.Item2 || t.Item3)
+            .ToProperty(this, x => x.HasActiveFilter);
+
+        // CanExecute for GoToMessage: message selected AND filter active
+        var canGoToMessage = Observable.CombineLatest(
             hasSingleContextMessage,
-            _tradeManager.WhenAnyValue(x => x.IsTrading).StartWith(false),
-            this.WhenAnyValue(x => x.SelectedUserName).StartWith((string?)null),
-            _profileManager.WhenAnyValue(x => x.UserData!.Name).StartWith((string?)null),
-            (hasMessage, isTrading, selectedName, currentUserName) =>
-                hasMessage && !isTrading && selectedName != null && selectedName != currentUserName
+            this.WhenAnyValue(x => x.HasActiveFilter),
+            (hasMsg, hasFilter) => hasMsg && hasFilter
         ).ObserveOn(RxApp.MainThreadScheduler);
 
         var canMuteUsers = Observable.CombineLatest(
@@ -263,15 +271,19 @@ public class ChatPageViewModel : PageViewModel
 
         // Initialize commands
         FindUserCmd = ReactiveCommand.Create(FindUser, hasSingleContextMessage);
-        CopyUserToWardrobeCmd = ReactiveCommand.Create(CopyUserToWardrobe, hasAnyContextMessage);
-        TradeUserCmd = ReactiveCommand.Create(TradeUser, canTradeUser);
         CopyUserFieldCmd = ReactiveCommand.Create<string>(CopyUserField, hasSingleContextMessage);
         OpenUserProfileCmd = ReactiveCommand.Create<string, Task>(OpenUserProfile, hasSingleContextMessage);
+        GoToMessageCmd = ReactiveCommand.Create(GoToMessage, canGoToMessage);
 
         MuteUsersCmd = ReactiveCommand.Create<string, Task>(MuteUsersAsync, canMuteUsers);
         KickUsersCmd = ReactiveCommand.Create<Task>(KickUsersAsync, canKickUsers);
         BanUsersCmd = ReactiveCommand.Create<BanDuration, Task>(BanUsersAsync, canBanUsers);
         BounceUsersCmd = ReactiveCommand.Create<Task>(BounceUsersAsync, canBounceUsers);
+
+        // Quick mute/kick/ban by username (for profanity message buttons)
+        KickUserByNameCmd = ReactiveCommand.Create<string, Task>(KickUserByNameAsync);
+        MuteUserByNameCmd = ReactiveCommand.Create<(string Name, int Minutes), Task>(MuteUserByNameAsync);
+        BanUserByNameCmd = ReactiveCommand.Create<(string Name, BanDuration Duration), Task>(BanUserByNameAsync);
 
         AddToProfanityFilterCmd = ReactiveCommand.Create<Task>(AddToProfanityFilterAsync, hasSingleContextMessage);
         RemoveFromProfanityFilterCmd = ReactiveCommand.Create<string>(RemoveFromProfanityFilter);
@@ -280,12 +292,9 @@ public class ChatPageViewModel : PageViewModel
 
         // History commands
         SearchHistoryCmd = ReactiveCommand.Create(SearchHistory);
-        ClearHistoryCmd = ReactiveCommand.Create(ClearHistory);
         ExportHistoryCmd = ReactiveCommand.Create<string, Task>(ExportHistoryAsync);
         CopyHistoryEntriesCmd = ReactiveCommand.Create(CopyHistoryEntries);
-
-        // Update history entry count
-        HistoryEntryCount = _chatHistory.GetEntryCount();
+        SearchUserInHistoryCmd = ReactiveCommand.Create(SearchUserInHistory, hasSingleContextMessage);
 
         // Scroll to bottom when unchecking a filter
         this.WhenAnyValue(x => x.WhispersOnly)
@@ -431,6 +440,23 @@ public class ChatPageViewModel : PageViewModel
         }
     }
 
+    private void SearchUserInHistory()
+    {
+        if (ContextSelection is not [var message])
+            return;
+
+        // Clear other filters and set the username
+        HistorySearchUser = message.Name;
+        HistorySearchKeyword = null;
+        HistorySearchProfanityOnly = false;
+        HistorySearchFromDate = null;
+        HistorySearchToDate = null;
+
+        // Open the flyout and search
+        OpenHistoryFlyoutAction?.Invoke();
+        SearchHistory();
+    }
+
     private void SearchHistory()
     {
         HistoryErrorMessage = null;
@@ -454,10 +480,20 @@ public class ChatPageViewModel : PageViewModel
 
         foreach (var entry in results)
         {
+            // Recalculate HasProfanity and MatchedWords for displayed results
+            // This catches messages that should be flagged with newly added filter words
+            if (!string.IsNullOrEmpty(entry.Message))
+            {
+                var matches = _profanityFilter.FindMatches(entry.Message);
+                if (matches.Count > 0)
+                {
+                    entry.HasProfanity = true;
+                    entry.MatchedWords = matches.Select(m => entry.Message.Substring(m.Start, m.Length)).Distinct().ToList();
+                }
+            }
             _historyResults.Add(entry);
         }
 
-        HistoryEntryCount = _chatHistory.GetEntryCount();
         HistoryResultsTotal = totalCount;
 
         // Update results text
@@ -502,32 +538,6 @@ public class ChatPageViewModel : PageViewModel
         }
 
         _clipboard.SetText(sb.ToString().TrimEnd());
-    }
-
-    private async void ClearHistory()
-    {
-        // Close the flyout first so the dialog appears in front
-        CloseHistoryFlyoutAction?.Invoke();
-
-        var result = await _dialog.ShowContentDialogAsync(
-            _dialog.CreateViewModel<MainViewModel>(),
-            new HanumanInstitute.MvvmDialogs.Avalonia.Fluent.ContentDialogSettings
-            {
-                Title = "Clear history",
-                Content = $"Are you sure you want to clear all {HistoryEntryCount} chat history entries? This cannot be undone.",
-                PrimaryButtonText = "Clear",
-                CloseButtonText = "Cancel",
-            }
-        );
-
-        if (result == FluentAvalonia.UI.Controls.ContentDialogResult.Primary)
-        {
-            _chatHistory.Clear();
-            _historyResults.Clear();
-            HistoryEntryCount = 0;
-            await _chatHistory.SaveAsync();
-            _xabbot.ShowMessage("Chat history cleared");
-        }
     }
 
     private async Task ExportHistoryAsync(string format)
@@ -781,10 +791,11 @@ public class ChatPageViewModel : PageViewModel
             HasProfanity = hasProfanity,
             MessageSegments = segments,
             MatchedWords = matchedWords,
+            IsOwnMessage = e.Avatar.Name.Equals(_profileManager.UserData?.Name, StringComparison.OrdinalIgnoreCase),
         };
         AppendLog(vm);
 
-        // Save to history
+        // Save to history (MatchedWords will be recalculated at search time for highlighting)
         var isWhisper = e.ChatType == ChatType.Whisper && e.BubbleStyle != 34;
         _chatHistory.AddEntry(new ChatHistoryEntry
         {
@@ -795,7 +806,6 @@ public class ChatPageViewModel : PageViewModel
             ChatType = e.ChatType.ToString(),
             IsWhisper = isWhisper,
             HasProfanity = hasProfanity,
-            MatchedWords = matchedWords?.ToList()
         });
     }
 
@@ -809,6 +819,7 @@ public class ChatPageViewModel : PageViewModel
             return (false, null, null);
 
         var segments = new List<MessageSegment>();
+        // Base filter words (for "Remove from filter" menu)
         var matchedWords = matches.Select(m => m.MatchedWord).Distinct().ToList();
         int currentIndex = 0;
 
@@ -859,32 +870,18 @@ public class ChatPageViewModel : PageViewModel
         }
     }
 
-    private void TradeUser()
+    private void GoToMessage()
     {
         if (ContextSelection is not [var message])
             return;
 
-        if (_roomManager.Room?.TryGetUserByName(message.Name, out var user) == true)
-        {
-            _ext.Send(new TradeUserMsg(user.Index));
-        }
-    }
+        // Reset all filters
+        FilterText = null;
+        WhispersOnly = false;
+        ProfanityOnly = false;
 
-    private void CopyUserToWardrobe()
-    {
-        if (ContextSelection is { } selection)
-        {
-            foreach (var message in selection)
-            {
-                if (!string.IsNullOrEmpty(message.FigureString))
-                {
-                    if (_roomManager.Room?.TryGetUserByName(message.Name, out var user) == true)
-                    {
-                        _wardrobe.AddFigure(user.Gender, user.Figure);
-                    }
-                }
-            }
-        }
+        // Scroll to the message after filters are applied
+        ScrollToMessageAction?.Invoke(message);
     }
 
     private void CopyUserField(string field)
@@ -1106,6 +1103,66 @@ public class ChatPageViewModel : PageViewModel
             }
         }
     }
+
+    private Task KickUserByNameAsync(string userName) => TryModerate(async () =>
+    {
+        if (_roomManager.Room?.TryGetUserByName(userName, out var user) == true)
+        {
+            await _moderation.KickUsersAsync([user]);
+            _xabbot.ShowMessage($"Kicked user '{userName}'");
+        }
+        else
+        {
+            _xabbot.ShowMessage($"User '{userName}' not found");
+        }
+    });
+
+    private Task MuteUserByNameAsync((string Name, int Minutes) param) => TryModerate(async () =>
+    {
+        var (userName, minutes) = param;
+
+        if (_roomManager.Room?.TryGetUserByName(userName, out var user) == true)
+        {
+            await _moderation.MuteUsersAsync([user], minutes);
+            _xabbot.ShowMessage($"Muting user '{userName}' for {minutes} minute(s)");
+        }
+        else
+        {
+            _xabbot.ShowMessage($"User '{userName}' not found");
+        }
+    });
+
+    private Task BanUserByNameAsync((string Name, BanDuration Duration) param) => TryModerate(async () =>
+    {
+        var (userName, duration) = param;
+
+        var durationText = duration switch
+        {
+            BanDuration.Hour => "for an hour",
+            BanDuration.Day => "for a day",
+            BanDuration.Permanent => "permanently",
+            _ => ""
+        };
+
+        if (_roomManager.Room?.TryGetUserByName(userName, out var user) == true)
+        {
+            await _moderation.BanUsersAsync([user], duration);
+            _xabbot.ShowMessage($"Banned user '{userName}' {durationText}");
+        }
+        else
+        {
+            // Add to deferred ban list
+            _moderationCommands ??= Locator.Current.GetService<IEnumerable<CommandModule>>()
+                ?.OfType<ModerationCommands>()
+                .FirstOrDefault();
+
+            if (_moderationCommands is not null)
+            {
+                _moderationCommands.AddToBanList(userName, duration);
+                _xabbot.ShowMessage($"User '{userName}' not found, will be banned {durationText} upon next entry to this room.");
+            }
+        }
+    });
 
     private async Task TryModerate(Func<Task> moderate)
     {

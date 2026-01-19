@@ -1,37 +1,99 @@
 using System.Text.Json;
+using Microsoft.Data.Sqlite;
 using Xabbo.Models;
 using Xabbo.Models.Enums;
 using Xabbo.Services.Abstractions;
 
 namespace Xabbo.Services;
 
-public sealed class ChatHistoryService : IChatHistoryService
+public sealed class ChatHistoryService : IChatHistoryService, IDisposable
 {
     private readonly IAppPathProvider _pathProvider;
-    private readonly List<ChatHistoryEntry> _entries = [];
+    private readonly SqliteConnection _connection;
     private readonly object _lock = new();
-    private readonly Timer _saveTimer;
-    private bool _isDirty;
-    private bool _isLoaded;
+    private int _entryCount;
 
     public ChatHistoryService(IAppPathProvider pathProvider)
     {
         _pathProvider = pathProvider;
 
-        // Auto-save every 30 seconds if there are changes
-        _saveTimer = new Timer(_ => SaveIfDirty(), null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+        var dbPath = _pathProvider.GetPath(AppPathKind.ChatHistoryDb);
+        var directory = Path.GetDirectoryName(dbPath);
+        if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
 
-        // Load existing history in background - won't block startup
-        _ = LoadAsync();
+        _connection = new SqliteConnection($"Data Source={dbPath}");
+        _connection.Open();
+
+        InitializeDatabase();
+    }
+
+    private void InitializeDatabase()
+    {
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE IF NOT EXISTS chat_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                type TEXT NOT NULL,
+                name TEXT,
+                message TEXT,
+                chat_type TEXT,
+                is_whisper INTEGER DEFAULT 0,
+                has_profanity INTEGER DEFAULT 0,
+                matched_words TEXT,
+                user_name TEXT,
+                action TEXT,
+                room_name TEXT,
+                room_owner TEXT
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_timestamp ON chat_history(timestamp);
+            CREATE INDEX IF NOT EXISTS idx_name ON chat_history(name);
+            CREATE INDEX IF NOT EXISTS idx_user_name ON chat_history(user_name);
+            CREATE INDEX IF NOT EXISTS idx_has_profanity ON chat_history(has_profanity);
+            """;
+        cmd.ExecuteNonQuery();
+
+        // Get initial count
+        using var countCmd = _connection.CreateCommand();
+        countCmd.CommandText = "SELECT COUNT(*) FROM chat_history";
+        _entryCount = Convert.ToInt32(countCmd.ExecuteScalar());
     }
 
     public void AddEntry(ChatHistoryEntry entry)
     {
         lock (_lock)
         {
-            _entries.Add(entry);
-            _isDirty = true;
+            InsertEntry(entry);
+            _entryCount++;
         }
+    }
+
+    private void InsertEntry(ChatHistoryEntry entry)
+    {
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO chat_history (timestamp, type, name, message, chat_type, is_whisper, has_profanity, matched_words, user_name, action, room_name, room_owner)
+            VALUES (@timestamp, @type, @name, @message, @chatType, @isWhisper, @hasProfanity, @matchedWords, @userName, @action, @roomName, @roomOwner)
+            """;
+
+        cmd.Parameters.AddWithValue("@timestamp", entry.Timestamp.ToString("o"));
+        cmd.Parameters.AddWithValue("@type", entry.Type);
+        cmd.Parameters.AddWithValue("@name", (object?)entry.Name ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@message", (object?)entry.Message ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@chatType", (object?)entry.ChatType ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@isWhisper", entry.IsWhisper ? 1 : 0);
+        cmd.Parameters.AddWithValue("@hasProfanity", entry.HasProfanity ? 1 : 0);
+        cmd.Parameters.AddWithValue("@matchedWords", entry.MatchedWords is { Count: > 0 } ? JsonSerializer.Serialize(entry.MatchedWords, ChatHistoryJsonContext.Default.ListString) : DBNull.Value);
+        cmd.Parameters.AddWithValue("@userName", (object?)entry.UserName ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@action", (object?)entry.Action ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@roomName", (object?)entry.RoomName ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@roomOwner", (object?)entry.RoomOwner ?? DBNull.Value);
+
+        cmd.ExecuteNonQuery();
     }
 
     public IEnumerable<ChatHistoryEntry> Search(
@@ -55,52 +117,94 @@ public sealed class ChatHistoryService : IChatHistoryService
     {
         lock (_lock)
         {
-            IEnumerable<ChatHistoryEntry> results = _entries;
+            var conditions = new List<string>();
+            var parameters = new List<SqliteParameter>();
 
-            // Filter by date range
             if (fromDate.HasValue)
-                results = results.Where(e => e.Timestamp >= fromDate.Value);
-            if (toDate.HasValue)
-                results = results.Where(e => e.Timestamp <= toDate.Value);
+            {
+                conditions.Add("timestamp >= @fromDate");
+                parameters.Add(new SqliteParameter("@fromDate", fromDate.Value.ToString("o")));
+            }
 
-            // Filter by user name (for messages and actions)
+            if (toDate.HasValue)
+            {
+                conditions.Add("timestamp <= @toDate");
+                parameters.Add(new SqliteParameter("@toDate", toDate.Value.ToString("o")));
+            }
+
             if (!string.IsNullOrWhiteSpace(userName))
             {
-                results = results.Where(e =>
-                    (e.Name?.Contains(userName, StringComparison.OrdinalIgnoreCase) == true) ||
-                    (e.UserName?.Contains(userName, StringComparison.OrdinalIgnoreCase) == true));
+                conditions.Add("(name LIKE @userName OR user_name LIKE @userName)");
+                parameters.Add(new SqliteParameter("@userName", $"%{userName}%"));
             }
 
-            // Filter by keyword in message
             if (!string.IsNullOrWhiteSpace(keyword))
             {
-                results = results.Where(e =>
-                    e.Message?.Contains(keyword, StringComparison.OrdinalIgnoreCase) == true);
+                conditions.Add("message LIKE @keyword");
+                parameters.Add(new SqliteParameter("@keyword", $"%{keyword}%"));
             }
 
-            // Filter by profanity
             if (profanityOnly == true)
             {
-                results = results.Where(e => e.HasProfanity);
+                conditions.Add("has_profanity = 1");
             }
 
-            // Order by timestamp descending (most recent first)
-            var orderedResults = results.OrderByDescending(e => e.Timestamp).ToList();
-            var totalCount = orderedResults.Count;
+            var whereClause = conditions.Count > 0 ? "WHERE " + string.Join(" AND ", conditions) : "";
 
-            // Apply limit
-            if (limit.HasValue)
-                orderedResults = orderedResults.Take(limit.Value).ToList();
+            // Get total count
+            using var countCmd = _connection.CreateCommand();
+            countCmd.CommandText = $"SELECT COUNT(*) FROM chat_history {whereClause}";
+            countCmd.Parameters.AddRange(parameters.ToArray());
+            var totalCount = Convert.ToInt32(countCmd.ExecuteScalar());
 
-            return (orderedResults, totalCount);
+            // Get results
+            using var cmd = _connection.CreateCommand();
+            var limitClause = limit.HasValue ? $"LIMIT {limit.Value}" : "";
+            cmd.CommandText = $"SELECT * FROM chat_history {whereClause} ORDER BY timestamp DESC {limitClause}";
+            cmd.Parameters.AddRange(parameters.Select(p => new SqliteParameter(p.ParameterName, p.Value)).ToArray());
+
+            var results = new List<ChatHistoryEntry>();
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                results.Add(ReadEntry(reader));
+            }
+
+            return (results, totalCount);
         }
+    }
+
+    private static ChatHistoryEntry ReadEntry(SqliteDataReader reader)
+    {
+        List<string>? matchedWords = null;
+        var matchedWordsJson = reader["matched_words"] as string;
+        if (!string.IsNullOrEmpty(matchedWordsJson))
+        {
+            matchedWords = JsonSerializer.Deserialize(matchedWordsJson, ChatHistoryJsonContext.Default.ListString);
+        }
+
+        return new ChatHistoryEntry
+        {
+            Timestamp = DateTime.Parse(reader["timestamp"].ToString()!),
+            Type = reader["type"].ToString()!,
+            Name = reader["name"] as string,
+            Message = reader["message"] as string,
+            ChatType = reader["chat_type"] as string,
+            IsWhisper = Convert.ToInt32(reader["is_whisper"]) == 1,
+            HasProfanity = Convert.ToInt32(reader["has_profanity"]) == 1,
+            MatchedWords = matchedWords,
+            UserName = reader["user_name"] as string,
+            Action = reader["action"] as string,
+            RoomName = reader["room_name"] as string,
+            RoomOwner = reader["room_owner"] as string,
+        };
     }
 
     public int GetEntryCount()
     {
         lock (_lock)
         {
-            return _entries.Count;
+            return _entryCount;
         }
     }
 
@@ -108,73 +212,28 @@ public sealed class ChatHistoryService : IChatHistoryService
     {
         lock (_lock)
         {
-            _entries.Clear();
-            _isDirty = true;
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = "DELETE FROM chat_history";
+            cmd.ExecuteNonQuery();
+            _entryCount = 0;
         }
     }
 
-    public async Task SaveAsync()
+    public Task SaveAsync()
     {
-        List<ChatHistoryEntry> snapshot;
-        lock (_lock)
-        {
-            snapshot = [.. _entries];
-            _isDirty = false;
-        }
-
-        var path = _pathProvider.GetPath(AppPathKind.ChatHistory);
-        var directory = Path.GetDirectoryName(path);
-        if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-        {
-            Directory.CreateDirectory(directory);
-        }
-
-        await using var stream = File.Create(path);
-        await JsonSerializer.SerializeAsync(stream, snapshot, ChatHistoryJsonContext.Default.ListChatHistoryEntry);
+        // SQLite auto-saves, nothing to do
+        return Task.CompletedTask;
     }
 
-    public async Task LoadAsync()
+    public Task LoadAsync()
     {
-        // Only load once
-        if (_isLoaded)
-            return;
-
-        var path = _pathProvider.GetPath(AppPathKind.ChatHistory);
-        if (!File.Exists(path))
-        {
-            _isLoaded = true;
-            return;
-        }
-
-        try
-        {
-            await using var stream = File.OpenRead(path);
-            var entries = await JsonSerializer.DeserializeAsync(stream, ChatHistoryJsonContext.Default.ListChatHistoryEntry);
-
-            if (entries is not null)
-            {
-                lock (_lock)
-                {
-                    // Insert loaded entries at the beginning, keeping any new entries that were added
-                    _entries.InsertRange(0, entries);
-                }
-            }
-        }
-        catch
-        {
-            // Ignore corrupted history file
-        }
-        finally
-        {
-            _isLoaded = true;
-        }
+        // Already loaded via SQLite, nothing to do
+        return Task.CompletedTask;
     }
 
-    private void SaveIfDirty()
+    public void Dispose()
     {
-        if (_isDirty)
-        {
-            _ = SaveAsync();
-        }
+        _connection.Close();
+        _connection.Dispose();
     }
 }
