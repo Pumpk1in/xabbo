@@ -1,7 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
-using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Threading;
@@ -13,9 +11,6 @@ namespace Xabbo.Avalonia.Views;
 
 public partial class ChatPage : UserControl
 {
-    private ScrollViewer? _scrollViewer;
-    private bool _wasAtBottom;
-
     public ChatPage()
     {
         InitializeComponent();
@@ -29,46 +24,14 @@ public partial class ChatPage : UserControl
             }
         };
 
+        // Disable auto-scroll to focused item (prevents jumping to old selection on focus change)
         ListBoxMessages.TemplateApplied += (s, e) =>
         {
-            _scrollViewer = e.NameScope.Find<ScrollViewer>("PART_ScrollViewer");
-        };
-
-        AttachedToVisualTree += (s, e) =>
-        {
-            if (this.FindAncestorOfType<Window>() is { } window)
+            if (e.NameScope.Find<ScrollViewer>("PART_ScrollViewer") is { } scrollViewer)
             {
-                window.Deactivated += OnWindowDeactivated;
-                window.Activated += OnWindowActivated;
+                scrollViewer.BringIntoViewOnFocusChange = false;
             }
         };
-
-        DetachedFromVisualTree += (s, e) =>
-        {
-            if (this.FindAncestorOfType<Window>() is { } window)
-            {
-                window.Deactivated -= OnWindowDeactivated;
-                window.Activated -= OnWindowActivated;
-            }
-        };
-    }
-
-    private void OnWindowDeactivated(object? sender, EventArgs e)
-    {
-        if (_scrollViewer is null) return;
-        _wasAtBottom = _scrollViewer.Offset.Y + _scrollViewer.Viewport.Height >= _scrollViewer.Extent.Height - 10;
-    }
-
-    private void OnWindowActivated(object? sender, EventArgs e)
-    {
-        if (_scrollViewer is null || !_wasAtBottom) return;
-
-        // If was at bottom, scroll back to bottom after Avalonia's focus restoration
-        Dispatcher.UIThread.Post(() =>
-        {
-            var bottom = _scrollViewer.Extent.Height - _scrollViewer.Viewport.Height;
-            _scrollViewer.Offset = new Vector(_scrollViewer.Offset.X, Math.Max(0, bottom));
-        }, DispatcherPriority.Loaded);
     }
 
     private void ScrollToMessage(ChatLogEntryViewModel message)

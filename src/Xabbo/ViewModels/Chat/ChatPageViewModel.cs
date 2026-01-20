@@ -148,6 +148,10 @@ public class ChatPageViewModel : PageViewModel
 
     public ReactiveCommand<Unit, Unit> SearchUserInHistoryCmd { get; }
 
+    // Clear chat commands
+    public ReactiveCommand<Unit, Unit> ClearAllMessagesCmd { get; }
+    public ReactiveCommand<Unit, Unit> KeepLast60MinCmd { get; }
+
     [DependencyInjectionConstructor]
     public ChatPageViewModel(
         IExtension ext,
@@ -295,6 +299,10 @@ public class ChatPageViewModel : PageViewModel
         ExportHistoryCmd = ReactiveCommand.Create<string, Task>(ExportHistoryAsync);
         CopyHistoryEntriesCmd = ReactiveCommand.Create(CopyHistoryEntries);
         SearchUserInHistoryCmd = ReactiveCommand.Create(SearchUserInHistory, hasSingleContextMessage);
+
+        // Clear chat commands
+        ClearAllMessagesCmd = ReactiveCommand.Create(ClearAllMessages);
+        KeepLast60MinCmd = ReactiveCommand.Create(KeepLast60Min);
 
         // Scroll to bottom when unchecking a filter
         this.WhenAnyValue(x => x.WhispersOnly)
@@ -455,6 +463,18 @@ public class ChatPageViewModel : PageViewModel
         // Open the flyout and search
         OpenHistoryFlyoutAction?.Invoke();
         SearchHistory();
+    }
+
+    private void ClearAllMessages()
+    {
+        _cache.Clear();
+    }
+
+    private void KeepLast60Min()
+    {
+        var cutoff = DateTime.Now.AddMinutes(-60);
+        var toRemove = _cache.Items.Where(m => m.Timestamp < cutoff).Select(m => m.EntryId).ToList();
+        _cache.RemoveKeys(toRemove);
     }
 
     private void SearchHistory()

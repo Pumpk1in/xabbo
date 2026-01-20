@@ -20,7 +20,7 @@
     <vm:ChatPageViewModel />
   </Design.DataContext>
   <Grid RowDefinitions="Auto,*">
-    <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" Margin="10,10,10,0">
+    <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto" Margin="10,10,10,0">
       <TextBox
         Grid.Column="0"
         Classes="clearButton"
@@ -136,6 +136,15 @@
           </Flyout>
         </Button.Flyout>
         <ic:SymbolIcon Symbol="History" FontSize="16" />
+      </Button>
+      <Button Grid.Column="5" Margin="10,0,0,0" VerticalAlignment="Center" Padding="8" ToolTip.Tip="Clear chat">
+        <Button.Flyout>
+          <ui:FAMenuFlyout>
+            <ui:MenuFlyoutItem Text="Clear all" Command="{Binding ClearAllMessagesCmd}" IconSource="{icm:SymbolIconSource Symbol=Delete}" />
+            <ui:MenuFlyoutItem Text="Keep last 60 min" Command="{Binding KeepLast60MinCmd}" IconSource="{icm:SymbolIconSource Symbol=Clock}" />
+          </ui:FAMenuFlyout>
+        </Button.Flyout>
+        <ic:SymbolIcon Symbol="Delete" FontSize="16" />
       </Button>
     </Grid>
     <ListBox Grid.Row="1" Name="ListBoxMessages"
