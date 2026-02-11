@@ -77,6 +77,11 @@
                        SelectionMode="Multiple"
                        MaxHeight="350" MinHeight="100"
                        ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListBox.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <StackPanel />
+                  </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
                 <ListBox.KeyBindings>
                   <KeyBinding Gesture="Ctrl+C" Command="{Binding CopyHistoryEntriesCmd}" />
                 </ListBox.KeyBindings>

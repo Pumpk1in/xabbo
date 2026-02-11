@@ -13,18 +13,18 @@ public class ChatMessageViewModel : ChatLogEntryViewModel
     /// <summary>
     /// Whether this message contains profanity.
     /// </summary>
-    public bool HasProfanity { get; init; }
+    public bool HasProfanity { get; set; }
 
     /// <summary>
     /// Message segments for displaying with profanity highlighting.
     /// If null or empty, display the Message as-is.
     /// </summary>
-    public IReadOnlyList<MessageSegment>? MessageSegments { get; init; }
+    public IReadOnlyList<MessageSegment>? MessageSegments { get; set; }
 
     /// <summary>
     /// List of matched profanity words (base words from the filter).
     /// </summary>
-    public IReadOnlyList<string>? MatchedWords { get; init; }
+    public IReadOnlyList<string>? MatchedWords { get; set; }
 
     public bool IsTalk => Type is ChatType.Talk;
     public bool IsShout => Type is ChatType.Shout;

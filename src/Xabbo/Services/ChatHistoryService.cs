@@ -67,9 +67,39 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
     {
         lock (_lock)
         {
-            InsertEntry(entry);
-            _entryCount++;
+            // Check for duplicates before inserting
+            if (!EntryExists(entry))
+            {
+                InsertEntry(entry);
+                _entryCount++;
+            }
         }
+    }
+
+    /// <summary>
+    /// Checks if an equivalent message entry already exists in the database.
+    /// Uses name + message + timestamp (±2 seconds) to identify duplicates.
+    /// </summary>
+    private bool EntryExists(ChatHistoryEntry entry)
+    {
+        using var cmd = _connection.CreateCommand();
+
+        cmd.CommandText = @"
+            SELECT COUNT(*) FROM chat_history 
+            WHERE type = 'message' 
+            AND name = @name 
+            AND message = @message 
+            AND timestamp BETWEEN @startTime AND @endTime";
+
+        var startTime = entry.Timestamp.AddSeconds(-2);
+        var endTime = entry.Timestamp.AddSeconds(2);
+        cmd.Parameters.AddWithValue("@startTime", startTime.ToString("o"));
+        cmd.Parameters.AddWithValue("@endTime", endTime.ToString("o"));
+        cmd.Parameters.AddWithValue("@name", (object?)entry.Name ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@message", (object?)entry.Message ?? DBNull.Value);
+
+        int count = Convert.ToInt32(cmd.ExecuteScalar());
+        return count > 0;
     }
 
     private void InsertEntry(ChatHistoryEntry entry)

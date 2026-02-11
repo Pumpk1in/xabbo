@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
+using System.Reactive.Linq;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -15,7 +16,21 @@ public abstract class ConfigProvider<T> : ReactiveObject, IConfigProvider<T> whe
     private readonly JsonTypeInfo<T> _jsonTypeInfo;
 
     protected abstract string FilePath { get; }
-    [Reactive] public T Value { get; private set; }
+    
+    private T _value = new();
+    public T Value 
+    { 
+        get => _value;
+        private set
+        {
+            if (_value != value)
+            {
+                _value = value;
+                this.RaisePropertyChanged();
+                OnValueChanged();
+            }
+        }
+    }
 
     public ConfigProvider(
         JsonTypeInfo<T> jsonTypeInfo,
@@ -29,6 +44,13 @@ public abstract class ConfigProvider<T> : ReactiveObject, IConfigProvider<T> whe
 
         lifetime.ApplicationStarted.Register(OnApplicationStarted);
         lifetime.ApplicationStopping.Register(OnApplicationStopping);
+    }
+
+    /// <summary>
+    /// Called when the Value property changes. Can be overridden by derived classes.
+    /// </summary>
+    protected virtual void OnValueChanged()
+    {
     }
 
     private void OnApplicationStarted() => Load();
