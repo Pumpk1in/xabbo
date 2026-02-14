@@ -7,12 +7,15 @@ using DynamicData;
 using ReactiveUI;
 using HanumanInstitute.MvvmDialogs;
 
+using Splat;
 using Xabbo.Extension;
 using Xabbo.Core;
 using Xabbo.Core.Game;
 using Xabbo.Core.Messages.Incoming;
 using Xabbo.Core.Messages.Outgoing;
 using Xabbo.Services.Abstractions;
+using Xabbo.Command;
+using Xabbo.Command.Modules;
 using Xabbo.Controllers;
 using Xabbo.Exceptions;
 using Xabbo.Utility;
@@ -21,7 +24,7 @@ namespace Xabbo.ViewModels;
 
 public class RoomBansViewModel : ViewModelBase
 {
-    private readonly ILogger Log;
+    private readonly Microsoft.Extensions.Logging.ILogger Log;
     private readonly IUiContext _uiCtx;
     private readonly IDialogService _dialogService;
     private readonly IOperationManager _operationManager;
@@ -166,6 +169,14 @@ public class RoomBansViewModel : ViewModelBase
             });
 
             HasLoaded = true;
+
+            // Cleanup deferred bans for users already banned
+            var moderationCommands = Locator.Current.GetService<IEnumerable<CommandModule>>()
+                ?.OfType<ModerationCommands>()
+                .FirstOrDefault();
+            moderationCommands?.CleanupDeferredBans(
+                users.Select(u => u.Name),
+                currentRoomId);
         }
         catch (Exception ex)
         {

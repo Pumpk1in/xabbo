@@ -115,7 +115,9 @@ public class ChatPageViewModel : PageViewModel
     [Reactive] public string? HistorySearchKeyword { get; set; }
     [Reactive] public bool HistorySearchProfanityOnly { get; set; }
     [Reactive] public DateTime? HistorySearchFromDate { get; set; }
+    [Reactive] public TimeSpan? HistorySearchFromTime { get; set; }
     [Reactive] public DateTime? HistorySearchToDate { get; set; }
+    [Reactive] public TimeSpan? HistorySearchToTime { get; set; }
 
     private readonly ObservableCollection<ChatHistoryEntry> _historyResults = [];
     public ObservableCollection<ChatHistoryEntry> HistoryResults => _historyResults;
@@ -295,7 +297,7 @@ public class ChatPageViewModel : PageViewModel
         ExportChatCmd = ReactiveCommand.Create<string, Task>(ExportChatAsync);
 
         // History commands
-        SearchHistoryCmd = ReactiveCommand.Create(SearchHistory);
+        SearchHistoryCmd = ReactiveCommand.CreateFromTask(SearchHistoryAsync);
         ExportHistoryCmd = ReactiveCommand.Create<string, Task>(ExportHistoryAsync);
         CopyHistoryEntriesCmd = ReactiveCommand.Create(CopyHistoryEntries);
         SearchUserInHistoryCmd = ReactiveCommand.Create(SearchUserInHistory, hasSingleContextMessage);
@@ -448,7 +450,7 @@ public class ChatPageViewModel : PageViewModel
         }
     }
 
-    private void SearchUserInHistory()
+    private async void SearchUserInHistory()
     {
         if (ContextSelection is not [var message])
             return;
@@ -458,11 +460,13 @@ public class ChatPageViewModel : PageViewModel
         HistorySearchKeyword = null;
         HistorySearchProfanityOnly = false;
         HistorySearchFromDate = null;
+        HistorySearchFromTime = null;
         HistorySearchToDate = null;
+        HistorySearchToTime = null;
 
         // Open the flyout and search
         OpenHistoryFlyoutAction?.Invoke();
-        SearchHistory();
+        await SearchHistoryAsync();
     }
 
     private void ClearAllMessages()
@@ -477,7 +481,7 @@ public class ChatPageViewModel : PageViewModel
         _cache.RemoveKeys(toRemove);
     }
 
-    private void SearchHistory()
+    private async Task SearchHistoryAsync()
     {
         HistoryErrorMessage = null;
         _historyResults.Clear();
@@ -486,17 +490,24 @@ public class ChatPageViewModel : PageViewModel
         _lastSearchUser = string.IsNullOrWhiteSpace(HistorySearchUser) ? null : HistorySearchUser;
         _lastSearchKeyword = string.IsNullOrWhiteSpace(HistorySearchKeyword) ? null : HistorySearchKeyword;
         _lastSearchProfanityOnly = HistorySearchProfanityOnly;
-        _lastSearchFromDate = HistorySearchFromDate;
-        _lastSearchToDate = HistorySearchToDate;
 
-        var (results, totalCount) = _chatHistory.SearchWithCount(
+        // Combine date + time
+        _lastSearchFromDate = HistorySearchFromDate;
+        if (_lastSearchFromDate.HasValue && HistorySearchFromTime.HasValue)
+            _lastSearchFromDate = _lastSearchFromDate.Value.Date + HistorySearchFromTime.Value;
+
+        _lastSearchToDate = HistorySearchToDate;
+        if (_lastSearchToDate.HasValue && HistorySearchToTime.HasValue)
+            _lastSearchToDate = _lastSearchToDate.Value.Date + HistorySearchToTime.Value;
+
+        var (results, totalCount) = await Task.Run(() => _chatHistory.SearchWithCount(
             userName: _lastSearchUser,
             keyword: _lastSearchKeyword,
             profanityOnly: _lastSearchProfanityOnly ? true : null,
             fromDate: _lastSearchFromDate,
             toDate: _lastSearchToDate,
             limit: 500
-        );
+        ));
 
         foreach (var entry in results)
         {
@@ -679,6 +690,24 @@ public class ChatPageViewModel : PageViewModel
     {
         vm.EntryId = NextEntryId();
         _cache.AddOrUpdate(vm);
+    }
+
+    public void AppendModerationNotification(string userName, string action)
+    {
+        var vm = new ChatLogAvatarActionViewModel
+        {
+            UserName = userName,
+            Action = action
+        };
+        AppendLog(vm);
+
+        _chatHistory.AddEntry(new ChatHistoryEntry
+        {
+            Timestamp = vm.Timestamp,
+            Type = "action",
+            UserName = userName,
+            Action = action
+        });
     }
 
     private void OnAvatarAdded(AvatarEventArgs e)
@@ -1025,9 +1054,27 @@ public class ChatPageViewModel : PageViewModel
     }
 
     private Task MuteUsersAsync(string minutesStr) => TryModerate(() => MuteSelectedUsersAsync(int.Parse(minutesStr)));
-    private Task KickUsersAsync() => TryModerate(() => _moderation.KickUsersAsync(GetSelectedUsers()));
+    private Task KickUsersAsync() => TryModerate(async () =>
+    {
+        var users = GetSelectedUsers().ToList();
+        await _moderation.KickUsersAsync(users);
+        foreach (var user in users)
+        {
+            _xabbot.ShowMessage($"Kicked user '{user.Name}'");
+            AppendModerationNotification(user.Name, "kicked");
+        }
+    });
     private Task BanUsersAsync(BanDuration duration) => TryModerate(() => BanSelectedUsersAsync(duration));
-    private Task BounceUsersAsync() => TryModerate(() => _moderation.BounceUsersAsync(GetSelectedUsers()));
+    private Task BounceUsersAsync() => TryModerate(async () =>
+    {
+        var users = GetSelectedUsers().ToList();
+        await _moderation.BounceUsersAsync(users);
+        foreach (var user in users)
+        {
+            _xabbot.ShowMessage($"Bounced user '{user.Name}'");
+            AppendModerationNotification(user.Name, "bounced");
+        }
+    });
 
     private async Task MuteSelectedUsersAsync(int minutes)
     {
@@ -1057,6 +1104,7 @@ public class ChatPageViewModel : PageViewModel
             foreach (var user in usersInRoom)
             {
                 _xabbot.ShowMessage($"Muting user '{user.Name}' for {minutes} minute(s)");
+                AppendModerationNotification(user.Name, $"muted for {minutes} minute(s)");
             }
         }
 
@@ -1064,6 +1112,7 @@ public class ChatPageViewModel : PageViewModel
         foreach (var userName in usersNotInRoom)
         {
             _xabbot.ShowMessage($"User '{userName}' not found");
+            AppendModerationNotification(userName, "not found (mute)");
         }
     }
 
@@ -1103,6 +1152,7 @@ public class ChatPageViewModel : PageViewModel
             foreach (var user in usersInRoom)
             {
                 _xabbot.ShowMessage($"Banned user '{user.Name}' {durationText}");
+                AppendModerationNotification(user.Name, $"banned {durationText}");
             }
         }
 
@@ -1119,6 +1169,7 @@ public class ChatPageViewModel : PageViewModel
                 {
                     _moderationCommands.AddToBanList(userName, duration);
                     _xabbot.ShowMessage($"User '{userName}' not found, will be banned {durationText} upon next entry to this room.");
+                    AppendModerationNotification(userName, $"will be banned {durationText} upon next entry");
                 }
             }
         }
@@ -1130,10 +1181,12 @@ public class ChatPageViewModel : PageViewModel
         {
             await _moderation.KickUsersAsync([user]);
             _xabbot.ShowMessage($"Kicked user '{userName}'");
+            AppendModerationNotification(userName, "kicked");
         }
         else
         {
             _xabbot.ShowMessage($"User '{userName}' not found");
+            AppendModerationNotification(userName, "not found (kick)");
         }
     });
 
@@ -1145,10 +1198,12 @@ public class ChatPageViewModel : PageViewModel
         {
             await _moderation.MuteUsersAsync([user], minutes);
             _xabbot.ShowMessage($"Muting user '{userName}' for {minutes} minute(s)");
+            AppendModerationNotification(userName, $"muted for {minutes} minute(s)");
         }
         else
         {
             _xabbot.ShowMessage($"User '{userName}' not found");
+            AppendModerationNotification(userName, "not found (mute)");
         }
     });
 
@@ -1168,6 +1223,7 @@ public class ChatPageViewModel : PageViewModel
         {
             await _moderation.BanUsersAsync([user], duration);
             _xabbot.ShowMessage($"Banned user '{userName}' {durationText}");
+            AppendModerationNotification(userName, $"banned {durationText}");
         }
         else
         {
@@ -1180,6 +1236,7 @@ public class ChatPageViewModel : PageViewModel
             {
                 _moderationCommands.AddToBanList(userName, duration);
                 _xabbot.ShowMessage($"User '{userName}' not found, will be banned {durationText} upon next entry to this room.");
+                AppendModerationNotification(userName, $"will be banned {durationText} upon next entry");
             }
         }
     });

@@ -17,6 +17,7 @@ public sealed class AppPathService : IAppPathProvider
         AppPathKind.Wardrobe => GetAppDataFilePath("wardrobe.json"),
         AppPathKind.RoomPasswords => GetAppDataFilePath("passwords.json"),
         AppPathKind.ChatHistoryDb => GetAppDataFilePath("chat_history.db"),
+        AppPathKind.DeferredBans => GetAppDataFilePath("deferred_bans.json"),
         _ => throw new Exception($"Unsupported app path kind: '{kind}'."),
     };
 }

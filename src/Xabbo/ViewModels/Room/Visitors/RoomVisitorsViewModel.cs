@@ -34,6 +34,7 @@ public class RoomVisitorsViewModel : ViewModelBase
     private readonly RoomModerationController _moderation;
     private readonly XabbotComponent _xabbot;
     private ModerationCommands? _moderationCommands;
+    private ChatPageViewModel? _chatPage;
 
     private readonly ReadOnlyObservableCollection<VisitorViewModel> _visitors;
     public ReadOnlyObservableCollection<VisitorViewModel> Visitors => _visitors;
@@ -232,6 +233,7 @@ public class RoomVisitorsViewModel : ViewModelBase
             // User is in the room - ban immediately
             await _moderation.BanUsersAsync([user], duration);
             _xabbot.ShowMessage($"Banned user '{visitor.Name}' {durationText}");
+            NotifyChatLog(visitor.Name, $"banned {durationText}");
         }
         else
         {
@@ -245,6 +247,7 @@ public class RoomVisitorsViewModel : ViewModelBase
             {
                 _moderationCommands.AddToBanList(visitor.Name, duration);
                 _xabbot.ShowMessage($"User '{visitor.Name}' not found, will be banned {durationText} upon next entry to this room.");
+                NotifyChatLog(visitor.Name, $"will be banned {durationText} upon next entry");
                 _logger.LogInformation($"User '{visitor.Name}' added to ban list. Will be banned on next entry.");
             }
             else
@@ -253,5 +256,11 @@ public class RoomVisitorsViewModel : ViewModelBase
                 _logger.LogError("ModerationCommands module not found. Cannot add user to ban list.");
             }
         }
+    }
+
+    private void NotifyChatLog(string userName, string action)
+    {
+        _chatPage ??= Locator.Current.GetService<ChatPageViewModel>();
+        _chatPage?.AppendModerationNotification(userName, action);
     }
 }

@@ -7,6 +7,8 @@ using DynamicData.Kernel;
 using HanumanInstitute.MvvmDialogs;
 using ReactiveUI;
 
+using Splat;
+
 using Xabbo.Configuration;
 using Xabbo.Controllers;
 using Xabbo.Core;
@@ -38,6 +40,7 @@ public class RoomAvatarsViewModel : ViewModelBase
     private readonly RoomManager _roomManager;
     private readonly TradeManager _tradeManager;
     private readonly XabbotComponent _xabbot;
+    private ChatPageViewModel? _chatPage;
 
     private readonly SourceCache<AvatarViewModel, int> _avatarCache = new(x => x.Index);
 
@@ -360,9 +363,49 @@ public class RoomAvatarsViewModel : ViewModelBase
     }
 
     private Task MuteUsersAsync(string minutesStr) => TryModerate(() => MuteSelectedUsersAsync(int.Parse(minutesStr)));
-    private Task KickUsersAsync() => TryModerate(() => _moderation.KickUsersAsync(SelectedUsers));
-    private Task BanUsersAsync(BanDuration duration) => TryModerate(() => _moderation.BanUsersAsync(SelectedUsers, duration));
-    private Task BounceUsersAsync() => TryModerate(() => _moderation.BounceUsersAsync(SelectedUsers));
+    private Task KickUsersAsync() => TryModerate(async () =>
+    {
+        var users = SelectedUsers.ToList();
+        await _moderation.KickUsersAsync(users);
+        foreach (var user in users)
+        {
+            _xabbot.ShowMessage($"Kicked user '{user.Name}'");
+            NotifyChatLog(user.Name, "kicked");
+        }
+    });
+    private Task BanUsersAsync(BanDuration duration) => TryModerate(async () =>
+    {
+        var users = SelectedUsers.ToList();
+        var durationText = duration switch
+        {
+            BanDuration.Hour => "for an hour",
+            BanDuration.Day => "for a day",
+            BanDuration.Permanent => "permanently",
+            _ => ""
+        };
+        await _moderation.BanUsersAsync(users, duration);
+        foreach (var user in users)
+        {
+            _xabbot.ShowMessage($"Banned user '{user.Name}' {durationText}");
+            NotifyChatLog(user.Name, $"banned {durationText}");
+        }
+    });
+    private Task BounceUsersAsync() => TryModerate(async () =>
+    {
+        var users = SelectedUsers.ToList();
+        await _moderation.BounceUsersAsync(users);
+        foreach (var user in users)
+        {
+            _xabbot.ShowMessage($"Bounced user '{user.Name}'");
+            NotifyChatLog(user.Name, "bounced");
+        }
+    });
+
+    private void NotifyChatLog(string userName, string action)
+    {
+        _chatPage ??= Locator.Current.GetService<ChatPageViewModel>();
+        _chatPage?.AppendModerationNotification(userName, action);
+    }
 
     private async Task MuteSelectedUsersAsync(int minutes)
     {
@@ -374,6 +417,7 @@ public class RoomAvatarsViewModel : ViewModelBase
         foreach (var user in users)
         {
             _xabbot.ShowMessage($"Muting user '{user.Name}' for {minutes} minute(s)");
+            NotifyChatLog(user.Name, $"muted for {minutes} minute(s)");
         }
     }
 

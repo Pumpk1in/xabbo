@@ -1,26 +1,76 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
+using System.Text.Json;
+using Splat;
 using Xabbo.Messages.Flash;
 using Xabbo.Core;
 using Xabbo.Core.Game;
 using Xabbo.Core.Events;
 using Xabbo.Core.Messages.Outgoing;
+using Xabbo.Models;
+using Xabbo.Models.Enums;
+using Xabbo.Serialization;
+using Xabbo.Services.Abstractions;
+using Xabbo.ViewModels;
 
 namespace Xabbo.Command.Modules;
 
 [CommandModule]
-public sealed class ModerationCommands(RoomManager roomManager) : CommandModule
+public sealed class ModerationCommands(RoomManager roomManager, IAppPathProvider appPathProvider) : CommandModule
 {
     private readonly RoomManager _roomManager = roomManager;
+    private readonly IAppPathProvider _appPathProvider = appPathProvider;
 
     private readonly ConcurrentDictionary<string, int> _muteList = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, BanDuration> _banList = new(StringComparer.OrdinalIgnoreCase);
+    private DeferredModerationData _deferredData = new();
+    private ChatPageViewModel? _chatPage;
+
+    private void NotifyChatLog(string userName, string action)
+    {
+        _chatPage ??= Locator.Current.GetService<ChatPageViewModel>();
+        _chatPage?.AppendModerationNotification(userName, action);
+    }
 
     protected override void OnInitialize()
     {
         _roomManager.Left += RoomManager_Left;
+        _roomManager.Entered += RoomManager_Entered;
         _roomManager.AvatarsAdded += OnAvatarsAdded;
 
+        LoadDeferredData();
+
         IsAvailable = true;
+    }
+
+    private void LoadDeferredData()
+    {
+        var filePath = _appPathProvider.GetPath(AppPathKind.DeferredBans);
+        if (File.Exists(filePath))
+        {
+            try
+            {
+                _deferredData = JsonSerializer.Deserialize(
+                    File.ReadAllText(filePath),
+                    JsonSourceGenerationContext.Default.DeferredModerationData
+                ) ?? new();
+            }
+            catch
+            {
+                _deferredData = new();
+            }
+        }
+    }
+
+    private void SaveDeferredData()
+    {
+        try
+        {
+            File.WriteAllText(
+                _appPathProvider.GetPath(AppPathKind.DeferredBans),
+                JsonSerializer.Serialize(_deferredData, JsonSourceGenerationContext.Default.DeferredModerationData)
+            );
+        }
+        catch { }
     }
 
     private void MuteUser(IUser user, int minutes)
@@ -52,6 +102,54 @@ public sealed class ModerationCommands(RoomManager roomManager) : CommandModule
     public void AddToBanList(string userName, BanDuration duration)
     {
         _banList[userName] = duration;
+
+        // Persist
+        if (_roomManager.Room is { Id: var roomId })
+        {
+            if (!_deferredData.Bans.TryGetValue(roomId, out var roomBans))
+                _deferredData.Bans[roomId] = roomBans = new(StringComparer.OrdinalIgnoreCase);
+            roomBans[userName] = (int)duration;
+            SaveDeferredData();
+        }
+    }
+
+    public void CleanupDeferredBans(IEnumerable<string> bannedNames, long roomId)
+    {
+        var cleaned = false;
+        foreach (var name in bannedNames)
+        {
+            if (_banList.TryRemove(name, out _))
+            {
+                if (_deferredData.Bans.TryGetValue(roomId, out var roomBans))
+                    roomBans.Remove(name);
+                NotifyChatLog(name, "already banned, removed from deferred list");
+                cleaned = true;
+            }
+        }
+        if (cleaned)
+            SaveDeferredData();
+    }
+
+    private void RoomManager_Entered(RoomEventArgs e)
+    {
+        _banList.Clear();
+        _muteList.Clear();
+
+        var roomId = (long)e.Room.Id;
+
+        // Load deferred bans for this room
+        if (_deferredData.Bans.TryGetValue(roomId, out var roomBans))
+        {
+            foreach (var (userName, duration) in roomBans)
+                _banList[userName] = (BanDuration)duration;
+        }
+
+        // Load deferred mutes for this room
+        if (_deferredData.Mutes.TryGetValue(roomId, out var roomMutes))
+        {
+            foreach (var (userName, minutes) in roomMutes)
+                _muteList[userName] = minutes;
+        }
     }
 
     private void RoomManager_Left()
@@ -69,16 +167,38 @@ public sealed class ModerationCommands(RoomManager roomManager) : CommandModule
             if (_banList.TryGetValue(user.Name, out BanDuration banDuration))
             {
                 ShowMessage($"Banning user '{user.Name}'");
+                NotifyChatLog(user.Name, "banned (deferred)");
                 await Task.Delay(100);
                 BanUser(user, banDuration);
                 _banList.TryRemove(user.Name, out _);
+
+                // Remove from persistent storage
+                if (_roomManager.Room is { Id: var roomId } &&
+                    _deferredData.Bans.TryGetValue(roomId, out var roomBans))
+                {
+                    roomBans.Remove(user.Name);
+                    if (roomBans.Count == 0)
+                        _deferredData.Bans.Remove(roomId);
+                    SaveDeferredData();
+                }
             }
             else if (_muteList.TryGetValue(user.Name, out int muteDuration))
             {
                 ShowMessage($"Muting user '{user.Name}'");
+                NotifyChatLog(user.Name, "muted (deferred)");
                 await Task.Delay(100);
                 MuteUser(user, muteDuration);
                 _muteList.TryRemove(user.Name, out _);
+
+                // Remove from persistent storage
+                if (_roomManager.Room is { Id: var roomId } &&
+                    _deferredData.Mutes.TryGetValue(roomId, out var roomMutes))
+                {
+                    roomMutes.Remove(user.Name);
+                    if (roomMutes.Count == 0)
+                        _deferredData.Mutes.Remove(roomId);
+                    SaveDeferredData();
+                }
             }
         });
     }
@@ -132,6 +252,7 @@ public sealed class ModerationCommands(RoomManager roomManager) : CommandModule
                     else
                     {
                         ShowMessage($"Muting user '{user.Name}' for {inputDuration} {(isHours ? "hour(s)" : "minute(s)")}");
+                        NotifyChatLog(user.Name, $"muted for {inputDuration} {(isHours ? "hour(s)" : "minute(s)")}");
                         MuteUser(user, duration);
                     }
                 }
@@ -167,6 +288,7 @@ public sealed class ModerationCommands(RoomManager roomManager) : CommandModule
             _roomManager.Room.TryGetAvatarByName(userName, out IUser? user))
         {
             ShowMessage($"Unmuting user '{user.Name}'");
+            NotifyChatLog(user.Name, "unmuted");
             UnmuteUser(user);
         }
         else
@@ -199,6 +321,7 @@ public sealed class ModerationCommands(RoomManager roomManager) : CommandModule
             _roomManager.Room.TryGetUserByName(userName, out IUser? user))
         {
             ShowMessage($"Kicking user '{user.Name}'");
+            NotifyChatLog(user.Name, "kicked");
             KickUser(user);
         }
         else
@@ -244,12 +367,14 @@ public sealed class ModerationCommands(RoomManager roomManager) : CommandModule
             _roomManager.Room.TryGetUserByName(userName, out IUser? user))
         {
             ShowMessage($"Banning user '{user.Name}' {durationString}");
+            NotifyChatLog(user.Name, $"banned {durationString}");
             BanUser(user, banDuration);
         }
         else
         {
             ShowMessage($"User '{userName}' not found, will be banned {durationString} upon next entry to this room.");
-            _banList[userName] = banDuration;
+            NotifyChatLog(userName, $"will be banned {durationString} upon next entry");
+            AddToBanList(userName, banDuration);
         }
         return Task.CompletedTask;
     }
