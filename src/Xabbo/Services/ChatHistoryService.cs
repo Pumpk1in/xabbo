@@ -27,6 +27,17 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
         _connection = new SqliteConnection($"Data Source={dbPath}");
         _connection.Open();
 
+        using (var pragmaCmd = _connection.CreateCommand())
+        {
+            pragmaCmd.CommandText = """
+                PRAGMA journal_mode=WAL;
+                PRAGMA synchronous=NORMAL;
+                PRAGMA cache_size=-8000;
+                PRAGMA temp_store=MEMORY;
+                """;
+            pragmaCmd.ExecuteNonQuery();
+        }
+
         InitializeDatabase();
     }
 
@@ -36,7 +47,7 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
         cmd.CommandText = """
             CREATE TABLE IF NOT EXISTS chat_history (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp TEXT NOT NULL,
+                timestamp INTEGER NOT NULL,
                 type TEXT NOT NULL,
                 name TEXT,
                 message TEXT,
@@ -54,6 +65,8 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
             CREATE INDEX IF NOT EXISTS idx_name ON chat_history(name);
             CREATE INDEX IF NOT EXISTS idx_user_name ON chat_history(user_name);
             CREATE INDEX IF NOT EXISTS idx_has_profanity ON chat_history(has_profanity);
+            CREATE INDEX IF NOT EXISTS idx_name_timestamp ON chat_history(name, timestamp);
+            CREATE INDEX IF NOT EXISTS idx_user_name_timestamp ON chat_history(user_name, timestamp);
             """;
         cmd.ExecuteNonQuery();
 
@@ -91,10 +104,10 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
             AND message = @message 
             AND timestamp BETWEEN @startTime AND @endTime";
 
-        var startTime = entry.Timestamp.AddSeconds(-2);
-        var endTime = entry.Timestamp.AddSeconds(2);
-        cmd.Parameters.AddWithValue("@startTime", startTime.ToString("o"));
-        cmd.Parameters.AddWithValue("@endTime", endTime.ToString("o"));
+        var startTime = new DateTimeOffset(entry.Timestamp.AddSeconds(-2)).ToUnixTimeSeconds();
+        var endTime = new DateTimeOffset(entry.Timestamp.AddSeconds(2)).ToUnixTimeSeconds();
+        cmd.Parameters.AddWithValue("@startTime", startTime);
+        cmd.Parameters.AddWithValue("@endTime", endTime);
         cmd.Parameters.AddWithValue("@name", (object?)entry.Name ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@message", (object?)entry.Message ?? DBNull.Value);
 
@@ -110,7 +123,7 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
             VALUES (@timestamp, @type, @name, @message, @chatType, @isWhisper, @hasProfanity, @matchedWords, @userName, @action, @roomName, @roomOwner)
             """;
 
-        cmd.Parameters.AddWithValue("@timestamp", entry.Timestamp.ToString("o"));
+        cmd.Parameters.AddWithValue("@timestamp", new DateTimeOffset(entry.Timestamp).ToUnixTimeSeconds());
         cmd.Parameters.AddWithValue("@type", entry.Type);
         cmd.Parameters.AddWithValue("@name", (object?)entry.Name ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@message", (object?)entry.Message ?? DBNull.Value);
@@ -153,13 +166,13 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
             if (fromDate.HasValue)
             {
                 conditions.Add("timestamp >= @fromDate");
-                parameters.Add(new SqliteParameter("@fromDate", fromDate.Value.ToString("o")));
+                parameters.Add(new SqliteParameter("@fromDate", new DateTimeOffset(fromDate.Value).ToUnixTimeSeconds()));
             }
 
             if (toDate.HasValue)
             {
                 conditions.Add("timestamp <= @toDate");
-                parameters.Add(new SqliteParameter("@toDate", toDate.Value.ToString("o")));
+                parameters.Add(new SqliteParameter("@toDate", new DateTimeOffset(toDate.Value).ToUnixTimeSeconds()));
             }
 
             if (!string.IsNullOrWhiteSpace(userName))
@@ -181,22 +194,19 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
 
             var whereClause = conditions.Count > 0 ? "WHERE " + string.Join(" AND ", conditions) : "";
 
-            // Get total count
-            using var countCmd = _connection.CreateCommand();
-            countCmd.CommandText = $"SELECT COUNT(*) FROM chat_history {whereClause}";
-            countCmd.Parameters.AddRange(parameters.ToArray());
-            var totalCount = Convert.ToInt32(countCmd.ExecuteScalar());
-
-            // Get results
+            // Single query: get total count via window function, with optional limit on rows returned
             using var cmd = _connection.CreateCommand();
             var limitClause = limit.HasValue ? $"LIMIT {limit.Value}" : "";
-            cmd.CommandText = $"SELECT * FROM chat_history {whereClause} ORDER BY timestamp DESC {limitClause}";
-            cmd.Parameters.AddRange(parameters.Select(p => new SqliteParameter(p.ParameterName, p.Value)).ToArray());
+            cmd.CommandText = $"SELECT *, COUNT(*) OVER() AS total_count FROM chat_history {whereClause} ORDER BY timestamp DESC {limitClause}";
+            cmd.Parameters.AddRange(parameters.ToArray());
 
             var results = new List<ChatHistoryEntry>();
+            int totalCount = 0;
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
             {
+                if (totalCount == 0)
+                    totalCount = Convert.ToInt32(reader["total_count"]);
                 results.Add(ReadEntry(reader));
             }
 
@@ -215,7 +225,7 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
 
         return new ChatHistoryEntry
         {
-            Timestamp = DateTime.Parse(reader["timestamp"].ToString()!),
+            Timestamp = DateTimeOffset.FromUnixTimeSeconds(Convert.ToInt64(reader["timestamp"])).LocalDateTime,
             Type = reader["type"].ToString()!,
             Name = reader["name"] as string,
             Message = reader["message"] as string,
