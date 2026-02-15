@@ -32,6 +32,11 @@ public interface IChatHistoryService
         int? limit = null);
 
     /// <summary>
+    /// Re-scans all messages and updates has_profanity flags in the database.
+    /// </summary>
+    Task UpdateProfanityFlagsAsync(IProfanityFilterService profanityFilter);
+
+    /// <summary>
     /// Gets the total count of entries in the history.
     /// </summary>
     int GetEntryCount();

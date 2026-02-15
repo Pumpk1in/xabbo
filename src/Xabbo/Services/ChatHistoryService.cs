@@ -240,6 +240,53 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
         };
     }
 
+    public Task UpdateProfanityFlagsAsync(IProfanityFilterService profanityFilter)
+    {
+        return Task.Run(() =>
+        {
+            lock (_lock)
+            {
+                // Read all message IDs and their current profanity state
+                var updates = new List<(long Id, bool NewFlag)>();
+
+                using (var cmd = _connection.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT id, message, has_profanity FROM chat_history WHERE type = 'message' AND message IS NOT NULL";
+                    using var reader = cmd.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        var id = reader.GetInt64(0);
+                        var message = reader.GetString(1);
+                        var currentFlag = reader.GetInt32(2) == 1;
+                        var newFlag = profanityFilter.ContainsProfanity(message);
+
+                        if (newFlag != currentFlag)
+                            updates.Add((id, newFlag));
+                    }
+                }
+
+                if (updates.Count == 0)
+                    return;
+
+                // Batch update changed flags in a single transaction
+                using var transaction = _connection.BeginTransaction();
+                using var updateCmd = _connection.CreateCommand();
+                updateCmd.CommandText = "UPDATE chat_history SET has_profanity = @flag WHERE id = @id";
+                var flagParam = updateCmd.Parameters.Add("@flag", SqliteType.Integer);
+                var idParam = updateCmd.Parameters.Add("@id", SqliteType.Integer);
+
+                foreach (var (id, newFlag) in updates)
+                {
+                    flagParam.Value = newFlag ? 1 : 0;
+                    idParam.Value = id;
+                    updateCmd.ExecuteNonQuery();
+                }
+
+                transaction.Commit();
+            }
+        });
+    }
+
     public int GetEntryCount()
     {
         lock (_lock)

@@ -11,6 +11,12 @@ public readonly record struct ProfanityMatch(int Start, int Length, string Match
 public interface IProfanityFilterService
 {
     /// <summary>
+    /// Raised when profanity patterns are rebuilt (words added/removed).
+    /// Not raised during initial construction.
+    /// </summary>
+    event Action? PatternsChanged;
+
+    /// <summary>
     /// Checks if the message contains any profanity.
     /// </summary>
     bool ContainsProfanity(string message);

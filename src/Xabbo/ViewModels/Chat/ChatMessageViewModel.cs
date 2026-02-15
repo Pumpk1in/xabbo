@@ -1,3 +1,4 @@
+using ReactiveUI;
 using Xabbo.Core;
 
 namespace Xabbo.ViewModels;
@@ -13,18 +14,18 @@ public class ChatMessageViewModel : ChatLogEntryViewModel
     /// <summary>
     /// Whether this message contains profanity.
     /// </summary>
-    public bool HasProfanity { get; set; }
+    [Reactive] public bool HasProfanity { get; set; }
 
     /// <summary>
     /// Message segments for displaying with profanity highlighting.
     /// If null or empty, display the Message as-is.
     /// </summary>
-    public IReadOnlyList<MessageSegment>? MessageSegments { get; set; }
+    [Reactive] public IReadOnlyList<MessageSegment>? MessageSegments { get; set; }
 
     /// <summary>
     /// List of matched profanity words (base words from the filter).
     /// </summary>
-    public IReadOnlyList<string>? MatchedWords { get; set; }
+    [Reactive] public IReadOnlyList<string>? MatchedWords { get; set; }
 
     public bool IsTalk => Type is ChatType.Talk;
     public bool IsShout => Type is ChatType.Shout;
@@ -35,10 +36,17 @@ public class ChatMessageViewModel : ChatLogEntryViewModel
     /// </summary>
     public bool IsOwnMessage { get; init; }
 
+    private readonly ObservableAsPropertyHelper<bool> _showModerationButtons;
     /// <summary>
     /// Whether to show moderation buttons (has profanity and not own message).
     /// </summary>
-    public bool ShowModerationButtons => HasProfanity && !IsOwnMessage;
+    public bool ShowModerationButtons => _showModerationButtons.Value;
+
+    public ChatMessageViewModel()
+    {
+        _showModerationButtons = this.WhenAnyValue(x => x.HasProfanity, hp => hp && !IsOwnMessage)
+            .ToProperty(this, x => x.ShowModerationButtons);
+    }
 
     // Quick action parameters (Name, Duration/BanType)
     public (string Name, int Minutes) MuteParam2 => (Name, 2);

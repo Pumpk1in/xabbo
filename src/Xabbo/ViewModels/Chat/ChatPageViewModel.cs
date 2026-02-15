@@ -191,6 +191,7 @@ public class ChatPageViewModel : PageViewModel
         _roomManager.AvatarRemoved += OnAvatarRemoved;
         _roomManager.AvatarChat += RoomManager_AvatarChat;
         _roomManager.AvatarUpdated += RoomManager_AvatarUpdated;
+        _profanityFilter.PatternsChanged += OnProfanityPatternsChanged;
 
         // Context selection observables for command can-execute
         var hasSingleContextMessage = this
@@ -906,6 +907,28 @@ public class ChatPageViewModel : PageViewModel
         }
 
         return (true, segments, matchedWords);
+    }
+
+    private void OnProfanityPatternsChanged()
+    {
+        // Update profanity flags in DB (background)
+        _ = Task.Run(async () =>
+        {
+            try { await _chatHistory.UpdateProfanityFlagsAsync(_profanityFilter); }
+            catch { /* DB update is best-effort */ }
+        });
+
+        // Re-analyze all chat messages in the live cache on UI thread
+        Observable.Start(() =>
+        {
+            foreach (var msg in _cache.Items.OfType<ChatMessageViewModel>())
+            {
+                var (hasProfanity, segments, matchedWords) = AnalyzeProfanity(msg.Message);
+                msg.HasProfanity = hasProfanity;
+                msg.MessageSegments = segments;
+                msg.MatchedWords = matchedWords;
+            }
+        }, RxApp.MainThreadScheduler).Subscribe();
     }
 
     // Context menu command implementations

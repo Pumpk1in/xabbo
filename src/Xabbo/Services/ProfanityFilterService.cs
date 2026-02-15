@@ -21,6 +21,9 @@ public partial class ProfanityFilterService : IProfanityFilterService
 
     // Track the current CustomWords collection to handle resubscription
     private System.Collections.ObjectModel.ObservableCollection<string>? _subscribedCollection;
+    private bool _initialized;
+
+    public event Action? PatternsChanged;
 
     // Character substitutions for obfuscation detection
     private static readonly Dictionary<char, string> CharacterPatterns = new()
@@ -39,7 +42,7 @@ public partial class ProfanityFilterService : IProfanityFilterService
         ['l'] = "[l1|]",
         ['m'] = "[m]",
         ['n'] = "[nñ]",
-        ['o'] = "[o0°òóôõöx]",
+        ['o'] = "[o0°òóôõöx*]",
         ['p'] = "[p]",
         ['q'] = "[q]",
         ['r'] = "[r]",
@@ -63,6 +66,7 @@ public partial class ProfanityFilterService : IProfanityFilterService
         // Build initial patterns and subscribe to changes
         EnsureSubscribed();
         RebuildPatterns();
+        _initialized = true;
 
         // Re-subscribe when config is reloaded (Value is replaced with new instance)
         _configProvider.Loaded += () =>
@@ -112,6 +116,9 @@ public partial class ProfanityFilterService : IProfanityFilterService
                 }
             }
         }
+
+        if (_initialized)
+            PatternsChanged?.Invoke();
     }
 
     /// <summary>
