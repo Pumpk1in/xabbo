@@ -183,7 +183,7 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
 
             if (!string.IsNullOrWhiteSpace(keyword))
             {
-                conditions.Add("message LIKE @keyword");
+                conditions.Add("(message LIKE @keyword OR action LIKE @keyword)");
                 parameters.Add(new SqliteParameter("@keyword", $"%{keyword}%"));
             }
 

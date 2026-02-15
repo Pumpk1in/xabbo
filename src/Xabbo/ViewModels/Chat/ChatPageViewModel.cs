@@ -376,7 +376,8 @@ public class ChatPageViewModel : PageViewModel
                     chat.Message.Contains(keyword, StringComparison.OrdinalIgnoreCase)),
             ChatLogAvatarActionViewModel action =>
                 keywords.Any(keyword =>
-                    action.UserName.Contains(keyword, StringComparison.OrdinalIgnoreCase)),
+                    action.UserName.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
+                    action.Action.Contains(keyword, StringComparison.OrdinalIgnoreCase)),
             ChatLogRoomEntryViewModel room => 
                  keywords.Any(keyword =>
                     room.RoomName.Contains(keyword, StringComparison.OrdinalIgnoreCase)),
