@@ -191,7 +191,12 @@ public class ChatPageViewModel : PageViewModel
         _roomManager.AvatarRemoved += OnAvatarRemoved;
         _roomManager.AvatarChat += RoomManager_AvatarChat;
         _roomManager.AvatarUpdated += RoomManager_AvatarUpdated;
-        _profanityFilter.PatternsChanged += OnProfanityPatternsChanged;
+        Observable
+            .FromEvent(
+                h => _profanityFilter.PatternsChanged += h,
+                h => _profanityFilter.PatternsChanged -= h)
+            .Throttle(TimeSpan.FromMilliseconds(150))
+            .Subscribe(_ => OnProfanityPatternsChanged());
 
         // Context selection observables for command can-execute
         var hasSingleContextMessage = this
@@ -918,17 +923,28 @@ public class ChatPageViewModel : PageViewModel
             catch { /* DB update is best-effort */ }
         });
 
-        // Re-analyze all chat messages in the live cache on UI thread
-        Observable.Start(() =>
+        // Snapshot messages and analyze off the UI thread, then dispatch updates
+        var messages = _cache.Items.OfType<ChatMessageViewModel>().ToArray();
+        _ = Task.Run(() =>
         {
-            foreach (var msg in _cache.Items.OfType<ChatMessageViewModel>())
+            var updates = new List<(ChatMessageViewModel Msg, bool HasProfanity, IReadOnlyList<MessageSegment>? Segments, IReadOnlyList<string>? MatchedWords)>();
+            foreach (var msg in messages)
             {
                 var (hasProfanity, segments, matchedWords) = AnalyzeProfanity(msg.Message);
-                msg.HasProfanity = hasProfanity;
-                msg.MessageSegments = segments;
-                msg.MatchedWords = matchedWords;
+                updates.Add((msg, hasProfanity, segments, matchedWords));
             }
-        }, RxApp.MainThreadScheduler).Subscribe();
+
+            // Apply property updates on UI thread
+            Observable.Start(() =>
+            {
+                foreach (var (msg, hasProfanity, segments, matchedWords) in updates)
+                {
+                    msg.HasProfanity = hasProfanity;
+                    msg.MessageSegments = segments;
+                    msg.MatchedWords = matchedWords;
+                }
+            }, RxApp.MainThreadScheduler).Subscribe();
+        });
     }
 
     // Context menu command implementations
