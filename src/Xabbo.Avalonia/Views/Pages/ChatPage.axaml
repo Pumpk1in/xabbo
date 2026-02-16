@@ -226,62 +226,47 @@
             Text="Remove from filter..."
             IsVisible="False"
           />
+          <ui:MenuFlyoutSeparator />
+          <ui:MenuFlyoutItem
+            Text="{Binding SelectedUserName, StringFormat='Kick {0}'}"
+            IconSource="{icm:SymbolIconSource Symbol=SignOut}"
+            Command="{Binding KickUsersCmd}"
+          />
           <ui:MenuFlyoutSubItem
-            IconSource="{icm:SymbolIconSource Symbol=Warning}"
-            Text="Moderate..."
+            Classes="modern"
+            Text="{Binding SelectedUserName, StringFormat='Mute {0}'}"
+            IsEnabled="{Binding MuteUsersCmd.CanExecute^}"
+            IconSource="{icm:SymbolIconSource Symbol=ChatOff}"
           >
-            <ui:MenuFlyoutSubItem.IsEnabled>
-              <MultiBinding Converter="{x:Static BoolConverters.Or}">
-                <Binding Path="MuteUsersCmd.CanExecute^" />
-                <Binding Path="KickUsersCmd.CanExecute^" />
-                <Binding Path="BanUsersCmd.CanExecute^" />
-                <Binding Path="BounceUsersCmd.CanExecute^" />
-              </MultiBinding>
-            </ui:MenuFlyoutSubItem.IsEnabled>
-            <ui:MenuFlyoutItem
-              Text="Kick"
-              IconSource="{icm:SymbolIconSource Symbol=SignOut}"
-              Command="{Binding KickUsersCmd}"
-            />
-            <ui:MenuFlyoutSubItem
-              Classes="modern"
-              Text="Mute"
-              IsEnabled="{Binding MuteUsersCmd.CanExecute^}"
-              IconSource="{icm:SymbolIconSource Symbol=ChatOff}"
-            >
-              <ui:MenuFlyoutItem Text="2 mins" Command="{Binding MuteUsersCmd}" CommandParameter="2" />
-              <ui:MenuFlyoutItem Text="5 mins" Command="{Binding MuteUsersCmd}" CommandParameter="5" />
-              <ui:MenuFlyoutItem Text="10 mins" Command="{Binding MuteUsersCmd}" CommandParameter="10" />
-              <ui:MenuFlyoutItem Text="15 mins" Command="{Binding MuteUsersCmd}" CommandParameter="15" />
-              <ui:MenuFlyoutItem Text="30 mins" Command="{Binding MuteUsersCmd}" CommandParameter="30" />
-              <ui:MenuFlyoutItem Text="1 hour" Command="{Binding MuteUsersCmd}" CommandParameter="60" />
-              <ui:MenuFlyoutItem Text="6 hours" Command="{Binding MuteUsersCmd}" CommandParameter="360" />
-              <ui:MenuFlyoutItem Text="12 hours" Command="{Binding MuteUsersCmd}" CommandParameter="720" />
-              <ui:MenuFlyoutItem Text="24 hours" Command="{Binding MuteUsersCmd}" CommandParameter="1440" />
-            </ui:MenuFlyoutSubItem>
-            <ui:MenuFlyoutItem
-              Classes="modern"
-              Text="Unmute"
-              IconSource="{icm:SymbolIconSource Symbol=Chat}"
-              Command="{Binding MuteUsersCmd}"
-              CommandParameter="0"
-            />
-            <ui:MenuFlyoutSubItem
-              IsEnabled="{Binding BanUsersCmd.CanExecute^}"
-              IconSource="{icm:SymbolIconSource Symbol=PersonProhibited}"
-              Text="Ban"
-            >
-              <ui:MenuFlyoutItem Text="For an hour" Command="{Binding BanUsersCmd}" CommandParameter="{x:Static xc:BanDuration.Hour}" />
-              <ui:MenuFlyoutItem Text="For a day" Command="{Binding BanUsersCmd}" CommandParameter="{x:Static xc:BanDuration.Day}" />
-              <ui:MenuFlyoutItem Text="Permanently" Command="{Binding BanUsersCmd}" CommandParameter="{x:Static xc:BanDuration.Permanent}" />
-            </ui:MenuFlyoutSubItem>
-            <ui:MenuFlyoutItem
-              Classes="modern"
-              Text="Bounce"
-              IconSource="{icm:SymbolIconSource Symbol=ArrowBounce}"
-              Command="{Binding BounceUsersCmd}"
-            />
+            <ui:MenuFlyoutItem Text="1 min" Command="{Binding MuteUsersCmd}" CommandParameter="1" />
+            <ui:MenuFlyoutItem Text="2 mins" Command="{Binding MuteUsersCmd}" CommandParameter="2" />
+            <ui:MenuFlyoutItem Text="5 mins" Command="{Binding MuteUsersCmd}" CommandParameter="5" />
+            <ui:MenuFlyoutItem Text="10 mins" Command="{Binding MuteUsersCmd}" CommandParameter="10" />
+            <ui:MenuFlyoutItem Text="15 mins" Command="{Binding MuteUsersCmd}" CommandParameter="15" />
+            <ui:MenuFlyoutItem Text="30 mins" Command="{Binding MuteUsersCmd}" CommandParameter="30" />
+            <ui:MenuFlyoutSeparator />
+            <ui:MenuFlyoutItem Text="1 hour" Command="{Binding MuteUsersCmd}" CommandParameter="60" />
+            <ui:MenuFlyoutItem Text="6 hours" Command="{Binding MuteUsersCmd}" CommandParameter="360" />
+            <ui:MenuFlyoutItem Text="12 hours" Command="{Binding MuteUsersCmd}" CommandParameter="720" />
+            <ui:MenuFlyoutItem Text="24 hours" Command="{Binding MuteUsersCmd}" CommandParameter="1440" />
+            <ui:MenuFlyoutSeparator />
+            <ui:MenuFlyoutItem Text="Unmute" IconSource="{icm:SymbolIconSource Symbol=Chat}" Command="{Binding MuteUsersCmd}" CommandParameter="0" />
           </ui:MenuFlyoutSubItem>
+          <ui:MenuFlyoutSubItem
+            Text="{Binding SelectedUserName, StringFormat='Ban {0}'}"
+            IconSource="{icm:SymbolIconSource Symbol=PersonProhibited}"
+            IsEnabled="{Binding BanUsersCmd.CanExecute^}"
+          >
+            <ui:MenuFlyoutItem Text="For an hour" Command="{Binding BanUsersCmd}" CommandParameter="{x:Static xc:BanDuration.Hour}" />
+            <ui:MenuFlyoutItem Text="For a day" Command="{Binding BanUsersCmd}" CommandParameter="{x:Static xc:BanDuration.Day}" />
+            <ui:MenuFlyoutItem Text="Permanently" Command="{Binding BanUsersCmd}" CommandParameter="{x:Static xc:BanDuration.Permanent}" />
+          </ui:MenuFlyoutSubItem>
+          <ui:MenuFlyoutItem
+            Classes="modern"
+            Text="{Binding SelectedUserName, StringFormat='Bounce {0}'}"
+            IconSource="{icm:SymbolIconSource Symbol=ArrowBounce}"
+            Command="{Binding BounceUsersCmd}"
+          />
         </ui:FAMenuFlyout>
       </ListBox.ContextFlyout>
       <ListBox.Styles>
@@ -371,15 +356,18 @@
                 Padding="4"
                 Margin="2,0,0,0"
                 VerticalAlignment="Center"
-                ToolTip.Tip="Kick user"
-                Command="{Binding #ChatPageRoot.((vm:ChatPageViewModel)DataContext).KickUserByNameCmd}"
-                CommandParameter="{Binding Name}">
+                ToolTip.Tip="Kick user">
                 <Button.IsVisible>
                   <MultiBinding Converter="{x:Static BoolConverters.And}">
                     <Binding Path="ShowModerationButtons" />
                     <Binding Path="!#ListBoxMessages.(behaviors:ScrollThrottleBehavior.IsThrottled)" />
                   </MultiBinding>
                 </Button.IsVisible>
+                <Button.Flyout>
+                  <ui:FAMenuFlyout>
+                    <ui:MenuFlyoutItem Text="Kick" Command="{Binding #ChatPageRoot.((vm:ChatPageViewModel)DataContext).KickUserByNameCmd}" CommandParameter="{Binding Name}" />
+                  </ui:FAMenuFlyout>
+                </Button.Flyout>
                 <ic:SymbolIcon Symbol="PersonDelete" FontSize="12" />
               </Button>
               <!-- Quick Mute button for profanity messages (not on own messages, hidden during fast scroll) -->

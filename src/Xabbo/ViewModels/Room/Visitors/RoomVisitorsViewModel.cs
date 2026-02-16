@@ -232,6 +232,11 @@ public class RoomVisitorsViewModel : ViewModelBase
         {
             // User is in the room - ban immediately
             await _moderation.BanUsersAsync([user], duration);
+            if (_roomManager.Room?.Data is { IsGroupRoom: true })
+            {
+                _xabbot.ShowMessage($"Kicked user '{visitor.Name}' from room group");
+                NotifyChatLog(visitor.Name, "kicked from room group");
+            }
             _xabbot.ShowMessage($"Banned user '{visitor.Name}' {durationText}");
             NotifyChatLog(visitor.Name, $"banned {durationText}");
         }

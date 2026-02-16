@@ -30,7 +30,7 @@ public partial class ProfanityFilterService : IProfanityFilterService
     {
         ['a'] = "[a@4àáâãäåx]",
         ['b'] = "[b8ß]",
-        ['c'] = "[c¢©]",
+        ['c'] = "[c¢©x]",
         ['d'] = "[d]",
         ['e'] = "[e3€èéêëx]",
         ['f'] = "[f]",

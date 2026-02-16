@@ -383,19 +383,31 @@ public class RoomAvatarsViewModel : ViewModelBase
             BanDuration.Permanent => "permanently",
             _ => ""
         };
+        bool isGroupRoom = _roomManager.Room?.Data is { IsGroupRoom: true };
         await _moderation.BanUsersAsync(users, duration);
         foreach (var user in users)
         {
+            if (isGroupRoom)
+            {
+                _xabbot.ShowMessage($"Kicked user '{user.Name}' from room group");
+                NotifyChatLog(user.Name, "kicked from room group");
+            }
             _xabbot.ShowMessage($"Banned user '{user.Name}' {durationText}");
             NotifyChatLog(user.Name, $"banned {durationText}");
         }
     });
     private Task BounceUsersAsync() => TryModerate(async () =>
     {
+        bool isGroupRoom = _roomManager.Room?.Data is { IsGroupRoom: true };
         var users = SelectedUsers.ToList();
         await _moderation.BounceUsersAsync(users);
         foreach (var user in users)
         {
+            if (isGroupRoom)
+            {
+                _xabbot.ShowMessage($"Kicked user '{user.Name}' from room group");
+                NotifyChatLog(user.Name, "kicked from room group");
+            }
             _xabbot.ShowMessage($"Bounced user '{user.Name}'");
             NotifyChatLog(user.Name, "bounced");
         }

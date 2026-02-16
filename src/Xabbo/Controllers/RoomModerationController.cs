@@ -1,4 +1,6 @@
 using ReactiveUI;
+using Splat;
+using Xabbo.Components;
 using Xabbo.Configuration;
 
 using Xabbo.Core;
@@ -6,7 +8,11 @@ using Xabbo.Core.Game;
 using Xabbo.Core.Messages.Outgoing;
 using Xabbo.Exceptions;
 using Xabbo.Extension;
+using Xabbo.Interceptor;
+using Xabbo.Messages;
+using Xabbo.Messages.Flash;
 using Xabbo.Services.Abstractions;
+using Xabbo.ViewModels;
 
 namespace Xabbo.Controllers;
 
@@ -20,8 +26,11 @@ public partial class RoomModerationController : ControllerBase
     private readonly IOperationManager _operationManager;
     private readonly ProfileManager _profileManager;
     private readonly RoomManager _roomManager;
+    private readonly XabbotComponent _xabbot;
     private readonly SemaphoreSlim _workingSemaphore = new(1, 1);
     private CancellationTokenSource? _cts;
+    private string? _lastBannedUserName;
+    private ChatPageViewModel? _chatPage;
 
     private TimingConfigBase GetTiming() => Session.Is(ClientType.Origins)
         ? _config.Value.Timing.Origins
@@ -44,7 +53,8 @@ public partial class RoomModerationController : ControllerBase
         IConfigProvider<AppConfig> config,
         IOperationManager operationManager,
         ProfileManager profileManager,
-        RoomManager roomManager
+        RoomManager roomManager,
+        XabbotComponent xabbot
     )
         : base(extension)
     {
@@ -52,6 +62,7 @@ public partial class RoomModerationController : ControllerBase
         _operationManager = operationManager;
         _profileManager = profileManager;
         _roomManager = roomManager;
+        _xabbot = xabbot;
 
         _roomManager.Entered += (e) => RefreshPermissions();
         _roomManager.RoomDataUpdated += (e) => RefreshPermissions();
@@ -123,10 +134,34 @@ public partial class RoomModerationController : ControllerBase
         return Task.CompletedTask;
     }
 
-    private Task BanUserAsync(IUser user, Id roomId, BanDuration duration)
+    [Intercept(~ClientType.Shockwave)]
+    [InterceptIn(nameof(In.ErrorReport))]
+    private void HandleErrorReport(Intercept e)
     {
+        GenericErrorCode errorCode = (GenericErrorCode)e.Packet.Read<int>();
+        if (errorCode == GenericErrorCode.BanFailed && _lastBannedUserName is { } userName)
+        {
+            _xabbot.ShowMessage($"Failed to ban user '{userName}'");
+            _chatPage ??= Locator.Current.GetService<ChatPageViewModel>();
+            _chatPage?.AppendModerationNotification(userName, "ban failed");
+            _lastBannedUserName = null;
+        }
+    }
+
+    private async Task KickFromGroupIfNeededAsync(Id userId)
+    {
+        if (_roomManager.Room?.Data is { IsGroupRoom: true } data && Session.Is(ClientType.Modern))
+        {
+            Send(new KickGroupMemberMsg(data.GroupId, userId));
+            await Task.Delay(1000);
+        }
+    }
+
+    private async Task BanUserAsync(IUser user, Id roomId, BanDuration duration)
+    {
+        await KickFromGroupIfNeededAsync(user.Id);
+        _lastBannedUserName = user.Name;
         Send(new BanUserMsg(user.Id, user.Name, roomId, duration));
-        return Task.CompletedTask;
     }
 
     private Task UnbanUserAsync(IUser user, Id roomId)
@@ -137,6 +172,8 @@ public partial class RoomModerationController : ControllerBase
 
     private async Task BounceUserAsync(IUser user, Id roomId, CancellationToken cancellationToken)
     {
+        await KickFromGroupIfNeededAsync(user.Id);
+        _lastBannedUserName = user.Name;
         Send(new BanUserMsg(user, roomId, BanDuration.Hour));
         await Task.Delay(_config.Value.Timing.Modern.BounceUnbanDelay, cancellationToken);
         Send(new UnbanUserMsg(user.Id, roomId));

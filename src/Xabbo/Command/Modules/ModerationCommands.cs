@@ -166,6 +166,11 @@ public sealed class ModerationCommands(RoomManager roomManager, IAppPathProvider
         {
             if (_banList.TryGetValue(user.Name, out BanDuration banDuration))
             {
+                if (_roomManager.Room?.Data is { IsGroupRoom: true })
+                {
+                    ShowMessage($"Kicking user '{user.Name}' from room group");
+                    NotifyChatLog(user.Name, "kicked from room group");
+                }
                 ShowMessage($"Banning user '{user.Name}'");
                 NotifyChatLog(user.Name, "banned (deferred)");
                 await Task.Delay(100);
@@ -366,6 +371,11 @@ public sealed class ModerationCommands(RoomManager roomManager, IAppPathProvider
         if (_roomManager.Room is not null &&
             _roomManager.Room.TryGetUserByName(userName, out IUser? user))
         {
+            if (_roomManager.Room?.Data is { IsGroupRoom: true })
+            {
+                ShowMessage($"Kicking user '{user.Name}' from room group");
+                NotifyChatLog(user.Name, "kicked from room group");
+            }
             ShowMessage($"Banning user '{user.Name}' {durationString}");
             NotifyChatLog(user.Name, $"banned {durationString}");
             BanUser(user, banDuration);

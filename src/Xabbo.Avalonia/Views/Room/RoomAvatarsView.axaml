@@ -121,6 +121,7 @@
                 IconSource="{icm:SymbolIconSource Symbol=SignOut}"
                 Command="{Binding KickUsersCmd}"
               />
+              <ui:MenuFlyoutSeparator Classes="modern" />
               <ui:MenuFlyoutSubItem
                 Classes="modern"
                 Text="Mute"
@@ -144,15 +145,26 @@
                 Command="{Binding MuteUsersCmd}"
                 CommandParameter="0"
               />
-              <ui:MenuFlyoutSubItem
-                IsEnabled="{Binding BanUsersCmd.CanExecute^}"
+              <ui:MenuFlyoutSeparator />
+              <ui:MenuFlyoutItem
+                Text="Ban for an hour"
                 IconSource="{icm:SymbolIconSource Symbol=PersonProhibited}"
-                Text="Ban"
-              >
-                <ui:MenuFlyoutItem Text="For an hour" Command="{Binding BanUsersCmd}" CommandParameter="{x:Static xc:BanDuration.Hour}" />
-                <ui:MenuFlyoutItem Text="For a day" Command="{Binding BanUsersCmd}" CommandParameter="{x:Static xc:BanDuration.Day}" />
-                <ui:MenuFlyoutItem Text="Permanently" Command="{Binding BanUsersCmd}" CommandParameter="{x:Static xc:BanDuration.Permanent}" />
-              </ui:MenuFlyoutSubItem>
+                Command="{Binding BanUsersCmd}"
+                CommandParameter="{x:Static xc:BanDuration.Hour}"
+              />
+              <ui:MenuFlyoutItem
+                Text="Ban for a day"
+                IconSource="{icm:SymbolIconSource Symbol=PersonProhibited}"
+                Command="{Binding BanUsersCmd}"
+                CommandParameter="{x:Static xc:BanDuration.Day}"
+              />
+              <ui:MenuFlyoutItem
+                Text="Ban permanently"
+                IconSource="{icm:SymbolIconSource Symbol=PersonProhibited}"
+                Command="{Binding BanUsersCmd}"
+                CommandParameter="{x:Static xc:BanDuration.Permanent}"
+              />
+              <ui:MenuFlyoutSeparator Classes="modern" />
               <ui:MenuFlyoutItem
                 Classes="modern"
                 Text="Bounce"
