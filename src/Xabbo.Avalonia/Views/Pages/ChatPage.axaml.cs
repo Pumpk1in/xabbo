@@ -6,6 +6,7 @@ using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using FluentAvalonia.UI.Controls;
+using Xabbo.Models;
 using Xabbo.ViewModels;
 
 namespace Xabbo.Avalonia.Views;
@@ -35,6 +36,20 @@ public partial class ChatPage : UserControl
         };
 
         ChatInputTextBox.KeyDown += OnChatInputKeyDown;
+        WhisperRecipientBox.KeyDown += OnWhisperRecipientKeyDown;
+
+        // Select a recent whisper recipient from the flyout
+        RecentWhispersList.SelectionChanged += (s, e) =>
+        {
+            if (RecentWhispersList.SelectedItem is WhisperSuggestionItem item
+                && DataContext is ChatPageViewModel vm)
+            {
+                vm.WhisperRecipient = item.Name;
+                RecentWhispersButton.Flyout?.Hide();
+                RecentWhispersList.SelectedItem = null;
+                ChatInputTextBox.Focus();
+            }
+        };
     }
 
     private void OnChatInputKeyDown(object? sender, KeyEventArgs e)
@@ -42,6 +57,15 @@ public partial class ChatPage : UserControl
         if (e.Key == Key.Enter && DataContext is ChatPageViewModel vm)
         {
             vm.SendChat();
+            e.Handled = true;
+        }
+    }
+
+    private void OnWhisperRecipientKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key is Key.Enter or Key.Tab)
+        {
+            ChatInputTextBox.Focus();
             e.Handled = true;
         }
     }

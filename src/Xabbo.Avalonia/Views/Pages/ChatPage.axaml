@@ -56,11 +56,11 @@
               <StackPanel Spacing="8">
                 <Grid ColumnDefinitions="70,*">
                   <TextBlock Grid.Column="0" Text="User:" VerticalAlignment="Center" />
-                  <TextBox x:Name="HistorySearchUserTextBox" Grid.Column="1" Text="{Binding HistorySearchUser}" Watermark="Username..." />
+                  <TextBox x:Name="HistorySearchUserTextBox" Grid.Column="1" Classes="clearButton" Text="{Binding HistorySearchUser}" Watermark="Username..." />
                 </Grid>
                 <Grid ColumnDefinitions="70,*">
                   <TextBlock Grid.Column="0" Text="Keyword:" VerticalAlignment="Center" />
-                  <TextBox Grid.Column="1" Text="{Binding HistorySearchKeyword}" Watermark="Search text..." />
+                  <TextBox Grid.Column="1" Classes="clearButton" Text="{Binding HistorySearchKeyword}" Watermark="Search text..." />
                 </Grid>
                 <Grid ColumnDefinitions="70,Auto,8,Auto">
                   <TextBlock Grid.Column="0" Text="From:" VerticalAlignment="Center" />
@@ -185,17 +185,6 @@
             IconSource="{icm:SymbolIconSource Symbol=Search}"
             Text="Find" Command="{Binding FindUserCmd}"
           />
-          <ui:MenuFlyoutItem
-            IconSource="{icm:SymbolIconSource Symbol=History}"
-            Text="Search in history"
-            Command="{Binding SearchUserInHistoryCmd}"
-          />
-          <ui:MenuFlyoutItem
-            IconSource="{icm:SymbolIconSource Symbol=ArrowRight}"
-            Text="Go to message"
-            Command="{Binding GoToMessageCmd}"
-            IsVisible="{Binding HasActiveFilter}"
-          />
           <ui:MenuFlyoutSubItem
             IsEnabled="{Binding CopyUserFieldCmd.CanExecute^}"
             IconSource="{icm:SymbolIconSource Symbol=Copy}"
@@ -215,6 +204,18 @@
             <ui:MenuFlyoutItem Text="On the web" Command="{Binding OpenUserProfileCmd}" CommandParameter="web" />
             <ui:MenuFlyoutItem Text="On HabboWidgets" Command="{Binding OpenUserProfileCmd}" CommandParameter="habbowidgets" />
           </ui:MenuFlyoutSubItem>
+          <ui:MenuFlyoutSeparator />
+          <ui:MenuFlyoutItem
+            IconSource="{icm:SymbolIconSource Symbol=ArrowRight}"
+            Text="Go to message"
+            Command="{Binding GoToMessageCmd}"
+            IsVisible="{Binding HasActiveFilter}"
+          />
+          <ui:MenuFlyoutItem
+            IconSource="{icm:SymbolIconSource Symbol=History}"
+            Text="Search in history"
+            Command="{Binding SearchUserInHistoryCmd}"
+          />
           <ui:MenuFlyoutItem
             IconSource="{icm:SymbolIconSource Symbol=TextBulletListSquareWarning}"
             Text="Add to profanity filter..."
@@ -476,7 +477,7 @@
       />
     </Button>
     <!-- Chat input bar -->
-    <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,*" Margin="10,5,10,10"
+    <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,Auto,*" Margin="10,5,10,10"
           IsVisible="{Binding IsInRoom}">
       <ComboBox
         Grid.Column="0"
@@ -492,18 +493,113 @@
         <xc:ChatType>Shout</xc:ChatType>
         <xc:ChatType>Whisper</xc:ChatType>
       </ComboBox>
-      <TextBox
+      <!-- Recent whisper recipients button -->
+      <Button
+        x:Name="RecentWhispersButton"
         Grid.Column="1"
-        Watermark="To..."
-        Text="{Binding WhisperRecipient}"
         IsVisible="{Binding IsWhisperMode}"
-        MinWidth="120"
+        Padding="6"
         Margin="5,0,0,0"
         VerticalAlignment="Center"
-      />
+        ToolTip.Tip="Recent whisper recipients"
+      >
+        <ic:SymbolIcon Symbol="Clock" FontSize="16" />
+        <Button.Flyout>
+          <Flyout Placement="TopEdgeAlignedLeft">
+            <StackPanel Width="200" MaxHeight="300">
+              <TextBlock Text="Recent whispers" FontWeight="SemiBold" Margin="4,4,4,8"
+                         Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+              <ListBox
+                x:Name="RecentWhispersList"
+                ItemsSource="{Binding RecentWhisperList}"
+                MaxHeight="250"
+              >
+                <ListBox.ItemTemplate>
+                  <DataTemplate DataType="models:WhisperSuggestionItem">
+                    <Grid ColumnDefinitions="Auto,*" Margin="2">
+                      <ic:SymbolIcon
+                        Grid.Column="0"
+                        Symbol="CheckmarkCircle"
+                        IconVariant="Filled"
+                        FontSize="12"
+                        Margin="0,0,6,0"
+                        Foreground="#44DD66"
+                        IsVisible="{Binding IsInRoom}"
+                        ToolTip.Tip="In room"
+                      />
+                      <ic:SymbolIcon
+                        Grid.Column="0"
+                        Symbol="Warning"
+                        IconVariant="Filled"
+                        FontSize="12"
+                        Margin="0,0,6,0"
+                        Foreground="#FFAA00"
+                        IsVisible="{Binding !IsInRoom}"
+                        ToolTip.Tip="Not in this room"
+                      />
+                      <TextBlock
+                        Grid.Column="1"
+                        Text="{Binding Name}"
+                        VerticalAlignment="Center"
+                      />
+                    </Grid>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+            </StackPanel>
+          </Flyout>
+        </Button.Flyout>
+      </Button>
+      <!-- Whisper recipient autocomplete with inline presence indicator -->
+      <Grid Grid.Column="2" IsVisible="{Binding IsWhisperMode}" Margin="5,0,0,0">
+        <AutoCompleteBox
+          x:Name="WhisperRecipientBox"
+          Watermark="To..."
+          Text="{Binding WhisperRecipient, Mode=TwoWay}"
+          ItemsSource="{Binding WhisperSuggestions}"
+          ValueMemberBinding="{Binding Name}"
+          FilterMode="None"
+          MinimumPrefixLength="1"
+          MinWidth="140"
+          Padding="24,4,4,4"
+          VerticalAlignment="Center"
+          MaxDropDownHeight="300"
+        >
+          <AutoCompleteBox.ItemTemplate>
+            <DataTemplate DataType="models:WhisperSuggestionItem">
+              <TextBlock Text="{Binding Name}" Margin="4,2" />
+            </DataTemplate>
+          </AutoCompleteBox.ItemTemplate>
+        </AutoCompleteBox>
+        <!-- Presence indicator inside the field -->
+        <ic:SymbolIcon
+          Symbol="CheckmarkCircle"
+          IconVariant="Filled"
+          FontSize="13"
+          Foreground="#44DD66"
+          HorizontalAlignment="Left"
+          VerticalAlignment="Center"
+          Margin="6,0,0,0"
+          ToolTip.Tip="In room"
+          IsVisible="{Binding IsRecipientInRoom}"
+          IsHitTestVisible="False"
+        />
+        <ic:SymbolIcon
+          Symbol="Warning"
+          IconVariant="Filled"
+          FontSize="13"
+          Foreground="#FFAA00"
+          HorizontalAlignment="Left"
+          VerticalAlignment="Center"
+          Margin="6,0,0,0"
+          ToolTip.Tip="Not in this room"
+          IsVisible="{Binding !IsRecipientInRoom}"
+          IsHitTestVisible="False"
+        />
+      </Grid>
       <TextBox
         x:Name="ChatInputTextBox"
-        Grid.Column="2"
+        Grid.Column="3"
         Watermark="Message..."
         Text="{Binding ChatInputText, UpdateSourceTrigger=PropertyChanged}"
         Margin="5,0,0,0"

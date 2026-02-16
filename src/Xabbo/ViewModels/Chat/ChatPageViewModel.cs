@@ -104,6 +104,15 @@ public class ChatPageViewModel : PageViewModel
     private readonly ObservableAsPropertyHelper<bool> _isWhisperMode;
     public bool IsWhisperMode => _isWhisperMode.Value;
 
+    // Whisper autocomplete
+    private readonly Dictionary<string, DateTime> _recentWhisperRecipients = new(StringComparer.OrdinalIgnoreCase);
+    [Reactive] public ObservableCollection<WhisperSuggestionItem> WhisperSuggestions { get; set; } = [];
+    [Reactive] public ObservableCollection<WhisperSuggestionItem> RecentWhisperList { get; set; } = [];
+
+    private readonly ObservableAsPropertyHelper<bool> _isRecipientInRoom;
+    public bool IsRecipientInRoom => _isRecipientInRoom.Value;
+
+    public ReactiveCommand<string, Unit> SelectRecentRecipientCmd { get; }
     public ReactiveCommand<Unit, Unit> SendChatCmd { get; }
     public ReactiveCommand<Unit, Unit> WhisperToSelectedCmd { get; }
 
@@ -365,6 +374,23 @@ public class ChatPageViewModel : PageViewModel
 
         SendChatCmd = ReactiveCommand.Create(SendChat, canSendChat);
         WhisperToSelectedCmd = ReactiveCommand.Create(WhisperToSelected, hasSingleContextMessage);
+        SelectRecentRecipientCmd = ReactiveCommand.Create<string>(name => WhisperRecipient = name);
+
+        // Update whisper suggestions when recipient text changes while in whisper mode
+        this.WhenAnyValue(x => x.WhisperRecipient, x => x.IsWhisperMode)
+            .Where(t => t.Item2)
+            .Throttle(TimeSpan.FromMilliseconds(100))
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(t => UpdateWhisperSuggestions(t.Item1));
+
+        // Live indicator: is the current recipient in the room?
+        _isRecipientInRoom = this
+            .WhenAnyValue(x => x.WhisperRecipient)
+            .Throttle(TimeSpan.FromMilliseconds(100))
+            .Select(name => !string.IsNullOrWhiteSpace(name)
+                && _roomManager.Room?.TryGetUserByName(name.Trim(), out _) == true)
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .ToProperty(this, x => x.IsRecipientInRoom);
     }
 
     // Combined filter for text search, whispers only, and profanity only
@@ -440,6 +466,9 @@ public class ChatPageViewModel : PageViewModel
                 var recipient = WhisperRecipient?.Trim();
                 if (string.IsNullOrEmpty(recipient)) return;
                 _ext.Send(new WhisperMsg(recipient, text));
+                RecordWhisperRecipient(recipient);
+                if (_roomManager.Room?.TryGetUserByName(recipient, out _) != true)
+                    _xabbot.ShowMessage($"'{recipient}' is not in this room. Your whisper was sent but won't be seen.");
                 break;
         }
 
@@ -453,6 +482,72 @@ public class ChatPageViewModel : PageViewModel
             ChatInputMode = ChatType.Whisper;
             WhisperRecipient = name;
         }
+    }
+
+    private void UpdateWhisperSuggestions(string? filterText)
+    {
+        var roomUsers = _roomManager.Room?.Users;
+        if (roomUsers is null)
+        {
+            WhisperSuggestions = [];
+            return;
+        }
+
+        var selfName = _profileManager.UserData?.Name;
+        var suggestions = new List<WhisperSuggestionItem>();
+
+        foreach (var user in roomUsers)
+        {
+            if (user.Name.Equals(selfName, StringComparison.OrdinalIgnoreCase)) continue;
+            if (!string.IsNullOrEmpty(filterText) &&
+                !user.Name.Contains(filterText, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            suggestions.Add(new WhisperSuggestionItem
+            {
+                Name = user.Name,
+                IsInRoom = true,
+                IsRecent = false,
+            });
+        }
+
+        WhisperSuggestions = new ObservableCollection<WhisperSuggestionItem>(suggestions);
+    }
+
+    private void UpdateRecentWhisperList()
+    {
+        var cutoff = DateTime.Now.AddHours(-1);
+        var roomUsers = _roomManager.Room?.Users;
+
+        var recents = _recentWhisperRecipients
+            .Where(kv => kv.Value >= cutoff)
+            .OrderByDescending(kv => kv.Value)
+            .Select(kv => new WhisperSuggestionItem
+            {
+                Name = kv.Key,
+                IsInRoom = roomUsers?.Any(u =>
+                    u.Name.Equals(kv.Key, StringComparison.OrdinalIgnoreCase)) ?? false,
+                IsRecent = true,
+            })
+            .ToList();
+
+        RecentWhisperList = new ObservableCollection<WhisperSuggestionItem>(recents);
+    }
+
+    private void RecordWhisperRecipient(string name)
+    {
+        _recentWhisperRecipients[name] = DateTime.Now;
+
+        // Prune entries older than 1 hour
+        var cutoff = DateTime.Now.AddHours(-1);
+        var expired = _recentWhisperRecipients
+            .Where(kv => kv.Value < cutoff)
+            .Select(kv => kv.Key)
+            .ToList();
+        foreach (var key in expired)
+            _recentWhisperRecipients.Remove(key);
+
+        UpdateRecentWhisperList();
     }
 
     private async Task ExportChatAsync(string format)
@@ -796,6 +891,12 @@ public class ChatPageViewModel : PageViewModel
             UserName = e.Avatar.Name,
             Action = "entered the room"
         });
+
+        if (IsWhisperMode)
+        {
+            UpdateWhisperSuggestions(WhisperRecipient);
+            UpdateRecentWhisperList();
+        }
     }
 
     private void OnAvatarRemoved(AvatarEventArgs e)
@@ -819,6 +920,12 @@ public class ChatPageViewModel : PageViewModel
             UserName = e.Avatar.Name,
             Action = "left the room"
         });
+
+        if (IsWhisperMode)
+        {
+            UpdateWhisperSuggestions(WhisperRecipient);
+            UpdateRecentWhisperList();
+        }
     }
 
     private void RoomManager_AvatarUpdated(AvatarEventArgs e)
