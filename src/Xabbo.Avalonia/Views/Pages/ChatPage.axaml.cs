@@ -2,6 +2,7 @@
 using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
+using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using FluentAvalonia.UI.Controls;
@@ -32,6 +33,17 @@ public partial class ChatPage : UserControl
                 scrollViewer.BringIntoViewOnFocusChange = false;
             }
         };
+
+        ChatInputTextBox.KeyDown += OnChatInputKeyDown;
+    }
+
+    private void OnChatInputKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && DataContext is ChatPageViewModel vm)
+        {
+            vm.SendChat();
+            e.Handled = true;
+        }
     }
 
     private void ScrollToMessage(ChatLogEntryViewModel message)

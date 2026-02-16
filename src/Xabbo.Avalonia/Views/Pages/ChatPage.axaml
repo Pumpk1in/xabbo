@@ -19,7 +19,7 @@
   <Design.DataContext>
     <vm:ChatPageViewModel />
   </Design.DataContext>
-  <Grid RowDefinitions="Auto,*">
+  <Grid RowDefinitions="Auto,*,Auto">
     <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto" Margin="10,10,10,0">
       <TextBox
         Grid.Column="0"
@@ -267,6 +267,12 @@
             IconSource="{icm:SymbolIconSource Symbol=ArrowBounce}"
             Command="{Binding BounceUsersCmd}"
           />
+          <ui:MenuFlyoutSeparator />
+          <ui:MenuFlyoutItem
+            Text="{Binding SelectedUserName, StringFormat='Whisper to {0}'}"
+            IconSource="{icm:SymbolIconSource Symbol=ChatMail}"
+            Command="{Binding WhisperToSelectedCmd}"
+          />
         </ui:FAMenuFlyout>
       </ListBox.ContextFlyout>
       <ListBox.Styles>
@@ -469,5 +475,40 @@
         VerticalAlignment="Center"
       />
     </Button>
+    <!-- Chat input bar -->
+    <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,*" Margin="10,5,10,10"
+          IsVisible="{Binding IsInRoom}">
+      <ComboBox
+        Grid.Column="0"
+        SelectedItem="{Binding ChatInputMode}"
+        MinWidth="100"
+        VerticalAlignment="Center">
+        <ComboBox.ItemTemplate>
+          <DataTemplate>
+            <TextBlock Text="{Binding}" />
+          </DataTemplate>
+        </ComboBox.ItemTemplate>
+        <xc:ChatType>Talk</xc:ChatType>
+        <xc:ChatType>Shout</xc:ChatType>
+        <xc:ChatType>Whisper</xc:ChatType>
+      </ComboBox>
+      <TextBox
+        Grid.Column="1"
+        Watermark="To..."
+        Text="{Binding WhisperRecipient}"
+        IsVisible="{Binding IsWhisperMode}"
+        MinWidth="120"
+        Margin="5,0,0,0"
+        VerticalAlignment="Center"
+      />
+      <TextBox
+        x:Name="ChatInputTextBox"
+        Grid.Column="2"
+        Watermark="Message..."
+        Text="{Binding ChatInputText, UpdateSourceTrigger=PropertyChanged}"
+        Margin="5,0,0,0"
+        VerticalAlignment="Center"
+      />
+    </Grid>
   </Grid>
 </UserControl>

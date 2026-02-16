@@ -95,6 +95,18 @@ public class ChatPageViewModel : PageViewModel
 
     public ReactiveCommand<string, Task> ExportChatCmd { get; }
 
+    // Chat input
+    [Reactive] public ChatType ChatInputMode { get; set; } = ChatType.Talk;
+    [Reactive] public string ChatInputText { get; set; } = "";
+    [Reactive] public string WhisperRecipient { get; set; } = "";
+    [Reactive] public bool IsInRoom { get; set; }
+
+    private readonly ObservableAsPropertyHelper<bool> _isWhisperMode;
+    public bool IsWhisperMode => _isWhisperMode.Value;
+
+    public ReactiveCommand<Unit, Unit> SendChatCmd { get; }
+    public ReactiveCommand<Unit, Unit> WhisperToSelectedCmd { get; }
+
     public SelectionModel<ChatLogEntryViewModel> Selection { get; } = new SelectionModel<ChatLogEntryViewModel>()
     {
         SingleSelect = false
@@ -187,6 +199,7 @@ public class ChatPageViewModel : PageViewModel
         _xabbot = xabbot;
 
         _roomManager.Entered += OnEnteredRoom;
+        _roomManager.Left += () => IsInRoom = false;
         _roomManager.AvatarAdded += OnAvatarAdded;
         _roomManager.AvatarRemoved += OnAvatarRemoved;
         _roomManager.AvatarChat += RoomManager_AvatarChat;
@@ -338,6 +351,20 @@ public class ChatPageViewModel : PageViewModel
             .Subscribe();
 
         CopySelectedEntriesCmd = ReactiveCommand.Create(CopySelectedEntries);
+
+        // Chat input
+        _isWhisperMode = this
+            .WhenAnyValue(x => x.ChatInputMode)
+            .Select(mode => mode == ChatType.Whisper)
+            .ToProperty(this, x => x.IsWhisperMode);
+
+        var canSendChat = this
+            .WhenAnyValue(x => x.IsInRoom, x => x.ChatInputText,
+                (inRoom, text) => inRoom && !string.IsNullOrEmpty(text))
+            .ObserveOn(RxApp.MainThreadScheduler);
+
+        SendChatCmd = ReactiveCommand.Create(SendChat, canSendChat);
+        WhisperToSelectedCmd = ReactiveCommand.Create(WhisperToSelected, hasSingleContextMessage);
     }
 
     // Combined filter for text search, whispers only, and profanity only
@@ -394,6 +421,38 @@ public class ChatPageViewModel : PageViewModel
     private void CopySelectedEntries()
     {
         _clipboard.SetText(string.Join("\n", Selection.SelectedItems));
+    }
+
+    public void SendChat()
+    {
+        var text = ChatInputText;
+        if (string.IsNullOrEmpty(text)) return;
+
+        switch (ChatInputMode)
+        {
+            case ChatType.Talk:
+                _ext.Send(new ChatMsg(ChatType.Talk, text));
+                break;
+            case ChatType.Shout:
+                _ext.Send(new ChatMsg(ChatType.Shout, text));
+                break;
+            case ChatType.Whisper:
+                var recipient = WhisperRecipient?.Trim();
+                if (string.IsNullOrEmpty(recipient)) return;
+                _ext.Send(new WhisperMsg(recipient, text));
+                break;
+        }
+
+        ChatInputText = "";
+    }
+
+    private void WhisperToSelected()
+    {
+        if (SelectedUserName is { } name)
+        {
+            ChatInputMode = ChatType.Whisper;
+            WhisperRecipient = name;
+        }
     }
 
     private async Task ExportChatAsync(string format)
@@ -790,6 +849,7 @@ public class ChatPageViewModel : PageViewModel
 
     private void OnEnteredRoom(RoomEventArgs e)
     {
+        IsInRoom = true;
         var roomName = e.Room.Data?.Name ?? "?";
         var roomOwner = e.Room.Data?.OwnerName ?? "?";
         var vm = new ChatLogRoomEntryViewModel
