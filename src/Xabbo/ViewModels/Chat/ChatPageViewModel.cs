@@ -137,6 +137,7 @@ public class ChatPageViewModel : PageViewModel
     [Reactive] public string? HistorySearchUser { get; set; }
     [Reactive] public string? HistorySearchKeyword { get; set; }
     [Reactive] public bool HistorySearchProfanityOnly { get; set; }
+    [Reactive] public bool HistorySearchWhispersOnly { get; set; }
     [Reactive] public DateTime? HistorySearchFromDate { get; set; }
     [Reactive] public TimeSpan? HistorySearchFromTime { get; set; }
     [Reactive] public DateTime? HistorySearchToDate { get; set; }
@@ -153,6 +154,7 @@ public class ChatPageViewModel : PageViewModel
     private string? _lastSearchUser;
     private string? _lastSearchKeyword;
     private bool _lastSearchProfanityOnly;
+    private bool _lastSearchWhispersOnly;
     private DateTime? _lastSearchFromDate;
     private DateTime? _lastSearchToDate;
 
@@ -626,6 +628,7 @@ public class ChatPageViewModel : PageViewModel
         HistorySearchUser = message.Name;
         HistorySearchKeyword = null;
         HistorySearchProfanityOnly = false;
+        HistorySearchWhispersOnly = false;
         HistorySearchFromDate = null;
         HistorySearchFromTime = null;
         HistorySearchToDate = null;
@@ -657,6 +660,7 @@ public class ChatPageViewModel : PageViewModel
         _lastSearchUser = string.IsNullOrWhiteSpace(HistorySearchUser) ? null : HistorySearchUser;
         _lastSearchKeyword = string.IsNullOrWhiteSpace(HistorySearchKeyword) ? null : HistorySearchKeyword;
         _lastSearchProfanityOnly = HistorySearchProfanityOnly;
+        _lastSearchWhispersOnly = HistorySearchWhispersOnly;
 
         // Combine date + time
         _lastSearchFromDate = HistorySearchFromDate;
@@ -671,9 +675,10 @@ public class ChatPageViewModel : PageViewModel
             userName: _lastSearchUser,
             keyword: _lastSearchKeyword,
             profanityOnly: _lastSearchProfanityOnly ? true : null,
+            whispersOnly: _lastSearchWhispersOnly ? true : null,
             fromDate: _lastSearchFromDate,
             toDate: _lastSearchToDate,
-            limit: 500
+            limit: 5000
         ));
 
         foreach (var entry in results)
@@ -764,6 +769,7 @@ public class ChatPageViewModel : PageViewModel
             userName: _lastSearchUser,
             keyword: _lastSearchKeyword,
             profanityOnly: _lastSearchProfanityOnly ? true : null,
+            whispersOnly: _lastSearchWhispersOnly ? true : null,
             fromDate: _lastSearchFromDate,
             toDate: _lastSearchToDate,
             limit: null // No limit for export

@@ -16,6 +16,7 @@ public interface IChatHistoryService
         string? userName = null,
         string? keyword = null,
         bool? profanityOnly = null,
+        bool? whispersOnly = null,
         DateTime? fromDate = null,
         DateTime? toDate = null,
         int? limit = null);
@@ -27,6 +28,7 @@ public interface IChatHistoryService
         string? userName = null,
         string? keyword = null,
         bool? profanityOnly = null,
+        bool? whispersOnly = null,
         DateTime? fromDate = null,
         DateTime? toDate = null,
         int? limit = null);

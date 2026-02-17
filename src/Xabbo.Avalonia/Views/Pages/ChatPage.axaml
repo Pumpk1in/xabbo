@@ -79,9 +79,10 @@
                               ClockIdentifier="24HourClock" />
                 </Grid>
               </StackPanel>
-              <Grid>
-                <CheckBox IsChecked="{Binding HistorySearchProfanityOnly}" Content="Profanity only" HorizontalAlignment="Left" />
-                <Button Content="Search" Command="{Binding SearchHistoryCmd}" HorizontalAlignment="Right" />
+              <Grid ColumnDefinitions="Auto,Auto,*">
+                <CheckBox Grid.Column="0" IsChecked="{Binding HistorySearchProfanityOnly}" Content="Profanity only" />
+                <CheckBox Grid.Column="1" IsChecked="{Binding HistorySearchWhispersOnly}" Content="Whispers only" Margin="10,0,0,0" />
+                <Button Grid.Column="2" Content="Search" Command="{Binding SearchHistoryCmd}" HorizontalAlignment="Right" />
               </Grid>
               <Separator />
               <TextBlock Text="{Binding HistoryResultsText}" FontWeight="SemiBold" />

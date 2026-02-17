@@ -143,17 +143,19 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
         string? userName = null,
         string? keyword = null,
         bool? profanityOnly = null,
+        bool? whispersOnly = null,
         DateTime? fromDate = null,
         DateTime? toDate = null,
         int? limit = null)
     {
-        return SearchWithCount(userName, keyword, profanityOnly, fromDate, toDate, limit).Results;
+        return SearchWithCount(userName, keyword, profanityOnly, whispersOnly, fromDate, toDate, limit).Results;
     }
 
     public (IEnumerable<ChatHistoryEntry> Results, int TotalCount) SearchWithCount(
         string? userName = null,
         string? keyword = null,
         bool? profanityOnly = null,
+        bool? whispersOnly = null,
         DateTime? fromDate = null,
         DateTime? toDate = null,
         int? limit = null)
@@ -190,6 +192,11 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
             if (profanityOnly == true)
             {
                 conditions.Add("has_profanity = 1");
+            }
+
+            if (whispersOnly == true)
+            {
+                conditions.Add("is_whisper = 1");
             }
 
             var whereClause = conditions.Count > 0 ? "WHERE " + string.Join(" AND ", conditions) : "";
