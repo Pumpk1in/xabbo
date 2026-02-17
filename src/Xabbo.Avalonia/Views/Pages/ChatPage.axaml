@@ -91,6 +91,24 @@
                        SelectionMode="Multiple"
                        MaxHeight="350" MinHeight="100"
                        ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListBox.ContextFlyout>
+                  <ui:FAMenuFlyout>
+                    <ui:MenuFlyoutItem
+                      Text="Copy"
+                      IconSource="{icm:SymbolIconSource Symbol=Copy}"
+                      Command="{Binding CopyHistoryEntriesCmd}"
+                    />
+                    <ui:MenuFlyoutSeparator />
+                    <ui:MenuFlyoutSubItem
+                      Text="Ban"
+                      IconSource="{icm:SymbolIconSource Symbol=PersonProhibited}"
+                    >
+                      <ui:MenuFlyoutItem Text="For an hour" Command="{Binding BanHistoryUserCmd}" CommandParameter="{x:Static xc:BanDuration.Hour}" />
+                      <ui:MenuFlyoutItem Text="For a day" Command="{Binding BanHistoryUserCmd}" CommandParameter="{x:Static xc:BanDuration.Day}" />
+                      <ui:MenuFlyoutItem Text="Permanently" Command="{Binding BanHistoryUserCmd}" CommandParameter="{x:Static xc:BanDuration.Permanent}" />
+                    </ui:MenuFlyoutSubItem>
+                  </ui:FAMenuFlyout>
+                </ListBox.ContextFlyout>
                 <ListBox.ItemsPanel>
                   <ItemsPanelTemplate>
                     <VirtualizingStackPanel />
@@ -357,7 +375,7 @@
                 IsVisible="{Binding HasProfanity}"
                 ToolTip.Tip="This message contains flagged words"
               />
-              <!-- Quick Kick button for profanity messages (not on own messages, hidden during fast scroll) -->
+              <!-- Quick Kick button for profanity messages (not on own messages, shown on hover, hidden during fast scroll) -->
               <Button
                 Grid.Column="4"
                 Padding="4"
@@ -367,6 +385,7 @@
                 <Button.IsVisible>
                   <MultiBinding Converter="{x:Static BoolConverters.And}">
                     <Binding Path="ShowModerationButtons" />
+                    <Binding Path="$parent[ListBoxItem].IsPointerOver" />
                     <Binding Path="!#ListBoxMessages.(behaviors:ScrollThrottleBehavior.IsThrottled)" />
                   </MultiBinding>
                 </Button.IsVisible>
@@ -377,7 +396,7 @@
                 </Button.Flyout>
                 <ic:SymbolIcon Symbol="PersonDelete" FontSize="12" />
               </Button>
-              <!-- Quick Mute button for profanity messages (not on own messages, hidden during fast scroll) -->
+              <!-- Quick Mute button for profanity messages (not on own messages, shown on hover, hidden during fast scroll) -->
               <Button
                 Grid.Column="5"
                 Padding="4"
@@ -387,6 +406,7 @@
                 <Button.IsVisible>
                   <MultiBinding Converter="{x:Static BoolConverters.And}">
                     <Binding Path="ShowModerationButtons" />
+                    <Binding Path="$parent[ListBoxItem].IsPointerOver" />
                     <Binding Path="!#ListBoxMessages.(behaviors:ScrollThrottleBehavior.IsThrottled)" />
                   </MultiBinding>
                 </Button.IsVisible>
@@ -402,7 +422,7 @@
                 </Button.Flyout>
                 <ic:SymbolIcon Symbol="ChatOff" FontSize="12" />
               </Button>
-              <!-- Quick Ban button for profanity messages (not on own messages, hidden during fast scroll) -->
+              <!-- Quick Ban button for profanity messages (not on own messages, shown on hover, hidden during fast scroll) -->
               <Button
                 Grid.Column="6"
                 Padding="4"
@@ -412,6 +432,7 @@
                 <Button.IsVisible>
                   <MultiBinding Converter="{x:Static BoolConverters.And}">
                     <Binding Path="ShowModerationButtons" />
+                    <Binding Path="$parent[ListBoxItem].IsPointerOver" />
                     <Binding Path="!#ListBoxMessages.(behaviors:ScrollThrottleBehavior.IsThrottled)" />
                   </MultiBinding>
                 </Button.IsVisible>

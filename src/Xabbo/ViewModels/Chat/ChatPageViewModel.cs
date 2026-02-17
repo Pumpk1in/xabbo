@@ -159,6 +159,7 @@ public class ChatPageViewModel : PageViewModel
     public ReactiveCommand<Unit, Unit> SearchHistoryCmd { get; }
     public ReactiveCommand<string, Task> ExportHistoryCmd { get; }
     public ReactiveCommand<Unit, Unit> CopyHistoryEntriesCmd { get; }
+    public ReactiveCommand<BanDuration, Task> BanHistoryUserCmd { get; }
 
     public SelectionModel<ChatHistoryEntry> HistorySelection { get; } = new SelectionModel<ChatHistoryEntry>()
     {
@@ -330,6 +331,7 @@ public class ChatPageViewModel : PageViewModel
         SearchHistoryCmd = ReactiveCommand.CreateFromTask(SearchHistoryAsync);
         ExportHistoryCmd = ReactiveCommand.Create<string, Task>(ExportHistoryAsync);
         CopyHistoryEntriesCmd = ReactiveCommand.Create(CopyHistoryEntries);
+        BanHistoryUserCmd = ReactiveCommand.Create<BanDuration, Task>(BanHistoryUserAsync);
         SearchUserInHistoryCmd = ReactiveCommand.Create(SearchUserInHistory, hasSingleContextMessage);
 
         // Clear chat commands
@@ -734,6 +736,15 @@ public class ChatPageViewModel : PageViewModel
         }
 
         _clipboard.SetText(sb.ToString().TrimEnd());
+    }
+
+    private Task BanHistoryUserAsync(BanDuration duration)
+    {
+        var entry = HistorySelection.SelectedItem as ChatHistoryEntry;
+        var name = entry?.Name;
+        if (string.IsNullOrEmpty(name))
+            return Task.CompletedTask;
+        return BanUserByNameAsync((name, duration));
     }
 
     private async Task ExportHistoryAsync(string format)
