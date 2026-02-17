@@ -602,6 +602,7 @@
         Grid.Column="3"
         Watermark="Message..."
         Text="{Binding ChatInputText, UpdateSourceTrigger=PropertyChanged}"
+        MaxLength="120"
         Margin="5,0,0,0"
         VerticalAlignment="Center"
       />

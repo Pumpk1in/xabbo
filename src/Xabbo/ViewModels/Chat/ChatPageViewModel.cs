@@ -1,6 +1,7 @@
 ﻿using System.Collections.ObjectModel;
 using System.Reactive;
 using System.Reactive.Linq;
+using System.Reactive.Subjects;
 using System.Text;
 using System.Web;
 using System.Windows.Input;
@@ -109,6 +110,7 @@ public class ChatPageViewModel : PageViewModel
     [Reactive] public ObservableCollection<WhisperSuggestionItem> WhisperSuggestions { get; set; } = [];
     [Reactive] public ObservableCollection<WhisperSuggestionItem> RecentWhisperList { get; set; } = [];
 
+    private readonly Subject<Unit> _avatarPresenceChanged = new();
     private readonly ObservableAsPropertyHelper<bool> _isRecipientInRoom;
     public bool IsRecipientInRoom => _isRecipientInRoom.Value;
 
@@ -384,8 +386,10 @@ public class ChatPageViewModel : PageViewModel
             .Subscribe(t => UpdateWhisperSuggestions(t.Item1));
 
         // Live indicator: is the current recipient in the room?
+        // Re-evaluates when the recipient name changes OR when avatars enter/leave the room.
         _isRecipientInRoom = this
             .WhenAnyValue(x => x.WhisperRecipient)
+            .CombineLatest(_avatarPresenceChanged.StartWith(Unit.Default), (name, _) => name)
             .Throttle(TimeSpan.FromMilliseconds(100))
             .Select(name => !string.IsNullOrWhiteSpace(name)
                 && _roomManager.Room?.TryGetUserByName(name.Trim(), out _) == true)
@@ -873,7 +877,12 @@ public class ChatPageViewModel : PageViewModel
 
     private void OnAvatarAdded(AvatarEventArgs e)
     {
-        if (_roomManager.IsLoadingRoom || !Config.UserEntry || e.Avatar.Type is not AvatarType.User)
+        if (e.Avatar.Type is not AvatarType.User)
+            return;
+
+        _avatarPresenceChanged.OnNext(Unit.Default);
+
+        if (_roomManager.IsLoadingRoom || !Config.UserEntry)
             return;
 
         var vm = new ChatLogAvatarActionViewModel
@@ -901,7 +910,12 @@ public class ChatPageViewModel : PageViewModel
 
     private void OnAvatarRemoved(AvatarEventArgs e)
     {
-        if (_roomManager.IsLoadingRoom || !Config.UserEntry || e.Avatar.Type is not AvatarType.User)
+        if (e.Avatar.Type is not AvatarType.User)
+            return;
+
+        _avatarPresenceChanged.OnNext(Unit.Default);
+
+        if (_roomManager.IsLoadingRoom || !Config.UserEntry)
             return;
 
         var displayName = e.Avatar.Name.Equals(_profileManager.UserData?.Name) ? "You" : e.Avatar.Name;
