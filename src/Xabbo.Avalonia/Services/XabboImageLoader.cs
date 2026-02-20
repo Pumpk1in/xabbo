@@ -13,6 +13,7 @@ public sealed class XabboImageLoader(HttpClient httpClient, bool disposeHttpClie
     public static XabboImageLoader Instance { get; }
 
     private readonly ConcurrentDictionary<string, DateTime> _failureCache = [];
+    private readonly ConcurrentDictionary<string, Bitmap> _syncBitmapCache = [];
 
     static XabboImageLoader()
     {
@@ -20,6 +21,9 @@ public sealed class XabboImageLoader(HttpClient httpClient, bool disposeHttpClie
         client.DefaultRequestHeaders.Add("User-Agent", "xabbo");
         Instance = new XabboImageLoader(client, false);
     }
+
+    public bool TryGetBitmap(string url, out Bitmap? bitmap)
+        => _syncBitmapCache.TryGetValue(url, out bitmap);
 
     protected override Task<Bitmap?> LoadAsync(string url)
     {
@@ -40,6 +44,10 @@ public sealed class XabboImageLoader(HttpClient httpClient, bool disposeHttpClie
             if (image is null)
             {
                 _failureCache.AddOrUpdate(url, DateTime.Now, (_, _) => DateTime.Now);
+            }
+            else
+            {
+                _syncBitmapCache[url] = image;
             }
 
             return image;

@@ -36,18 +36,27 @@
               </Style>
             </Style>
           </Panel.Styles>
-          <img:AdvancedImage Source="{TemplateBinding Placeholder}">
-            <img:AdvancedImage.IsVisible>
-              <MultiBinding Converter="{x:Static BoolConverters.Or}">
-                <Binding Path="#AvatarImage.IsLoading" />
-                <TemplateBinding Property="AvatarImageUrl" Converter="{x:Static StringConverters.IsNullOrEmpty}" />
-              </MultiBinding>
-            </img:AdvancedImage.IsVisible>
-          </img:AdvancedImage>
-          <img:AdvancedImage
-            x:Name="AvatarImage"
-            Loader="{x:Static services:XabboImageLoader.Instance}"
-            Source="{TemplateBinding AvatarImageUrl}"
+          <!-- Async loader: used when bitmap is not yet in sync cache -->
+          <Panel IsVisible="{TemplateBinding DirectBitmap, Converter={x:Static ObjectConverters.IsNull}}">
+            <img:AdvancedImage Source="{TemplateBinding Placeholder}">
+              <img:AdvancedImage.IsVisible>
+                <MultiBinding Converter="{x:Static BoolConverters.Or}">
+                  <Binding Path="#AvatarImage.IsLoading" />
+                  <TemplateBinding Property="AvatarImageUrl" Converter="{x:Static StringConverters.IsNullOrEmpty}" />
+                </MultiBinding>
+              </img:AdvancedImage.IsVisible>
+            </img:AdvancedImage>
+            <img:AdvancedImage
+              x:Name="AvatarImage"
+              Loader="{x:Static services:XabboImageLoader.Instance}"
+              Source="{TemplateBinding AvatarImageUrl}"
+            />
+          </Panel>
+          <!-- Direct image from sync cache: no async, no placeholder flash -->
+          <Image
+            Source="{TemplateBinding DirectBitmap}"
+            IsVisible="{TemplateBinding DirectBitmap, Converter={x:Static ObjectConverters.IsNotNull}}"
+            Stretch="None"
           />
         </Panel>
       </ControlTemplate>

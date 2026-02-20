@@ -1,5 +1,7 @@
 using Avalonia;
 using Avalonia.Controls.Primitives;
+using Avalonia.Media;
+using Xabbo.Avalonia.Services;
 using Xabbo.Utility;
 
 namespace Xabbo.Avalonia.Controls;
@@ -25,6 +27,10 @@ public class AvatarImage : TemplatedControl
     public static readonly DirectProperty<AvatarImage, string?> AvatarImageUrlProperty =
         AvaloniaProperty.RegisterDirect<AvatarImage, string?>(nameof(AvatarImageUrl),
             x => x.AvatarImageUrl);
+
+    public static readonly DirectProperty<AvatarImage, IImage?> DirectBitmapProperty =
+        AvaloniaProperty.RegisterDirect<AvatarImage, IImage?>(nameof(DirectBitmap),
+            x => x.DirectBitmap);
 
     public string? FigureString
     {
@@ -64,6 +70,13 @@ public class AvatarImage : TemplatedControl
         private set => SetAndRaise(AvatarImageUrlProperty, ref _avatarImageUrl, value);
     }
 
+    private IImage? _directBitmap;
+    public IImage? DirectBitmap
+    {
+        get => _directBitmap;
+        private set => SetAndRaise(DirectBitmapProperty, ref _directBitmap, value);
+    }
+
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         if (change.Property == FigureStringProperty ||
@@ -76,16 +89,28 @@ public class AvatarImage : TemplatedControl
             if (string.IsNullOrWhiteSpace(FigureString) &&
                 string.IsNullOrWhiteSpace(UserName))
             {
+                DirectBitmap = null;
                 AvatarImageUrl = null;
             }
             else
             {
-                AvatarImageUrl = UrlHelper.AvatarImageUrl(
+                var url = UrlHelper.AvatarImageUrl(
                     figure: FigureString,
                     direction: Direction,
                     headOnly: HeadOnly,
                     name: UserName
                 );
+
+                if (url is not null && XabboImageLoader.Instance.TryGetBitmap(url, out var cached))
+                {
+                    DirectBitmap = cached;
+                    AvatarImageUrl = null;
+                }
+                else
+                {
+                    DirectBitmap = null;
+                    AvatarImageUrl = url;
+                }
             }
         }
 
