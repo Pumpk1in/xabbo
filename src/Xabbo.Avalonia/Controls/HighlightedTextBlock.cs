@@ -23,6 +23,12 @@ public class HighlightedTextBlock : TextBlock
         AvaloniaProperty.Register<HighlightedTextBlock, IBrush?>(nameof(HighlightForeground),
             new SolidColorBrush(Color.Parse("#FF6B6B")));
 
+    public static readonly StyledProperty<bool> IsWhisperProperty =
+        AvaloniaProperty.Register<HighlightedTextBlock, bool>(nameof(IsWhisper));
+
+    public static readonly StyledProperty<string?> WhisperRecipientProperty =
+        AvaloniaProperty.Register<HighlightedTextBlock, string?>(nameof(WhisperRecipient));
+
     /// <summary>
     /// The text to display.
     /// </summary>
@@ -50,11 +56,33 @@ public class HighlightedTextBlock : TextBlock
         set => SetValue(HighlightForegroundProperty, value);
     }
 
+    /// <summary>
+    /// Whether this is a whisper message (applies italic/purple styling).
+    /// </summary>
+    public bool IsWhisper
+    {
+        get => GetValue(IsWhisperProperty);
+        set => SetValue(IsWhisperProperty, value);
+    }
+
+    /// <summary>
+    /// The recipient name for outgoing whispers.
+    /// </summary>
+    public string? WhisperRecipient
+    {
+        get => GetValue(WhisperRecipientProperty);
+        set => SetValue(WhisperRecipientProperty, value);
+    }
+
+    private static readonly IBrush WhisperBrush = new SolidColorBrush(Color.Parse("#a495ff"));
+
     static HighlightedTextBlock()
     {
         TextProperty.Changed.AddClassHandler<HighlightedTextBlock>((x, _) => x.UpdateInlines());
         HighlightWordsProperty.Changed.AddClassHandler<HighlightedTextBlock>((x, _) => x.UpdateInlines());
         HighlightForegroundProperty.Changed.AddClassHandler<HighlightedTextBlock>((x, _) => x.UpdateInlines());
+        IsWhisperProperty.Changed.AddClassHandler<HighlightedTextBlock>((x, _) => x.UpdateInlines());
+        WhisperRecipientProperty.Changed.AddClassHandler<HighlightedTextBlock>((x, _) => x.UpdateInlines());
     }
 
     private void UpdateInlines()
@@ -67,11 +95,14 @@ public class HighlightedTextBlock : TextBlock
             return;
         }
 
+        var isWhisper = IsWhisper;
+
         var words = HighlightWords;
         if (words is null or { Count: 0 })
         {
-            // No words to highlight, just show the text
-            Inlines?.Add(new Run(text));
+            var run = new Run(text);
+            if (isWhisper) { run.FontStyle = FontStyle.Italic; run.Foreground = WhisperBrush; }
+            Inlines?.Add(run);
             return;
         }
 
@@ -87,7 +118,9 @@ public class HighlightedTextBlock : TextBlock
 
         if (escapedWords.Count == 0)
         {
-            Inlines?.Add(new Run(text));
+            var run = new Run(text);
+            if (isWhisper) { run.FontStyle = FontStyle.Italic; run.Foreground = WhisperBrush; }
+            Inlines?.Add(run);
             return;
         }
 
@@ -100,7 +133,9 @@ public class HighlightedTextBlock : TextBlock
             // Add text before the match
             if (match.Index > currentIndex)
             {
-                Inlines?.Add(new Run(text.Substring(currentIndex, match.Index - currentIndex)));
+                var run = new Run(text.Substring(currentIndex, match.Index - currentIndex));
+                if (isWhisper) { run.FontStyle = FontStyle.Italic; run.Foreground = WhisperBrush; }
+                Inlines?.Add(run);
             }
 
             // Add the highlighted match
@@ -117,7 +152,9 @@ public class HighlightedTextBlock : TextBlock
         // Add remaining text after last match
         if (currentIndex < text.Length)
         {
-            Inlines?.Add(new Run(text.Substring(currentIndex)));
+            var run = new Run(text.Substring(currentIndex));
+            if (isWhisper) { run.FontStyle = FontStyle.Italic; run.Foreground = WhisperBrush; }
+            Inlines?.Add(run);
         }
     }
 

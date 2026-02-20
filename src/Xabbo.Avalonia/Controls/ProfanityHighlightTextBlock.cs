@@ -24,6 +24,9 @@ public class ProfanityHighlightTextBlock : TextBlock
     public static readonly StyledProperty<string?> UsernameProperty =
         AvaloniaProperty.Register<ProfanityHighlightTextBlock, string?>(nameof(Username));
 
+    public static readonly StyledProperty<string?> WhisperRecipientProperty =
+        AvaloniaProperty.Register<ProfanityHighlightTextBlock, string?>(nameof(WhisperRecipient));
+
     /// <summary>
     /// The message segments to display with profanity highlighting.
     /// </summary>
@@ -60,6 +63,15 @@ public class ProfanityHighlightTextBlock : TextBlock
         set => SetValue(UsernameProperty, value);
     }
 
+    /// <summary>
+    /// The whisper recipient name for outgoing whispers (displays "Name -> Recipient: msg").
+    /// </summary>
+    public string? WhisperRecipient
+    {
+        get => GetValue(WhisperRecipientProperty);
+        set => SetValue(WhisperRecipientProperty, value);
+    }
+
     private static readonly IBrush ProfanityBrush = new SolidColorBrush(Color.Parse("#FF4444"));
     private static readonly IBrush WhisperBrush = new SolidColorBrush(Color.Parse("#a495ff"));
 
@@ -69,6 +81,7 @@ public class ProfanityHighlightTextBlock : TextBlock
         FallbackTextProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.UpdateInlines());
         IsWhisperProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.UpdateInlines());
         UsernameProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.UpdateInlines());
+        WhisperRecipientProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.UpdateInlines());
     }
 
     private void UpdateInlines()
@@ -83,10 +96,19 @@ public class ProfanityHighlightTextBlock : TextBlock
                 FontWeight = FontWeight.Bold
             };
             if (IsWhisper)
-            {
                 usernameRun.Foreground = WhisperBrush;
-            }
             Inlines?.Add(usernameRun);
+
+            // For outgoing whispers, show "Name -> Recipient: msg" (all italic/purple, no bold)
+            if (!string.IsNullOrEmpty(WhisperRecipient))
+            {
+                var arrowRun = new Run($" -> {WhisperRecipient}")
+                {
+                    FontStyle = FontStyle.Italic,
+                    Foreground = WhisperBrush
+                };
+                Inlines?.Add(arrowRun);
+            }
 
             var separatorRun = new Run(": ");
             if (IsWhisper)

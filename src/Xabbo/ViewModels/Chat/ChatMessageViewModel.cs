@@ -27,6 +27,11 @@ public class ChatMessageViewModel : ChatLogEntryViewModel
     /// </summary>
     [Reactive] public IReadOnlyList<string>? MatchedWords { get; set; }
 
+    /// <summary>
+    /// The recipient name for outgoing whisper messages.
+    /// </summary>
+    public string? WhisperRecipient { get; init; }
+
     public bool IsTalk => Type is ChatType.Talk;
     public bool IsShout => Type is ChatType.Shout;
     public bool IsWhisper => Type is ChatType.Whisper;

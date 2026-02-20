@@ -105,6 +105,9 @@ public class ChatPageViewModel : PageViewModel
     private readonly ObservableAsPropertyHelper<bool> _isWhisperMode;
     public bool IsWhisperMode => _isWhisperMode.Value;
 
+    // Tracks the recipient of the last sent whisper, to label outgoing whisper echoes
+    private string? _lastSentWhisperRecipient;
+
     // Whisper autocomplete
     private readonly Dictionary<string, DateTime> _recentWhisperRecipients = new(StringComparer.OrdinalIgnoreCase);
     [Reactive] public ObservableCollection<WhisperSuggestionItem> WhisperSuggestions { get; set; } = [];
@@ -333,7 +336,11 @@ public class ChatPageViewModel : PageViewModel
         SearchHistoryCmd = ReactiveCommand.CreateFromTask(SearchHistoryAsync);
         ExportHistoryCmd = ReactiveCommand.Create<string, Task>(ExportHistoryAsync);
         CopyHistoryEntriesCmd = ReactiveCommand.Create(CopyHistoryEntries);
-        BanHistoryUserCmd = ReactiveCommand.Create<BanDuration, Task>(BanHistoryUserAsync);
+        var canBanHistoryUser = Observable
+            .FromEventPattern(HistorySelection, nameof(HistorySelection.SelectionChanged))
+            .Select(_ => HistorySelection.SelectedItem is ChatHistoryEntry { CanBan: true })
+            .StartWith(false);
+        BanHistoryUserCmd = ReactiveCommand.Create<BanDuration, Task>(BanHistoryUserAsync, canBanHistoryUser);
         SearchUserInHistoryCmd = ReactiveCommand.Create(SearchUserInHistory, hasSingleContextMessage);
 
         // Clear chat commands
@@ -473,6 +480,7 @@ public class ChatPageViewModel : PageViewModel
             case ChatType.Whisper:
                 var recipient = WhisperRecipient?.Trim();
                 if (string.IsNullOrEmpty(recipient)) return;
+                _lastSentWhisperRecipient = recipient;
                 _ext.Send(new WhisperMsg(recipient, text));
                 RecordWhisperRecipient(recipient);
                 if (_roomManager.Room?.TryGetUserByName(recipient, out _) != true)
@@ -681,6 +689,7 @@ public class ChatPageViewModel : PageViewModel
             limit: 5000
         ));
 
+        var ownName = _profileManager.UserData?.Name;
         foreach (var entry in results)
         {
             // Recalculate HasProfanity and MatchedWords for displayed results
@@ -694,6 +703,10 @@ public class ChatPageViewModel : PageViewModel
                     entry.MatchedWords = matches.Select(m => entry.Message.Substring(m.Start, m.Length)).Distinct().ToList();
                 }
             }
+            // Ban is only available on message entries that are not from the local user
+            entry.CanBan = entry.Type == "message"
+                && !string.IsNullOrEmpty(entry.Name)
+                && !entry.Name.Equals(ownName, StringComparison.OrdinalIgnoreCase);
             _historyResults.Add(entry);
         }
 
@@ -1035,6 +1048,10 @@ public class ChatPageViewModel : PageViewModel
         var renderedMessage = H.RenderText(e.Message);
         var (hasProfanity, segments, matchedWords) = AnalyzeProfanity(renderedMessage);
 
+        var isWhisper = e.ChatType == ChatType.Whisper && e.BubbleStyle != 34;
+        var isOwnMessage = e.Avatar.Name.Equals(_profileManager.UserData?.Name, StringComparison.OrdinalIgnoreCase);
+        var whisperRecipient = (isWhisper && isOwnMessage) ? _lastSentWhisperRecipient : null;
+
         var vm = new ChatMessageViewModel
         {
             Type = e.ChatType,
@@ -1045,12 +1062,12 @@ public class ChatPageViewModel : PageViewModel
             HasProfanity = hasProfanity,
             MessageSegments = segments,
             MatchedWords = matchedWords,
-            IsOwnMessage = e.Avatar.Name.Equals(_profileManager.UserData?.Name, StringComparison.OrdinalIgnoreCase),
+            IsOwnMessage = isOwnMessage,
+            WhisperRecipient = whisperRecipient,
         };
         AppendLog(vm);
 
         // Save to history (MatchedWords will be recalculated at search time for highlighting)
-        var isWhisper = e.ChatType == ChatType.Whisper && e.BubbleStyle != 34;
         _chatHistory.AddEntry(new ChatHistoryEntry
         {
             Timestamp = vm.Timestamp,
@@ -1059,6 +1076,7 @@ public class ChatPageViewModel : PageViewModel
             Message = renderedMessage,
             ChatType = e.ChatType.ToString(),
             IsWhisper = isWhisper,
+            WhisperRecipient = whisperRecipient,
             HasProfanity = hasProfanity,
         });
     }

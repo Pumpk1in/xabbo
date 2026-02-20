@@ -70,6 +70,15 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
             """;
         cmd.ExecuteNonQuery();
 
+        // Add whisper_recipient column if it doesn't exist (migration)
+        try
+        {
+            using var alterCmd = _connection.CreateCommand();
+            alterCmd.CommandText = "ALTER TABLE chat_history ADD COLUMN whisper_recipient TEXT";
+            alterCmd.ExecuteNonQuery();
+        }
+        catch (SqliteException) { /* Column already exists */ }
+
         // Get initial count
         using var countCmd = _connection.CreateCommand();
         countCmd.CommandText = "SELECT COUNT(*) FROM chat_history";
@@ -119,8 +128,8 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
     {
         using var cmd = _connection.CreateCommand();
         cmd.CommandText = """
-            INSERT INTO chat_history (timestamp, type, name, message, chat_type, is_whisper, has_profanity, matched_words, user_name, action, room_name, room_owner)
-            VALUES (@timestamp, @type, @name, @message, @chatType, @isWhisper, @hasProfanity, @matchedWords, @userName, @action, @roomName, @roomOwner)
+            INSERT INTO chat_history (timestamp, type, name, message, chat_type, is_whisper, whisper_recipient, has_profanity, matched_words, user_name, action, room_name, room_owner)
+            VALUES (@timestamp, @type, @name, @message, @chatType, @isWhisper, @whisperRecipient, @hasProfanity, @matchedWords, @userName, @action, @roomName, @roomOwner)
             """;
 
         cmd.Parameters.AddWithValue("@timestamp", new DateTimeOffset(entry.Timestamp).ToUnixTimeSeconds());
@@ -129,6 +138,7 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
         cmd.Parameters.AddWithValue("@message", (object?)entry.Message ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@chatType", (object?)entry.ChatType ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@isWhisper", entry.IsWhisper ? 1 : 0);
+        cmd.Parameters.AddWithValue("@whisperRecipient", (object?)entry.WhisperRecipient ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@hasProfanity", entry.HasProfanity ? 1 : 0);
         cmd.Parameters.AddWithValue("@matchedWords", entry.MatchedWords is { Count: > 0 } ? JsonSerializer.Serialize(entry.MatchedWords, ChatHistoryJsonContext.Default.ListString) : DBNull.Value);
         cmd.Parameters.AddWithValue("@userName", (object?)entry.UserName ?? DBNull.Value);
@@ -238,6 +248,7 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
             Message = reader["message"] as string,
             ChatType = reader["chat_type"] as string,
             IsWhisper = Convert.ToInt32(reader["is_whisper"]) == 1,
+            WhisperRecipient = reader["whisper_recipient"] as string,
             HasProfanity = Convert.ToInt32(reader["has_profanity"]) == 1,
             MatchedWords = matchedWords,
             UserName = reader["user_name"] as string,

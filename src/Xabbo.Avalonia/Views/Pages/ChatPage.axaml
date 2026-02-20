@@ -103,6 +103,7 @@
                     <ui:MenuFlyoutSubItem
                       Text="Ban"
                       IconSource="{icm:SymbolIconSource Symbol=PersonProhibited}"
+                      IsEnabled="{Binding BanHistoryUserCmd.CanExecute^}"
                     >
                       <ui:MenuFlyoutItem Text="For an hour" Command="{Binding BanHistoryUserCmd}" CommandParameter="{x:Static xc:BanDuration.Hour}" />
                       <ui:MenuFlyoutItem Text="For a day" Command="{Binding BanHistoryUserCmd}" CommandParameter="{x:Static xc:BanDuration.Day}" />
@@ -139,7 +140,9 @@
                         FontSize="12"
                         Text="{Binding DisplayText}"
                         HighlightWords="{Binding MatchedWords}"
-                        HighlightForeground="#FF6B6B" />
+                        HighlightForeground="#FF6B6B"
+                        IsWhisper="{Binding IsWhisper}"
+                        WhisperRecipient="{Binding WhisperRecipient}" />
                     </StackPanel>
                   </DataTemplate>
                 </ListBox.ItemTemplate>
@@ -364,6 +367,7 @@
                 FallbackText="{Binding Message}"
                 IsWhisper="{Binding IsWhisper}"
                 Username="{Binding Name}"
+                WhisperRecipient="{Binding WhisperRecipient}"
               />
               <ic:SymbolIcon
                 Grid.Column="3"
