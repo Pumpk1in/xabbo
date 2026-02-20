@@ -504,15 +504,13 @@ public class ChatPageViewModel : PageViewModel
 
     private void UpdateWhisperSuggestions(string? filterText)
     {
+        WhisperSuggestions.Clear();
+
         var roomUsers = _roomManager.Room?.Users;
         if (roomUsers is null)
-        {
-            WhisperSuggestions = [];
             return;
-        }
 
         var selfName = _profileManager.UserData?.Name;
-        var suggestions = new List<WhisperSuggestionItem>();
 
         foreach (var user in roomUsers)
         {
@@ -521,15 +519,13 @@ public class ChatPageViewModel : PageViewModel
                 !user.Name.Contains(filterText, StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            suggestions.Add(new WhisperSuggestionItem
+            WhisperSuggestions.Add(new WhisperSuggestionItem
             {
                 Name = user.Name,
                 IsInRoom = true,
                 IsRecent = false,
             });
         }
-
-        WhisperSuggestions = new ObservableCollection<WhisperSuggestionItem>(suggestions);
     }
 
     private void UpdateRecentWhisperList()
@@ -537,19 +533,17 @@ public class ChatPageViewModel : PageViewModel
         var cutoff = DateTime.Now.AddHours(-1);
         var roomUsers = _roomManager.Room?.Users;
 
-        var recents = _recentWhisperRecipients
-            .Where(kv => kv.Value >= cutoff)
-            .OrderByDescending(kv => kv.Value)
-            .Select(kv => new WhisperSuggestionItem
+        RecentWhisperList.Clear();
+        foreach (var kv in _recentWhisperRecipients.Where(kv => kv.Value >= cutoff).OrderByDescending(kv => kv.Value))
+        {
+            RecentWhisperList.Add(new WhisperSuggestionItem
             {
                 Name = kv.Key,
                 IsInRoom = roomUsers?.Any(u =>
                     u.Name.Equals(kv.Key, StringComparison.OrdinalIgnoreCase)) ?? false,
                 IsRecent = true,
-            })
-            .ToList();
-
-        RecentWhisperList = new ObservableCollection<WhisperSuggestionItem>(recents);
+            });
+        }
     }
 
     private void RecordWhisperRecipient(string name)
