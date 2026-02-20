@@ -166,10 +166,12 @@ public sealed class ModerationCommands(RoomManager roomManager, IAppPathProvider
         {
             if (_banList.TryGetValue(user.Name, out BanDuration banDuration))
             {
-                if (_roomManager.Room?.Data is { IsGroupRoom: true })
+                if (_roomManager.Room?.Data is { IsGroupRoom: true } data && Session.Is(ClientType.Modern))
                 {
+                    Ext.Send(new KickGroupMemberMsg(data.GroupId, user.Id));
                     ShowMessage($"Kicking user '{user.Name}' from room group");
                     NotifyChatLog(user.Name, "kicked from room group");
+                    await Task.Delay(1000);
                 }
                 ShowMessage($"Banning user '{user.Name}'");
                 NotifyChatLog(user.Name, "banned (deferred)");
@@ -337,9 +339,9 @@ public sealed class ModerationCommands(RoomManager roomManager, IAppPathProvider
     }
 
     [Command("ban")]
-    public Task HandleBanCommand(CommandArgs args)
+    public async Task HandleBanCommand(CommandArgs args)
     {
-        if (args.Length < 1) return Task.CompletedTask;
+        if (args.Length < 1) return;
 
         var banDuration = BanDuration.Hour;
         string durationString = "for an hour";
@@ -362,7 +364,7 @@ public sealed class ModerationCommands(RoomManager roomManager, IAppPathProvider
                     break;
                 default:
                     ShowMessage($"Unknown ban type '{args[1]}'.");
-                    return Task.CompletedTask;
+                    return;
             }
         }
 
@@ -371,10 +373,12 @@ public sealed class ModerationCommands(RoomManager roomManager, IAppPathProvider
         if (_roomManager.Room is not null &&
             _roomManager.Room.TryGetUserByName(userName, out IUser? user))
         {
-            if (_roomManager.Room?.Data is { IsGroupRoom: true })
+            if (_roomManager.Room?.Data is { IsGroupRoom: true } data && Session.Is(ClientType.Modern))
             {
+                Ext.Send(new KickGroupMemberMsg(data.GroupId, user.Id));
                 ShowMessage($"Kicking user '{user.Name}' from room group");
                 NotifyChatLog(user.Name, "kicked from room group");
+                await Task.Delay(1000);
             }
             ShowMessage($"Banning user '{user.Name}' {durationString}");
             NotifyChatLog(user.Name, $"banned {durationString}");
@@ -386,6 +390,5 @@ public sealed class ModerationCommands(RoomManager roomManager, IAppPathProvider
             NotifyChatLog(userName, $"will be banned {durationString} upon next entry");
             AddToBanList(userName, banDuration);
         }
-        return Task.CompletedTask;
     }
 }
