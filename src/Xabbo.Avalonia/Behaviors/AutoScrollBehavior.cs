@@ -71,9 +71,13 @@ public class AutoScrollBehavior : Behavior<ListBox>
             return;
         }
 
-        // Ignore scroll events triggered by our own programmatic scrolls
+        // Ignore scroll events triggered by our own programmatic scrolls and reset flag here,
+        // not inside ScrollToBottom(), so events dispatched asynchronously are also covered.
         if (_isProgrammaticScroll)
+        {
+            _isProgrammaticScroll = false;
             return;
+        }
 
         // Only react to actual scroll movements (not extent changes)
         if (Math.Abs(e.OffsetDelta.Y) < 0.1)
@@ -122,6 +126,6 @@ public class AutoScrollBehavior : Behavior<ListBox>
         _isProgrammaticScroll = true;
         var newOffset = scrollable.Extent.Height - scrollable.Viewport.Height;
         scrollable.Offset = new Vector(scrollable.Offset.X, Math.Max(0, newOffset));
-        _isProgrammaticScroll = false;
+        // _isProgrammaticScroll is reset in OnScrollChanged to cover async dispatch
     }
 }
