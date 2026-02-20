@@ -337,7 +337,9 @@ public class ChatPageViewModel : PageViewModel
         ExportHistoryCmd = ReactiveCommand.Create<string, Task>(ExportHistoryAsync);
         CopyHistoryEntriesCmd = ReactiveCommand.Create(CopyHistoryEntries);
         var canBanHistoryUser = Observable
-            .FromEventPattern(HistorySelection, nameof(HistorySelection.SelectionChanged))
+            .FromEventPattern<EventHandler<SelectionModelSelectionChangedEventArgs<ChatHistoryEntry>>, SelectionModelSelectionChangedEventArgs<ChatHistoryEntry>>(
+                h => HistorySelection.SelectionChanged += h,
+                h => HistorySelection.SelectionChanged -= h)
             .Select(_ => HistorySelection.SelectedItem is ChatHistoryEntry { CanBan: true })
             .StartWith(false);
         BanHistoryUserCmd = ReactiveCommand.Create<BanDuration, Task>(BanHistoryUserAsync, canBanHistoryUser);
