@@ -151,8 +151,6 @@ public class ProfanityHighlightTextBlock : TextBlock
 
             Inlines?.Add(run);
         }
-
-        InvalidateMeasure();
     }
 
     protected override void OnInitialized()
