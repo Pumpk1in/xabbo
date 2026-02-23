@@ -10,6 +10,7 @@
   xmlns:controls="using:Xabbo.Avalonia.Controls"
   xmlns:v="using:Xabbo.Avalonia.Views"
   xmlns:vm="using:Xabbo.ViewModels"
+  xmlns:models="using:Xabbo.Models"
   mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
   x:Class="Xabbo.Avalonia.Views.SettingsPageView"
   x:Name="SettingsPageViewRoot"
@@ -37,6 +38,32 @@
               <CheckBox IsChecked="{Binding Config.Chat.Log.Trades}" Content="Trades" />
               <CheckBox IsChecked="{Binding Config.Chat.Log.UserEntry}" Content="User enters or leaves" />
             </WrapPanel>
+          </StackPanel>
+        </ui:SettingsExpanderItem>
+        <ui:SettingsExpanderItem>
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <TextBlock VerticalAlignment="Center">Chat bubble:</TextBlock>
+            <ComboBox
+              ItemsSource="{x:Static vm:SettingsPageViewModel.ChatBubbles}"
+              SelectedItem="{Binding SelectedBubble}"
+              MinWidth="160"
+              VerticalAlignment="Center"
+            >
+              <ComboBox.ItemTemplate>
+                <DataTemplate DataType="models:ChatBubbleOption">
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <!-- Placeholder: replace this Border with an Image once PNG assets are available -->
+                    <Border
+                      Width="32" Height="18"
+                      CornerRadius="9"
+                      Background="#4488CC"
+                      VerticalAlignment="Center"
+                    />
+                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                  </StackPanel>
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
           </StackPanel>
         </ui:SettingsExpanderItem>
         <ui:SettingsExpanderItem>

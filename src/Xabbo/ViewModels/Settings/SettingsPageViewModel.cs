@@ -1,8 +1,10 @@
 using System.Collections.Specialized;
 using System.Reactive;
+using System.Reactive.Linq;
 using FluentAvalonia.UI.Controls;
 using ReactiveUI;
 using Xabbo.Configuration;
+using Xabbo.Models;
 using Xabbo.Services.Abstractions;
 
 namespace Xabbo.ViewModels;
@@ -19,6 +21,9 @@ public sealed class SettingsPageViewModel : PageViewModel
     private readonly IChatHistoryService _chatHistory;
     public AppConfig Config => _config.Value;
 
+    public static IReadOnlyList<ChatBubbleOption> ChatBubbles { get; } = ChatBubbleOption.All;
+
+    [Reactive] public ChatBubbleOption? SelectedBubble { get; set; }
     [Reactive] public string CustomProfanityWordsText { get; set; } = string.Empty;
     [Reactive] public int HistoryEntryCount { get; set; }
 
@@ -42,6 +47,12 @@ public sealed class SettingsPageViewModel : PageViewModel
             SubscribeToCustomWordsChanges();
             RefreshCustomWordsText();
         };
+
+        // Initialize bubble selection from config
+        SelectedBubble = ChatBubbles.FirstOrDefault(b => b.Id == Config.Chat.BubbleStyle) ?? ChatBubbles[0];
+        this.WhenAnyValue(x => x.SelectedBubble)
+            .WhereNotNull()
+            .Subscribe(b => Config.Chat.BubbleStyle = b.Id);
 
         // Initialize history count
         HistoryEntryCount = _chatHistory.GetEntryCount();

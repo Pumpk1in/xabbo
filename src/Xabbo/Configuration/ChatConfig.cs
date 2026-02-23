@@ -12,6 +12,7 @@ public sealed class ChatConfig : ReactiveObject
     [Reactive] public bool MuteWired { get; set; }
     [Reactive] public bool MuteRespects { get; set; }
     [Reactive] public bool MuteScratches { get; set; }
+    [Reactive] public int BubbleStyle { get; set; } = 0;
     [Reactive] public ChatLogConfig Log { get; set; } = new();
     [Reactive] public ProfanityConfig Profanity { get; set; } = new();
 }

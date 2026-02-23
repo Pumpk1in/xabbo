@@ -474,16 +474,16 @@ public class ChatPageViewModel : PageViewModel
         switch (ChatInputMode)
         {
             case ChatType.Talk:
-                _ext.Send(new ChatMsg(ChatType.Talk, text));
+                _ext.Send(new ChatMsg(ChatType.Talk, text, Settings.Chat.BubbleStyle));
                 break;
             case ChatType.Shout:
-                _ext.Send(new ChatMsg(ChatType.Shout, text));
+                _ext.Send(new ChatMsg(ChatType.Shout, text, Settings.Chat.BubbleStyle));
                 break;
             case ChatType.Whisper:
                 var recipient = WhisperRecipient?.Trim();
                 if (string.IsNullOrEmpty(recipient)) return;
                 _lastSentWhisperRecipient = recipient;
-                _ext.Send(new WhisperMsg(recipient, text));
+                _ext.Send(new WhisperMsg(recipient, text, Settings.Chat.BubbleStyle));
                 RecordWhisperRecipient(recipient);
                 if (_roomManager.Room?.TryGetUserByName(recipient, out _) != true)
                     _xabbot.ShowMessage($"'{recipient}' is not in this room. Your whisper was sent but won't be seen.");
