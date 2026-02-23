@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using ReactiveUI;
 using Avalonia;
 using Avalonia.ReactiveUI;
@@ -12,9 +13,24 @@ internal sealed class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
         PlatformRegistrationManager.SetRegistrationNamespaces(RegistrationNamespace.Avalonia);
         BuildAvaloniaApp()
             .StartWithClassicDesktopLifetime(args);
+    }
+
+    private static void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
+    {
+        try
+        {
+            var logPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "xabbo", "crash.log");
+            Directory.CreateDirectory(Path.GetDirectoryName(logPath)!);
+            var msg = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Unhandled exception:\n{e.ExceptionObject}\n\n";
+            File.AppendAllText(logPath, msg);
+        }
+        catch { /* never throw from crash handler */ }
     }
 
     // Avalonia configuration, don't remove; also used by visual designer.
