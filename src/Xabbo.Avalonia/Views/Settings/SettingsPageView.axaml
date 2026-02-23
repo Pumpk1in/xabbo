@@ -79,7 +79,7 @@
               <ListBox.ItemTemplate>
                 <DataTemplate DataType="models:ChatBubbleOption">
                   <Image
-                    Height="40" MaxWidth="120"
+                    Height="40"
                     Stretch="Uniform"
                     Source="{Binding ., Converter={StaticResource BubbleImageConverter}}"
                     ToolTip.Tip="{Binding Name}"
@@ -130,7 +130,7 @@
               <ListBox.ItemTemplate>
                 <DataTemplate DataType="models:ChatBubbleOption">
                   <Image
-                    Height="40" MaxWidth="120"
+                    Height="40"
                     Stretch="Uniform"
                     Source="{Binding ., Converter={StaticResource BubbleImageConverter}}"
                     ToolTip.Tip="{Binding Name}"
