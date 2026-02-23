@@ -49,29 +49,19 @@
               Background="Transparent"
               BorderThickness="0"
             >
+              <ListBox.Resources>
+                <SolidColorBrush x:Key="ListViewItemBackgroundSelected">#9b8aff</SolidColorBrush>
+                <SolidColorBrush x:Key="ListViewItemBackgroundSelectedPointerOver">#9b8aff</SolidColorBrush>
+                <SolidColorBrush x:Key="ListViewItemBackgroundSelectedPressed">#9b8aff</SolidColorBrush>
+                <SolidColorBrush x:Key="ListViewItemBackgroundPointerOver">#9b8aff</SolidColorBrush>
+              </ListBox.Resources>
               <ListBox.Styles>
                 <Style Selector="ListBoxItem">
                   <Setter Property="Padding" Value="2" />
                   <Setter Property="Margin" Value="2" />
                   <Setter Property="MinWidth" Value="0" />
                   <Setter Property="MinHeight" Value="0" />
-                </Style>
-                <Style Selector="ListBoxItem > Border">
-                  <Setter Property="Background" Value="Transparent" />
-                  <Setter Property="BorderBrush" Value="Transparent" />
-                  <Setter Property="BorderThickness" Value="2" />
                   <Setter Property="CornerRadius" Value="4" />
-                  <Setter Property="Padding" Value="4" />
-                  <Setter Property="Transitions">
-                    <Transitions>
-                      <BrushTransition Property="BorderBrush" Duration="0:0:0.1" />
-                      <BrushTransition Property="Background" Duration="0:0:0.1" />
-                    </Transitions>
-                  </Setter>
-                </Style>
-                <Style Selector="ListBoxItem:selected > Border">
-                  <Setter Property="BorderBrush" Value="#5000AA" />
-                  <Setter Property="Background" Value="#5000AA" />
                 </Style>
                 <Style Selector="ListBoxItem:selected /template/ Rectangle#SelectionIndicator">
                   <Setter Property="IsVisible" Value="false" />
@@ -103,29 +93,19 @@
               Background="Transparent"
               BorderThickness="0"
             >
+              <ListBox.Resources>
+                <SolidColorBrush x:Key="ListViewItemBackgroundSelected">#5000AA</SolidColorBrush>
+                <SolidColorBrush x:Key="ListViewItemBackgroundSelectedPointerOver">#5000AA</SolidColorBrush>
+                <SolidColorBrush x:Key="ListViewItemBackgroundSelectedPressed">#5000AA</SolidColorBrush>
+                <SolidColorBrush x:Key="ListViewItemBackgroundPointerOver">#33FFFFFF</SolidColorBrush>
+              </ListBox.Resources>
               <ListBox.Styles>
                 <Style Selector="ListBoxItem">
                   <Setter Property="Padding" Value="2" />
                   <Setter Property="Margin" Value="2" />
                   <Setter Property="MinWidth" Value="0" />
                   <Setter Property="MinHeight" Value="0" />
-                </Style>
-                <Style Selector="ListBoxItem > Border">
-                  <Setter Property="Background" Value="Transparent" />
-                  <Setter Property="BorderBrush" Value="Transparent" />
-                  <Setter Property="BorderThickness" Value="2" />
                   <Setter Property="CornerRadius" Value="4" />
-                  <Setter Property="Padding" Value="4" />
-                  <Setter Property="Transitions">
-                    <Transitions>
-                      <BrushTransition Property="BorderBrush" Duration="0:0:0.1" />
-                      <BrushTransition Property="Background" Duration="0:0:0.1" />
-                    </Transitions>
-                  </Setter>
-                </Style>
-                <Style Selector="ListBoxItem:selected > Border">
-                  <Setter Property="BorderBrush" Value="#5000AA" />
-                  <Setter Property="Background" Value="#5000AA" />
                 </Style>
                 <Style Selector="ListBoxItem:selected /template/ Rectangle#SelectionIndicator">
                   <Setter Property="IsVisible" Value="false" />
