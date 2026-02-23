@@ -67,6 +67,7 @@
       <c:EqualityConverter x:Key="EqConverter"/>
       <c:InequalityConverter x:Key="NeqConverter"/>
       <c:HslU8Converter x:Key="HslU8Converter"/>
+      <c:BubbleImageConverter x:Key="BubbleImageConverter"/>
 
     </ResourceDictionary>
   </Application.Resources>

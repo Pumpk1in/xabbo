@@ -21,9 +21,11 @@ public sealed class SettingsPageViewModel : PageViewModel
     private readonly IChatHistoryService _chatHistory;
     public AppConfig Config => _config.Value;
 
-    public static IReadOnlyList<ChatBubbleOption> ChatBubbles { get; } = ChatBubbleOption.All;
+    public static IReadOnlyList<ChatBubbleOption> NormalBubbles { get; } = ChatBubbleOption.NormalBubbles;
+    public static IReadOnlyList<ChatBubbleOption> OtherBubbles  { get; } = ChatBubbleOption.OtherBubbles;
 
-    [Reactive] public ChatBubbleOption? SelectedBubble { get; set; }
+    [Reactive] public ChatBubbleOption? SelectedNormalBubble { get; set; }
+    [Reactive] public ChatBubbleOption? SelectedOtherBubble  { get; set; }
     [Reactive] public string CustomProfanityWordsText { get; set; } = string.Empty;
     [Reactive] public int HistoryEntryCount { get; set; }
 
@@ -46,19 +48,34 @@ public sealed class SettingsPageViewModel : PageViewModel
         {
             SubscribeToCustomWordsChanges();
             RefreshCustomWordsText();
+            InitBubbleSelection();
         };
 
         // Initialize bubble selection from config
-        SelectedBubble = ChatBubbles.FirstOrDefault(b => b.Id == Config.Chat.BubbleStyle) ?? ChatBubbles[0];
-        this.WhenAnyValue(x => x.SelectedBubble)
+        InitBubbleSelection();
+
+        this.WhenAnyValue(x => x.SelectedNormalBubble)
             .WhereNotNull()
-            .Subscribe(b => Config.Chat.BubbleStyle = b.Id);
+            .Subscribe(b => { SelectedOtherBubble = null; Config.Chat.BubbleStyle = b.Id; });
+
+        this.WhenAnyValue(x => x.SelectedOtherBubble)
+            .WhereNotNull()
+            .Subscribe(b => { SelectedNormalBubble = null; Config.Chat.BubbleStyle = b.Id; });
 
         // Initialize history count
         HistoryEntryCount = _chatHistory.GetEntryCount();
 
         ApplyCustomWordsCmd = ReactiveCommand.Create(ApplyCustomWords);
         ClearHistoryCmd = ReactiveCommand.Create(ClearHistory);
+    }
+
+    private void InitBubbleSelection()
+    {
+        var savedId = Config.Chat.BubbleStyle;
+        SelectedNormalBubble = ChatBubbleOption.NormalBubbles.FirstOrDefault(b => b.Id == savedId);
+        SelectedOtherBubble  = ChatBubbleOption.OtherBubbles.FirstOrDefault(b => b.Id == savedId);
+        if (SelectedNormalBubble is null && SelectedOtherBubble is null)
+            SelectedNormalBubble = ChatBubbleOption.NormalBubbles[0];
     }
 
     private void ClearHistory()
