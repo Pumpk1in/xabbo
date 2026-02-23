@@ -85,7 +85,7 @@
                   <Image
                     Height="40"
                     Stretch="Uniform"
-                    RenderOptions.BitmapInterpolationMode="NearestNeighbor"
+                    RenderOptions.BitmapInterpolationMode="LowQuality"
                     Source="{Binding ., Converter={StaticResource BubbleImageConverter}}"
                     ToolTip.Tip="{Binding Name}"
                   />
@@ -141,7 +141,7 @@
                   <Image
                     Height="40"
                     Stretch="Uniform"
-                    RenderOptions.BitmapInterpolationMode="NearestNeighbor"
+                    RenderOptions.BitmapInterpolationMode="LowQuality"
                     Source="{Binding ., Converter={StaticResource BubbleImageConverter}}"
                     ToolTip.Tip="{Binding Name}"
                   />
