@@ -314,6 +314,14 @@
           <Setter Property="Foreground" Value="#a495ff" />
           <Setter Property="FontWeight" Value="Bold" />
         </Style>
+        <Style Selector="ListBoxItem Button.moderation">
+          <Setter Property="Opacity" Value="0" />
+          <Setter Property="IsHitTestVisible" Value="False" />
+        </Style>
+        <Style Selector="ListBoxItem:pointerover Button.moderation">
+          <Setter Property="Opacity" Value="1" />
+          <Setter Property="IsHitTestVisible" Value="True" />
+        </Style>
       </ListBox.Styles>
       <ListBox.KeyBindings>
         <KeyBinding Gesture="Ctrl+C" Command="{Binding CopySelectedEntriesCmd}" />
@@ -383,17 +391,12 @@
               <!-- Quick Kick button for profanity messages (not on own messages, shown on hover, hidden during fast scroll) -->
               <Button
                 Grid.Column="4"
+                Classes="moderation"
                 Padding="4"
                 Margin="2,0,0,0"
                 VerticalAlignment="Center"
+                IsVisible="{Binding ShowModerationButtons}"
                 ToolTip.Tip="Kick user">
-                <Button.IsVisible>
-                  <MultiBinding Converter="{x:Static BoolConverters.And}">
-                    <Binding Path="ShowModerationButtons" />
-                    <Binding Path="$parent[ListBoxItem].IsPointerOver" />
-                    <Binding Path="!#ListBoxMessages.(behaviors:ScrollThrottleBehavior.IsThrottled)" />
-                  </MultiBinding>
-                </Button.IsVisible>
                 <Button.Flyout>
                   <ui:FAMenuFlyout>
                     <ui:MenuFlyoutItem Text="Kick" Command="{Binding #ChatPageRoot.((vm:ChatPageViewModel)DataContext).KickUserByNameCmd}" CommandParameter="{Binding Name}" />
@@ -404,17 +407,12 @@
               <!-- Quick Mute button for profanity messages (not on own messages, shown on hover, hidden during fast scroll) -->
               <Button
                 Grid.Column="5"
+                Classes="moderation"
                 Padding="4"
                 Margin="2,0,0,0"
                 VerticalAlignment="Center"
+                IsVisible="{Binding ShowModerationButtons}"
                 ToolTip.Tip="Mute user">
-                <Button.IsVisible>
-                  <MultiBinding Converter="{x:Static BoolConverters.And}">
-                    <Binding Path="ShowModerationButtons" />
-                    <Binding Path="$parent[ListBoxItem].IsPointerOver" />
-                    <Binding Path="!#ListBoxMessages.(behaviors:ScrollThrottleBehavior.IsThrottled)" />
-                  </MultiBinding>
-                </Button.IsVisible>
                 <Button.Flyout>
                   <ui:FAMenuFlyout>
                     <ui:MenuFlyoutItem Text="2 mins" Command="{Binding #ChatPageRoot.((vm:ChatPageViewModel)DataContext).MuteUserByNameCmd}" CommandParameter="{Binding MuteParam2}" />
@@ -430,17 +428,12 @@
               <!-- Quick Ban button for profanity messages (not on own messages, shown on hover, hidden during fast scroll) -->
               <Button
                 Grid.Column="6"
+                Classes="moderation"
                 Padding="4"
                 Margin="2,0,0,0"
                 VerticalAlignment="Center"
+                IsVisible="{Binding ShowModerationButtons}"
                 ToolTip.Tip="Ban user">
-                <Button.IsVisible>
-                  <MultiBinding Converter="{x:Static BoolConverters.And}">
-                    <Binding Path="ShowModerationButtons" />
-                    <Binding Path="$parent[ListBoxItem].IsPointerOver" />
-                    <Binding Path="!#ListBoxMessages.(behaviors:ScrollThrottleBehavior.IsThrottled)" />
-                  </MultiBinding>
-                </Button.IsVisible>
                 <Button.Flyout>
                   <ui:FAMenuFlyout>
                     <ui:MenuFlyoutItem Text="For an hour" Command="{Binding #ChatPageRoot.((vm:ChatPageViewModel)DataContext).BanUserByNameCmd}" CommandParameter="{Binding BanParamHour}" />
