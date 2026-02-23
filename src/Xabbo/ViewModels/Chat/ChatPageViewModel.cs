@@ -176,6 +176,7 @@ public class ChatPageViewModel : PageViewModel
 
     // Action to open history flyout - set from view
     public Action? OpenHistoryFlyoutAction { get; set; }
+    public Action? FocusChatInputAction { get; set; }
 
     public ReactiveCommand<Unit, Unit> SearchUserInHistoryCmd { get; }
 
@@ -499,6 +500,7 @@ public class ChatPageViewModel : PageViewModel
         {
             ChatInputMode = ChatType.Whisper;
             WhisperRecipient = name;
+            FocusChatInputAction?.Invoke();
         }
     }
 
