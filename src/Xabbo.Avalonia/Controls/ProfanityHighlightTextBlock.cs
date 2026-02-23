@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
 using Avalonia.Media;
+using Avalonia.Threading;
 using Xabbo.ViewModels;
 
 namespace Xabbo.Avalonia.Controls;
@@ -77,16 +78,29 @@ public class ProfanityHighlightTextBlock : TextBlock
 
     static ProfanityHighlightTextBlock()
     {
-        SegmentsProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.UpdateInlines());
-        FallbackTextProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.UpdateInlines());
-        IsWhisperProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.UpdateInlines());
-        UsernameProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.UpdateInlines());
-        WhisperRecipientProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.UpdateInlines());
+        SegmentsProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.QueueUpdateInlines());
+        FallbackTextProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.QueueUpdateInlines());
+        IsWhisperProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.QueueUpdateInlines());
+        UsernameProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.QueueUpdateInlines());
+        WhisperRecipientProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.QueueUpdateInlines());
+    }
+
+    private bool _updatePending;
+
+    private void QueueUpdateInlines()
+    {
+        if (_updatePending) return;
+        _updatePending = true;
+        Dispatcher.UIThread.Post(() =>
+        {
+            _updatePending = false;
+            UpdateInlines();
+        }, DispatcherPriority.Normal);
     }
 
     private void UpdateInlines()
     {
-        Inlines?.Clear();
+        var runs = new List<Inline>();
 
         // Add username prefix if provided
         if (!string.IsNullOrEmpty(Username))
@@ -97,17 +111,16 @@ public class ProfanityHighlightTextBlock : TextBlock
             };
             if (IsWhisper)
                 usernameRun.Foreground = WhisperBrush;
-            Inlines?.Add(usernameRun);
+            runs.Add(usernameRun);
 
             // For outgoing whispers, show "Name -> Recipient: msg" (all italic/purple, no bold)
             if (!string.IsNullOrEmpty(WhisperRecipient))
             {
-                var arrowRun = new Run($" -> {WhisperRecipient}")
+                runs.Add(new Run($" -> {WhisperRecipient}")
                 {
                     FontStyle = FontStyle.Italic,
                     Foreground = WhisperBrush
-                };
-                Inlines?.Add(arrowRun);
+                });
             }
 
             var separatorRun = new Run(": ");
@@ -116,41 +129,44 @@ public class ProfanityHighlightTextBlock : TextBlock
                 separatorRun.FontStyle = FontStyle.Italic;
                 separatorRun.Foreground = WhisperBrush;
             }
-            Inlines?.Add(separatorRun);
+            runs.Add(separatorRun);
         }
 
         var segments = Segments;
         if (segments is null or { Count: 0 })
         {
-            // No segments, use fallback text
             var fallbackRun = new Run(FallbackText ?? string.Empty);
             if (IsWhisper)
             {
                 fallbackRun.FontStyle = FontStyle.Italic;
                 fallbackRun.Foreground = WhisperBrush;
             }
-            Inlines?.Add(fallbackRun);
-            return;
+            runs.Add(fallbackRun);
         }
-
-        foreach (var segment in segments)
+        else
         {
-            var run = new Run(segment.Text);
-
-            if (segment.IsProfanity)
+            foreach (var segment in segments)
             {
-                run.Foreground = ProfanityBrush;
-                run.TextDecorations = global::Avalonia.Media.TextDecorations.Underline;
-                run.FontWeight = FontWeight.SemiBold;
-            }
-            else if (IsWhisper)
-            {
-                run.FontStyle = FontStyle.Italic;
-                run.Foreground = WhisperBrush;
-            }
+                var run = new Run(segment.Text);
 
-            Inlines?.Add(run);
+                if (segment.IsProfanity)
+                {
+                    run.Foreground = ProfanityBrush;
+                    run.TextDecorations = global::Avalonia.Media.TextDecorations.Underline;
+                    run.FontWeight = FontWeight.SemiBold;
+                }
+                else if (IsWhisper)
+                {
+                    run.FontStyle = FontStyle.Italic;
+                    run.Foreground = WhisperBrush;
+                }
+
+                runs.Add(run);
+            }
         }
+
+        Inlines?.Clear();
+        Inlines?.AddRange(runs);
     }
 
     protected override void OnInitialized()

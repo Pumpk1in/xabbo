@@ -5,6 +5,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
 using Avalonia.Media;
+using Avalonia.Threading;
 
 namespace Xabbo.Avalonia.Controls;
 
@@ -78,84 +79,88 @@ public class HighlightedTextBlock : TextBlock
 
     static HighlightedTextBlock()
     {
-        TextProperty.Changed.AddClassHandler<HighlightedTextBlock>((x, _) => x.UpdateInlines());
-        HighlightWordsProperty.Changed.AddClassHandler<HighlightedTextBlock>((x, _) => x.UpdateInlines());
-        HighlightForegroundProperty.Changed.AddClassHandler<HighlightedTextBlock>((x, _) => x.UpdateInlines());
-        IsWhisperProperty.Changed.AddClassHandler<HighlightedTextBlock>((x, _) => x.UpdateInlines());
-        WhisperRecipientProperty.Changed.AddClassHandler<HighlightedTextBlock>((x, _) => x.UpdateInlines());
+        TextProperty.Changed.AddClassHandler<HighlightedTextBlock>((x, _) => x.QueueUpdateInlines());
+        HighlightWordsProperty.Changed.AddClassHandler<HighlightedTextBlock>((x, _) => x.QueueUpdateInlines());
+        HighlightForegroundProperty.Changed.AddClassHandler<HighlightedTextBlock>((x, _) => x.QueueUpdateInlines());
+        IsWhisperProperty.Changed.AddClassHandler<HighlightedTextBlock>((x, _) => x.QueueUpdateInlines());
+        WhisperRecipientProperty.Changed.AddClassHandler<HighlightedTextBlock>((x, _) => x.QueueUpdateInlines());
+    }
+
+    private bool _updatePending;
+
+    private void QueueUpdateInlines()
+    {
+        if (_updatePending) return;
+        _updatePending = true;
+        Dispatcher.UIThread.Post(() =>
+        {
+            _updatePending = false;
+            UpdateInlines();
+        }, DispatcherPriority.Normal);
     }
 
     private void UpdateInlines()
     {
-        Inlines?.Clear();
+        var runs = new List<Inline>();
 
         var text = Text;
-        if (string.IsNullOrEmpty(text))
+        if (!string.IsNullOrEmpty(text))
         {
-            return;
-        }
+            var isWhisper = IsWhisper;
 
-        var isWhisper = IsWhisper;
-
-        var words = HighlightWords;
-        if (words is null or { Count: 0 })
-        {
-            var run = new Run(text);
-            if (isWhisper) { run.FontStyle = FontStyle.Italic; run.Foreground = WhisperBrush; }
-            Inlines?.Add(run);
-            return;
-        }
-
-        // Build a regex pattern to match any of the highlight words (case-insensitive)
-        var escapedWords = new List<string>();
-        foreach (var word in words)
-        {
-            if (!string.IsNullOrWhiteSpace(word))
+            var words = HighlightWords;
+            var escapedWords = new List<string>();
+            if (words is not null)
             {
-                escapedWords.Add(Regex.Escape(word));
+                foreach (var word in words)
+                {
+                    if (!string.IsNullOrWhiteSpace(word))
+                        escapedWords.Add(Regex.Escape(word));
+                }
             }
-        }
 
-        if (escapedWords.Count == 0)
-        {
-            var run = new Run(text);
-            if (isWhisper) { run.FontStyle = FontStyle.Italic; run.Foreground = WhisperBrush; }
-            Inlines?.Add(run);
-            return;
-        }
-
-        var pattern = string.Join("|", escapedWords);
-        var regex = new Regex(pattern, RegexOptions.IgnoreCase);
-
-        int currentIndex = 0;
-        foreach (Match match in regex.Matches(text))
-        {
-            // Add text before the match
-            if (match.Index > currentIndex)
+            if (escapedWords.Count == 0)
             {
-                var run = new Run(text.Substring(currentIndex, match.Index - currentIndex));
+                var run = new Run(text);
                 if (isWhisper) { run.FontStyle = FontStyle.Italic; run.Foreground = WhisperBrush; }
-                Inlines?.Add(run);
+                runs.Add(run);
             }
-
-            // Add the highlighted match
-            var highlightRun = new Run(match.Value)
+            else
             {
-                Foreground = HighlightForeground,
-                FontWeight = FontWeight.SemiBold
-            };
-            Inlines?.Add(highlightRun);
+                var pattern = string.Join("|", escapedWords);
+                var regex = new Regex(pattern, RegexOptions.IgnoreCase);
 
-            currentIndex = match.Index + match.Length;
+                int currentIndex = 0;
+                foreach (Match match in regex.Matches(text))
+                {
+                    if (match.Index > currentIndex)
+                    {
+                        var run = new Run(text.Substring(currentIndex, match.Index - currentIndex));
+                        if (isWhisper) { run.FontStyle = FontStyle.Italic; run.Foreground = WhisperBrush; }
+                        runs.Add(run);
+                    }
+
+                    runs.Add(new Run(match.Value)
+                    {
+                        Foreground = HighlightForeground,
+                        FontWeight = FontWeight.SemiBold
+                    });
+
+                    currentIndex = match.Index + match.Length;
+                }
+
+                if (currentIndex < text.Length)
+                {
+                    var run = new Run(text.Substring(currentIndex));
+                    if (isWhisper) { run.FontStyle = FontStyle.Italic; run.Foreground = WhisperBrush; }
+                    runs.Add(run);
+                }
+            }
         }
 
-        // Add remaining text after last match
-        if (currentIndex < text.Length)
-        {
-            var run = new Run(text.Substring(currentIndex));
-            if (isWhisper) { run.FontStyle = FontStyle.Italic; run.Foreground = WhisperBrush; }
-            Inlines?.Add(run);
-        }
+        Inlines?.Clear();
+        if (runs.Count > 0)
+            Inlines?.AddRange(runs);
     }
 
     protected override void OnInitialized()
