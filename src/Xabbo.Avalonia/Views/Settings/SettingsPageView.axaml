@@ -71,11 +71,7 @@
                 </Style>
                 <Style Selector="ListBoxItem:selected > Border">
                   <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
-                  <Setter Property="Background">
-                    <Setter.Value>
-                      <SolidColorBrush Color="{DynamicResource SystemAccentColor}" Opacity="0.25" />
-                    </Setter.Value>
-                  </Setter>
+                  <Setter Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}" />
                 </Style>
                 <Style Selector="ListBoxItem:selected /template/ Rectangle#SelectionIndicator">
                   <Setter Property="IsVisible" Value="false" />
@@ -130,11 +126,7 @@
                 </Style>
                 <Style Selector="ListBoxItem:selected > Border">
                   <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
-                  <Setter Property="Background">
-                    <Setter.Value>
-                      <SolidColorBrush Color="{DynamicResource SystemAccentColor}" Opacity="0.25" />
-                    </Setter.Value>
-                  </Setter>
+                  <Setter Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}" />
                 </Style>
                 <Style Selector="ListBoxItem:selected /template/ Rectangle#SelectionIndicator">
                   <Setter Property="IsVisible" Value="false" />
