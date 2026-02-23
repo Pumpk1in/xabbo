@@ -50,6 +50,7 @@
               x:Name="AvatarImage"
               Loader="{x:Static services:XabboImageLoader.Instance}"
               Source="{TemplateBinding AvatarImageUrl}"
+              Stretch="None"
             />
           </Panel>
           <!-- Direct image from sync cache: no async, no placeholder flash -->
