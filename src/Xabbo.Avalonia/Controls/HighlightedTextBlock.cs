@@ -5,7 +5,6 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
 using Avalonia.Media;
-using Avalonia.Threading;
 
 namespace Xabbo.Avalonia.Controls;
 
@@ -79,24 +78,11 @@ public class HighlightedTextBlock : TextBlock
 
     static HighlightedTextBlock()
     {
-        TextProperty.Changed.AddClassHandler<HighlightedTextBlock>((x, _) => x.QueueUpdateInlines());
-        HighlightWordsProperty.Changed.AddClassHandler<HighlightedTextBlock>((x, _) => x.QueueUpdateInlines());
-        HighlightForegroundProperty.Changed.AddClassHandler<HighlightedTextBlock>((x, _) => x.QueueUpdateInlines());
-        IsWhisperProperty.Changed.AddClassHandler<HighlightedTextBlock>((x, _) => x.QueueUpdateInlines());
-        WhisperRecipientProperty.Changed.AddClassHandler<HighlightedTextBlock>((x, _) => x.QueueUpdateInlines());
-    }
-
-    private bool _updatePending;
-
-    private void QueueUpdateInlines()
-    {
-        if (_updatePending) return;
-        _updatePending = true;
-        Dispatcher.UIThread.Post(() =>
-        {
-            _updatePending = false;
-            UpdateInlines();
-        }, DispatcherPriority.Normal);
+        TextProperty.Changed.AddClassHandler<HighlightedTextBlock>((x, _) => x.UpdateInlines());
+        HighlightWordsProperty.Changed.AddClassHandler<HighlightedTextBlock>((x, _) => x.UpdateInlines());
+        HighlightForegroundProperty.Changed.AddClassHandler<HighlightedTextBlock>((x, _) => x.UpdateInlines());
+        IsWhisperProperty.Changed.AddClassHandler<HighlightedTextBlock>((x, _) => x.UpdateInlines());
+        WhisperRecipientProperty.Changed.AddClassHandler<HighlightedTextBlock>((x, _) => x.UpdateInlines());
     }
 
     private void UpdateInlines()

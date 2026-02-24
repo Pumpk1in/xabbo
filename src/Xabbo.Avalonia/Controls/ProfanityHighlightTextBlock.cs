@@ -3,7 +3,6 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
 using Avalonia.Media;
-using Avalonia.Threading;
 using Xabbo.ViewModels;
 
 namespace Xabbo.Avalonia.Controls;
@@ -78,24 +77,11 @@ public class ProfanityHighlightTextBlock : TextBlock
 
     static ProfanityHighlightTextBlock()
     {
-        SegmentsProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.QueueUpdateInlines());
-        FallbackTextProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.QueueUpdateInlines());
-        IsWhisperProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.QueueUpdateInlines());
-        UsernameProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.QueueUpdateInlines());
-        WhisperRecipientProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.QueueUpdateInlines());
-    }
-
-    private bool _updatePending;
-
-    private void QueueUpdateInlines()
-    {
-        if (_updatePending) return;
-        _updatePending = true;
-        Dispatcher.UIThread.Post(() =>
-        {
-            _updatePending = false;
-            UpdateInlines();
-        }, DispatcherPriority.Normal);
+        SegmentsProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.UpdateInlines());
+        FallbackTextProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.UpdateInlines());
+        IsWhisperProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.UpdateInlines());
+        UsernameProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.UpdateInlines());
+        WhisperRecipientProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.UpdateInlines());
     }
 
     private void UpdateInlines()
