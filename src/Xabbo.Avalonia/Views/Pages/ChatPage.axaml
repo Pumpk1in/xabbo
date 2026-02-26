@@ -322,6 +322,10 @@
           <Setter Property="Opacity" Value="1" />
           <Setter Property="IsHitTestVisible" Value="True" />
         </Style>
+        <Style Selector="ListBoxItem Border.moderation-overlay.kick-open,ListBoxItem Border.moderation-overlay.mute-open,ListBoxItem Border.moderation-overlay.ban-open">
+          <Setter Property="Opacity" Value="1" />
+          <Setter Property="IsHitTestVisible" Value="True" />
+        </Style>
       </ListBox.Styles>
       <ListBox.KeyBindings>
         <KeyBinding Gesture="Ctrl+C" Command="{Binding CopySelectedEntriesCmd}" />
@@ -379,6 +383,9 @@
                 />
                 <Border
                   Classes="moderation-overlay"
+                  Classes.kick-open="{Binding #KickBtn.Flyout.IsOpen}"
+                  Classes.mute-open="{Binding #MuteBtn.Flyout.IsOpen}"
+                  Classes.ban-open="{Binding #BanBtn.Flyout.IsOpen}"
                   HorizontalAlignment="Right"
                   VerticalAlignment="Center"
                   Background="{DynamicResource MenuFlyoutPresenterBackground}"
@@ -388,7 +395,7 @@
                   Padding="2"
                   IsVisible="{Binding ShowModerationButtons}">
                 <StackPanel Orientation="Horizontal">
-                  <Button Padding="4" Margin="2,0,0,0" ToolTip.Tip="Kick user">
+                  <Button x:Name="KickBtn" Padding="4" Margin="2,0,0,0" ToolTip.Tip="Kick user">
                     <Button.Flyout>
                       <ui:FAMenuFlyout>
                         <ui:MenuFlyoutItem Text="Kick" Command="{Binding #ChatPageRoot.((vm:ChatPageViewModel)DataContext).KickUserByNameCmd}" CommandParameter="{Binding Name}" />
@@ -396,7 +403,7 @@
                     </Button.Flyout>
                     <ic:SymbolIcon Symbol="PersonDelete" FontSize="12" />
                   </Button>
-                  <Button Padding="4" Margin="2,0,0,0" ToolTip.Tip="Mute user">
+                  <Button x:Name="MuteBtn" Padding="4" Margin="2,0,0,0" ToolTip.Tip="Mute user">
                     <Button.Flyout>
                       <ui:FAMenuFlyout>
                         <ui:MenuFlyoutItem Text="2 mins" Command="{Binding #ChatPageRoot.((vm:ChatPageViewModel)DataContext).MuteUserByNameCmd}" CommandParameter="{Binding MuteParam2}" />
@@ -409,7 +416,7 @@
                     </Button.Flyout>
                     <ic:SymbolIcon Symbol="ChatOff" FontSize="12" />
                   </Button>
-                  <Button Padding="4" Margin="2,0,0,0" ToolTip.Tip="Ban user">
+                  <Button x:Name="BanBtn" Padding="4" Margin="2,0,0,0" ToolTip.Tip="Ban user">
                     <Button.Flyout>
                       <ui:FAMenuFlyout>
                         <ui:MenuFlyoutItem Text="For an hour" Command="{Binding #ChatPageRoot.((vm:ChatPageViewModel)DataContext).BanUserByNameCmd}" CommandParameter="{Binding BanParamHour}" />
