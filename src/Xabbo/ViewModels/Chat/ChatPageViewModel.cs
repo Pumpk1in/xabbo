@@ -1049,6 +1049,7 @@ public class ChatPageViewModel : PageViewModel
         var isWhisper = e.ChatType == ChatType.Whisper && e.BubbleStyle != 34;
         var isOwnMessage = e.Avatar.Name.Equals(_profileManager.UserData?.Name, StringComparison.OrdinalIgnoreCase);
         var whisperRecipient = (isWhisper && isOwnMessage) ? _lastSentWhisperRecipient : null;
+        if (isOwnMessage) _lastSentWhisperRecipient = null;
 
         var vm = new ChatMessageViewModel
         {
