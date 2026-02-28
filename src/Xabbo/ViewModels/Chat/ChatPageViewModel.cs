@@ -392,6 +392,12 @@ public class ChatPageViewModel : PageViewModel
         WhisperToSelectedCmd = ReactiveCommand.Create(WhisperToSelected, hasSingleContextMessage);
         SelectRecentRecipientCmd = ReactiveCommand.Create<string>(name => WhisperRecipient = name);
 
+        // Refresh recent whisper list when entering whisper mode (IsInRoom values may be stale)
+        this.WhenAnyValue(x => x.IsWhisperMode)
+            .Where(isWhisper => isWhisper)
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(_ => UpdateRecentWhisperList());
+
         // Update whisper suggestions when recipient text changes while in whisper mode
         this.WhenAnyValue(x => x.WhisperRecipient, x => x.IsWhisperMode)
             .Where(t => t.Item2)
