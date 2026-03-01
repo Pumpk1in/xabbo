@@ -41,15 +41,20 @@ public class ChatMessageViewModel : ChatLogEntryViewModel
     /// </summary>
     public bool IsOwnMessage { get; init; }
 
+    /// <summary>
+    /// Whether the user has moderation rights (kick/mute/ban) in the current room.
+    /// </summary>
+    public bool HasModRights { get; init; }
+
     private readonly ObservableAsPropertyHelper<bool> _showModerationButtons;
     /// <summary>
-    /// Whether to show moderation buttons (has profanity and not own message).
+    /// Whether to show moderation buttons (has profanity, not own message, and has mod rights).
     /// </summary>
     public bool ShowModerationButtons => _showModerationButtons.Value;
 
     public ChatMessageViewModel()
     {
-        _showModerationButtons = this.WhenAnyValue(x => x.HasProfanity, hp => hp && !IsOwnMessage)
+        _showModerationButtons = this.WhenAnyValue(x => x.HasProfanity, hp => hp && !IsOwnMessage && HasModRights)
             .ToProperty(this, x => x.ShowModerationButtons);
     }
 

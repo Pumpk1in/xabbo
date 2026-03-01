@@ -1068,6 +1068,7 @@ public class ChatPageViewModel : PageViewModel
             MessageSegments = segments,
             MatchedWords = matchedWords,
             IsOwnMessage = isOwnMessage,
+            HasModRights = _moderation.CanKick || _moderation.CanMute || _moderation.CanBan,
             WhisperRecipient = whisperRecipient,
         };
         AppendLog(vm);
