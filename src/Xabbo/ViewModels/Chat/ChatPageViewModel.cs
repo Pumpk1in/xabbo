@@ -229,6 +229,19 @@ public class ChatPageViewModel : PageViewModel
             .Throttle(TimeSpan.FromMilliseconds(150))
             .Subscribe(_ => OnProfanityPatternsChanged());
 
+        // Update HasModRights on all existing messages when mod rights change
+        _moderation.WhenAnyValue(x => x.CanKick, x => x.CanMute, x => x.CanBan,
+                (kick, mute, ban) => kick || mute || ban)
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(hasRights =>
+            {
+                foreach (var entry in _cache.Items)
+                {
+                    if (entry is ChatMessageViewModel msg)
+                        msg.HasModRights = hasRights;
+                }
+            });
+
         // Context selection observables for command can-execute
         var hasSingleContextMessage = this
             .WhenAnyValue(x => x.ContextSelection)

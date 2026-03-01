@@ -44,7 +44,7 @@ public class ChatMessageViewModel : ChatLogEntryViewModel
     /// <summary>
     /// Whether the user has moderation rights (kick/mute/ban) in the current room.
     /// </summary>
-    public bool HasModRights { get; init; }
+    [Reactive] public bool HasModRights { get; set; }
 
     private readonly ObservableAsPropertyHelper<bool> _showModerationButtons;
     /// <summary>
@@ -54,7 +54,8 @@ public class ChatMessageViewModel : ChatLogEntryViewModel
 
     public ChatMessageViewModel()
     {
-        _showModerationButtons = this.WhenAnyValue(x => x.HasProfanity, hp => hp && !IsOwnMessage && HasModRights)
+        _showModerationButtons = this.WhenAnyValue(x => x.HasProfanity, x => x.HasModRights,
+                (hp, mr) => hp && !IsOwnMessage && mr)
             .ToProperty(this, x => x.ShowModerationButtons);
     }
 
