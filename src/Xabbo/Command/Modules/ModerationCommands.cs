@@ -53,6 +53,14 @@ public sealed class ModerationCommands(RoomManager roomManager, IAppPathProvider
                     File.ReadAllText(filePath),
                     JsonSourceGenerationContext.Default.DeferredModerationData
                 ) ?? new();
+
+                // Rebuild inner dictionaries with OrdinalIgnoreCase — lost during JSON deserialization.
+                _deferredData.Bans = _deferredData.Bans.ToDictionary(
+                    kv => kv.Key,
+                    kv => new Dictionary<string, int>(kv.Value, StringComparer.OrdinalIgnoreCase));
+                _deferredData.Mutes = _deferredData.Mutes.ToDictionary(
+                    kv => kv.Key,
+                    kv => new Dictionary<string, int>(kv.Value, StringComparer.OrdinalIgnoreCase));
             }
             catch
             {
@@ -115,13 +123,16 @@ public sealed class ModerationCommands(RoomManager roomManager, IAppPathProvider
 
     public void CleanupDeferredBans(IEnumerable<string> bannedNames, long roomId)
     {
+        _deferredData.Bans.TryGetValue(roomId, out var roomBans);
+
         var cleaned = false;
         foreach (var name in bannedNames)
         {
-            if (_banList.TryRemove(name, out _))
+            var inBanList = _banList.TryRemove(name, out _);
+            var inDeferredData = roomBans?.Remove(name) ?? false;
+
+            if (inBanList || inDeferredData)
             {
-                if (_deferredData.Bans.TryGetValue(roomId, out var roomBans))
-                    roomBans.Remove(name);
                 NotifyChatLog(name, "already banned, removed from deferred list");
                 cleaned = true;
             }
