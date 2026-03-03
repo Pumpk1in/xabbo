@@ -101,6 +101,16 @@
                     />
                     <ui:MenuFlyoutSeparator />
                     <ui:MenuFlyoutSubItem
+                      Classes="modern"
+                      IsEnabled="{Binding OpenHistoryUserProfileCmd.CanExecute^}"
+                      IconSource="{icm:SymbolIconSource Symbol=Person}"
+                      Text="Open profile..."
+                    >
+                      <ui:MenuFlyoutItem Text="In-game" Command="{Binding OpenHistoryUserProfileCmd}" CommandParameter="game" />
+                      <ui:MenuFlyoutItem Text="On the web" Command="{Binding OpenHistoryUserProfileCmd}" CommandParameter="web" />
+                      <ui:MenuFlyoutItem Text="On HabboWidgets" Command="{Binding OpenHistoryUserProfileCmd}" CommandParameter="habbowidgets" />
+                    </ui:MenuFlyoutSubItem>
+                    <ui:MenuFlyoutSubItem
                       Text="Ban"
                       IconSource="{icm:SymbolIconSource Symbol=PersonProhibited}"
                       IsEnabled="{Binding BanHistoryUserCmd.CanExecute^}"

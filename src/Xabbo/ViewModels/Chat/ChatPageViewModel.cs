@@ -165,6 +165,7 @@ public class ChatPageViewModel : PageViewModel
     public ReactiveCommand<string, Task> ExportHistoryCmd { get; }
     public ReactiveCommand<Unit, Unit> CopyHistoryEntriesCmd { get; }
     public ReactiveCommand<BanDuration, Task> BanHistoryUserCmd { get; }
+    public ReactiveCommand<string, Task> OpenHistoryUserProfileCmd { get; }
 
     public SelectionModel<ChatHistoryEntry> HistorySelection { get; } = new SelectionModel<ChatHistoryEntry>()
     {
@@ -357,6 +358,13 @@ public class ChatPageViewModel : PageViewModel
             .Select(_ => HistorySelection.SelectedItem is ChatHistoryEntry { CanBan: true })
             .StartWith(false);
         BanHistoryUserCmd = ReactiveCommand.Create<BanDuration, Task>(BanHistoryUserAsync, canBanHistoryUser);
+        var canOpenHistoryUserProfile = Observable
+            .FromEventPattern<EventHandler<SelectionModelSelectionChangedEventArgs<ChatHistoryEntry>>, SelectionModelSelectionChangedEventArgs<ChatHistoryEntry>>(
+                h => HistorySelection.SelectionChanged += h,
+                h => HistorySelection.SelectionChanged -= h)
+            .Select(_ => HistorySelection.SelectedItem is ChatHistoryEntry { Type: "message" } entry && !string.IsNullOrEmpty(entry.Name))
+            .StartWith(false);
+        OpenHistoryUserProfileCmd = ReactiveCommand.Create<string, Task>(OpenHistoryUserProfileAsync, canOpenHistoryUserProfile);
         SearchUserInHistoryCmd = ReactiveCommand.Create(SearchUserInHistory, hasSingleContextMessage);
 
         // Clear chat commands
@@ -780,6 +788,15 @@ public class ChatPageViewModel : PageViewModel
         if (string.IsNullOrEmpty(name))
             return Task.CompletedTask;
         return BanUserByNameAsync((name, duration));
+    }
+
+    private Task OpenHistoryUserProfileAsync(string type)
+    {
+        var entry = HistorySelection.SelectedItem as ChatHistoryEntry;
+        var name = entry?.Name;
+        if (string.IsNullOrEmpty(name))
+            return Task.CompletedTask;
+        return OpenUserProfileByName(name, type);
     }
 
     private async Task ExportHistoryAsync(string format)
@@ -1285,33 +1302,37 @@ public class ChatPageViewModel : PageViewModel
         }
     }
 
-    private async Task OpenUserProfile(string type)
+    private Task OpenUserProfile(string type)
     {
         if (ContextSelection is not [var message])
-            return;
+            return Task.CompletedTask;
+        return OpenUserProfileByName(message.Name, type);
+    }
 
+    private async Task OpenUserProfileByName(string name, string type)
+    {
         switch (type)
         {
             case "game":
-                var profile = await _ext.RequestAsync(new GetProfileByNameMsg(message.Name), block: false);
+                var profile = await _ext.RequestAsync(new GetProfileByNameMsg(name), block: false);
                 if (!profile.DisplayInClient)
                 {
-                    var result = await _dialog.ShowContentDialogAsync(
+                    await _dialog.ShowContentDialogAsync(
                         _dialog.CreateViewModel<MainViewModel>(),
                         new HanumanInstitute.MvvmDialogs.Avalonia.Fluent.ContentDialogSettings
                         {
                             Title = "Failed to open profile",
-                            Content = $"{message.Name}'s profile is not visible.",
+                            Content = $"{name}'s profile is not visible.",
                             PrimaryButtonText = "OK",
                         }
                     );
                 }
                 break;
             case "web":
-                _launcher.Launch($"https://{_ext.Session.Hotel.WebHost}/profile/{HttpUtility.UrlEncode(message.Name)}");
+                _launcher.Launch($"https://{_ext.Session.Hotel.WebHost}/profile/{HttpUtility.UrlEncode(name)}");
                 break;
             case "habbowidgets":
-                _launcher.Launch($"https://www.habbowidgets.com/habinfo/{_ext.Session.Hotel.Domain}/{HttpUtility.UrlEncode(message.Name)}");
+                _launcher.Launch($"https://www.habbowidgets.com/habinfo/{_ext.Session.Hotel.Domain}/{HttpUtility.UrlEncode(name)}");
                 break;
         }
     }
