@@ -35,7 +35,7 @@ public sealed class XabboImageLoader(HttpClient httpClient, bool disposeHttpClie
         try
         {
             if (_failureCache.TryGetValue(url, out DateTime failureTime) &&
-                (DateTime.Now - failureTime).TotalHours < 1)
+                (DateTime.Now - failureTime).TotalSeconds < 30)
             {
                 return null;
             }
