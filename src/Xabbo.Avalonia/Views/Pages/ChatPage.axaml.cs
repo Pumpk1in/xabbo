@@ -31,6 +31,12 @@ public partial class ChatPage : UserControl
             }
         };
 
+        if (HistoryButton.Flyout is { } flyout)
+        {
+            flyout.Opened += (s, e) => { if (DataContext is ChatPageViewModel vm) vm.IsHistoryFlyoutOpen = true; };
+            flyout.Closed += (s, e) => { if (DataContext is ChatPageViewModel vm) vm.IsHistoryFlyoutOpen = false; };
+        }
+
         // Disable auto-scroll to focused item (prevents jumping to old selection on focus change)
         ListBoxMessages.TemplateApplied += (s, e) =>
         {
@@ -143,5 +149,10 @@ public partial class ChatPage : UserControl
 
         RemoveFromFilterSubMenu.ItemsSource = menuItems;
         RemoveFromFilterSubMenu.IsVisible = true;
+    }
+
+    private void OnHistoryOverlayPressed(object? sender, PointerPressedEventArgs e)
+    {
+        HistoryButton.Flyout?.Hide();
     }
 }
