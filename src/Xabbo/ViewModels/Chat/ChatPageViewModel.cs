@@ -162,10 +162,13 @@ public class ChatPageViewModel : PageViewModel
     private DateTime? _lastSearchToDate;
 
     public ReactiveCommand<Unit, Unit> SearchHistoryCmd { get; }
+    public ReactiveCommand<Unit, Unit> ClearHistorySearchCmd { get; }
     public ReactiveCommand<string, Task> ExportHistoryCmd { get; }
     public ReactiveCommand<Unit, Unit> CopyHistoryEntriesCmd { get; }
     public ReactiveCommand<BanDuration, Task> BanHistoryUserCmd { get; }
     public ReactiveCommand<string, Task> OpenHistoryUserProfileCmd { get; }
+    public ReactiveCommand<Unit, Unit> GoToHistoryMessageCmd { get; }
+    public ReactiveCommand<Unit, Unit> SearchHistoryUserCmd { get; }
 
     public SelectionModel<ChatHistoryEntry> HistorySelection { get; } = new SelectionModel<ChatHistoryEntry>()
     {
@@ -178,6 +181,7 @@ public class ChatPageViewModel : PageViewModel
     // Action to open history flyout - set from view
     public Action? OpenHistoryFlyoutAction { get; set; }
     public Action? FocusChatInputAction { get; set; }
+    public Action<ChatHistoryEntry>? ScrollToHistoryEntryAction { get; set; }
 
     public ReactiveCommand<Unit, Unit> SearchUserInHistoryCmd { get; }
 
@@ -349,6 +353,7 @@ public class ChatPageViewModel : PageViewModel
 
         // History commands
         SearchHistoryCmd = ReactiveCommand.CreateFromTask(SearchHistoryAsync);
+        ClearHistorySearchCmd = ReactiveCommand.Create(ClearHistorySearch);
         ExportHistoryCmd = ReactiveCommand.Create<string, Task>(ExportHistoryAsync);
         CopyHistoryEntriesCmd = ReactiveCommand.Create(CopyHistoryEntries);
         var canBanHistoryUser = Observable
@@ -365,6 +370,21 @@ public class ChatPageViewModel : PageViewModel
             .Select(_ => HistorySelection.SelectedItem is ChatHistoryEntry { Type: "message" } entry && !string.IsNullOrEmpty(entry.Name))
             .StartWith(false);
         OpenHistoryUserProfileCmd = ReactiveCommand.Create<string, Task>(OpenHistoryUserProfileAsync, canOpenHistoryUserProfile);
+        var canGoToHistoryMessage = Observable
+            .FromEventPattern<EventHandler<SelectionModelSelectionChangedEventArgs<ChatHistoryEntry>>, SelectionModelSelectionChangedEventArgs<ChatHistoryEntry>>(
+                h => HistorySelection.SelectionChanged += h,
+                h => HistorySelection.SelectionChanged -= h)
+            .Select(_ => HistorySelection.SelectedItem is ChatHistoryEntry { Type: "message" or "action" })
+            .StartWith(false);
+        GoToHistoryMessageCmd = ReactiveCommand.Create(GoToHistoryMessage, canGoToHistoryMessage);
+        var canSearchHistoryUser = Observable
+            .FromEventPattern<EventHandler<SelectionModelSelectionChangedEventArgs<ChatHistoryEntry>>, SelectionModelSelectionChangedEventArgs<ChatHistoryEntry>>(
+                h => HistorySelection.SelectionChanged += h,
+                h => HistorySelection.SelectionChanged -= h)
+            .Select(_ => HistorySelection.SelectedItem is ChatHistoryEntry entry
+                && !string.IsNullOrEmpty(entry.Type == "action" ? entry.UserName : entry.Name))
+            .StartWith(false);
+        SearchHistoryUserCmd = ReactiveCommand.Create(SearchHistoryUser, canSearchHistoryUser);
         SearchUserInHistoryCmd = ReactiveCommand.Create(SearchUserInHistory, hasSingleContextMessage);
 
         // Clear chat commands
@@ -650,6 +670,60 @@ public class ChatPageViewModel : PageViewModel
         {
             _xabbot.ShowMessage($"Chat exported to {Path.GetFileName(filePath)}");
         }
+    }
+
+    private async void GoToHistoryMessage()
+    {
+        if (HistorySelection.SelectedItem is not ChatHistoryEntry entry)
+            return;
+
+        var target = entry.Timestamp;
+        var from = target.AddMinutes(-20);
+        var to = target.AddMinutes(20);
+
+        HistorySearchKeyword = null;
+        HistorySearchProfanityOnly = false;
+        HistorySearchWhispersOnly = false;
+        HistorySearchFromDate = from.Date;
+        HistorySearchFromTime = from.TimeOfDay;
+        HistorySearchToDate = to.Date;
+        HistorySearchToTime = to.TimeOfDay;
+        // HistorySearchUser deliberately unchanged
+
+        OpenHistoryFlyoutAction?.Invoke();
+        await SearchHistoryAsync();
+
+        var closest = _historyResults.MinBy(e => Math.Abs((e.Timestamp - target).TotalSeconds));
+        if (closest is not null)
+            ScrollToHistoryEntryAction?.Invoke(closest);
+    }
+
+    private void ClearHistorySearch()
+    {
+        HistorySearchUser = null;
+        HistorySearchKeyword = null;
+        HistorySearchProfanityOnly = false;
+        HistorySearchWhispersOnly = false;
+        HistorySearchFromDate = null;
+        HistorySearchFromTime = null;
+        HistorySearchToDate = null;
+        HistorySearchToTime = null;
+    }
+
+    private async void SearchHistoryUser()
+    {
+        if (HistorySelection.SelectedItem is not ChatHistoryEntry entry)
+            return;
+
+        var name = entry.Type == "action" ? entry.UserName : entry.Name;
+        if (string.IsNullOrEmpty(name))
+            return;
+
+        ClearHistorySearch();
+        HistorySearchUser = name;
+
+        OpenHistoryFlyoutAction?.Invoke();
+        await SearchHistoryAsync();
     }
 
     private async void SearchUserInHistory()

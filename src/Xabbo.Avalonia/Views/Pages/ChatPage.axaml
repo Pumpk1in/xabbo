@@ -82,7 +82,12 @@
               <Grid ColumnDefinitions="Auto,Auto,*">
                 <CheckBox Grid.Column="0" IsChecked="{Binding HistorySearchProfanityOnly}" Content="Profanity only" />
                 <CheckBox Grid.Column="1" IsChecked="{Binding HistorySearchWhispersOnly}" Content="Whispers only" Margin="10,0,0,0" />
-                <Button Grid.Column="2" Content="Search" Command="{Binding SearchHistoryCmd}" HorizontalAlignment="Right" />
+                <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="4">
+                  <Button Command="{Binding ClearHistorySearchCmd}" ToolTip.Tip="Clear search" Padding="8">
+                    <ui:SymbolIcon Symbol="Dismiss" />
+                  </Button>
+                  <Button Content="Search" Command="{Binding SearchHistoryCmd}" />
+                </StackPanel>
               </Grid>
               <Separator />
               <TextBlock Text="{Binding HistoryResultsText}" FontWeight="SemiBold" />
@@ -100,6 +105,18 @@
                       Command="{Binding CopyHistoryEntriesCmd}"
                     />
                     <ui:MenuFlyoutSeparator />
+                    <ui:MenuFlyoutItem
+                      Text="Go to message"
+                      IconSource="{icm:SymbolIconSource Symbol=ArrowCircleLeft}"
+                      IsEnabled="{Binding GoToHistoryMessageCmd.CanExecute^}"
+                      Command="{Binding GoToHistoryMessageCmd}"
+                    />
+                    <ui:MenuFlyoutItem
+                      Text="Search user messages"
+                      IconSource="{icm:SymbolIconSource Symbol=PersonSearch}"
+                      IsEnabled="{Binding SearchHistoryUserCmd.CanExecute^}"
+                      Command="{Binding SearchHistoryUserCmd}"
+                    />
                     <ui:MenuFlyoutSubItem
                       Classes="modern"
                       IsEnabled="{Binding OpenHistoryUserProfileCmd.CanExecute^}"

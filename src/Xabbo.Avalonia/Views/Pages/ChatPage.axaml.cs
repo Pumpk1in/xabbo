@@ -24,6 +24,10 @@ public partial class ChatPage : UserControl
                 vm.OpenHistoryFlyoutAction = () => HistoryButton?.Flyout?.ShowAt(HistoryButton);
                 vm.ScrollToMessageAction = ScrollToMessage;
                 vm.FocusChatInputAction = () => ChatInputTextBox.Focus();
+                vm.ScrollToHistoryEntryAction = entry =>
+                    Dispatcher.UIThread.Post(
+                        () => HistoryResultsListBox?.ScrollIntoView(entry),
+                        DispatcherPriority.Background);
             }
         };
 
