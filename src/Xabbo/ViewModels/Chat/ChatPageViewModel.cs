@@ -707,6 +707,7 @@ public class ChatPageViewModel : PageViewModel
         var from = target.AddMinutes(-20);
         var to = target.AddMinutes(20);
 
+        HistorySearchUser = null;
         HistorySearchKeyword = null;
         HistorySearchProfanityOnly = false;
         HistorySearchWhispersOnly = false;
@@ -714,7 +715,6 @@ public class ChatPageViewModel : PageViewModel
         HistorySearchFromTime = from.TimeOfDay;
         HistorySearchToDate = to.Date;
         HistorySearchToTime = to.TimeOfDay;
-        // HistorySearchUser deliberately unchanged
 
         OpenHistoryFlyoutAction?.Invoke();
         await SearchHistoryAsync();
