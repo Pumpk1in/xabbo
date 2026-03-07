@@ -34,8 +34,8 @@ public partial class ChatPage : UserControl
 
         if (HistoryButton.Flyout is { } flyout)
         {
-            flyout.Opened += (s, e) => { if (DataContext is ChatPageViewModel vm) vm.IsHistoryFlyoutOpen = true; };
-            flyout.Closed += (s, e) => { if (DataContext is ChatPageViewModel vm) vm.IsHistoryFlyoutOpen = false; };
+            flyout.Opened += (s, e) => { HistoryDimOverlay.Opacity = 0.4; HistoryDimOverlay.IsHitTestVisible = true; };
+            flyout.Closed += (s, e) => { HistoryDimOverlay.Opacity = 0; HistoryDimOverlay.IsHitTestVisible = false; };
         }
 
         // Disable auto-scroll to focused item (prevents jumping to old selection on focus change)

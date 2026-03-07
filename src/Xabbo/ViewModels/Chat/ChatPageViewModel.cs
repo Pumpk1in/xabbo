@@ -101,7 +101,6 @@ public class ChatPageViewModel : PageViewModel
     [Reactive] public string ChatInputText { get; set; } = "";
     [Reactive] public string WhisperRecipient { get; set; } = "";
     [Reactive] public bool IsInRoom { get; set; }
-    [Reactive] public bool IsHistoryFlyoutOpen { get; set; }
 
     private readonly ObservableAsPropertyHelper<bool> _isWhisperMode;
     public bool IsWhisperMode => _isWhisperMode.Value;

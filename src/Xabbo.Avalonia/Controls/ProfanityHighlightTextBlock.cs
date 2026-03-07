@@ -84,6 +84,21 @@ public class ProfanityHighlightTextBlock : TextBlock
         WhisperRecipientProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.UpdateInlines());
     }
 
+    // Inserts zero-width spaces every N chars in runs with no natural break points,
+    // preventing Avalonia's TextWrapping from entering an infinite layout loop.
+    private static string InjectWordBreaks(string text, int every = 30)
+    {
+        if (text.Length <= every || text.Contains(' ')) return text;
+        var sb = new System.Text.StringBuilder(text.Length + text.Length / every);
+        for (int i = 0; i < text.Length; i++)
+        {
+            sb.Append(text[i]);
+            if ((i + 1) % every == 0 && i + 1 < text.Length)
+                sb.Append('\u200B');
+        }
+        return sb.ToString();
+    }
+
     private void UpdateInlines()
     {
         var runs = new List<Inline>();
@@ -91,7 +106,7 @@ public class ProfanityHighlightTextBlock : TextBlock
         // Add username prefix if provided
         if (!string.IsNullOrEmpty(Username))
         {
-            var usernameRun = new Run(Username)
+            var usernameRun = new Run(InjectWordBreaks(Username))
             {
                 FontWeight = FontWeight.Bold
             };
@@ -102,7 +117,7 @@ public class ProfanityHighlightTextBlock : TextBlock
             // For outgoing whispers, show "Name -> Recipient: msg" (all italic/purple, no bold)
             if (!string.IsNullOrEmpty(WhisperRecipient))
             {
-                runs.Add(new Run($" -> {WhisperRecipient}")
+                runs.Add(new Run($" -> {InjectWordBreaks(WhisperRecipient)}")
                 {
                     FontStyle = FontStyle.Italic,
                     Foreground = WhisperBrush
@@ -121,7 +136,7 @@ public class ProfanityHighlightTextBlock : TextBlock
         var segments = Segments;
         if (segments is null or { Count: 0 })
         {
-            var fallbackRun = new Run(FallbackText ?? string.Empty);
+            var fallbackRun = new Run(InjectWordBreaks(FallbackText ?? string.Empty));
             if (IsWhisper)
             {
                 fallbackRun.FontStyle = FontStyle.Italic;
@@ -133,7 +148,7 @@ public class ProfanityHighlightTextBlock : TextBlock
         {
             foreach (var segment in segments)
             {
-                var run = new Run(segment.Text);
+                var run = new Run(InjectWordBreaks(segment.Text));
 
                 if (segment.IsProfanity)
                 {
