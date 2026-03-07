@@ -440,7 +440,7 @@ public class ChatPageViewModel : PageViewModel
             .SortAndBind(out _messages, SortExpressionComparer<ChatLogEntryViewModel>.Ascending(x => x.EntryId))
             .Subscribe();
 
-        CopySelectedEntriesCmd = ReactiveCommand.Create(CopySelectedEntries, hasAnyContextMessage);
+        CopySelectedEntriesCmd = ReactiveCommand.Create(CopySelectedEntries);
 
         // Chat input
         _isWhisperMode = this
@@ -535,9 +535,13 @@ public class ChatPageViewModel : PageViewModel
 
     private void CopySelectedEntries()
     {
-        if (ContextSelection is not { Count: > 0 } selection)
+        IEnumerable<object> items = ContextSelection is { Count: > 0 } ctx
+            ? ctx
+            : Selection.SelectedItems.OfType<ChatLogEntryViewModel>();
+        var list = items.ToList();
+        if (list.Count == 0)
             return;
-        _clipboard.SetText(string.Join("\n", selection));
+        _clipboard.SetText(string.Join("\n", list));
     }
 
     public void SendChat()
