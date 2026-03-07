@@ -34,7 +34,7 @@ public partial class ChatPage : UserControl
 
         if (HistoryButton.Flyout is { } flyout)
         {
-            flyout.Opened += (s, e) => { HistoryDimOverlay.Opacity = 0.4; HistoryDimOverlay.IsHitTestVisible = true; };
+            flyout.Opened += (s, e) => { HistoryDimOverlay.Opacity = 0.5; HistoryDimOverlay.IsHitTestVisible = true; };
             flyout.Closed += (s, e) => { HistoryDimOverlay.Opacity = 0; HistoryDimOverlay.IsHitTestVisible = false; };
         }
 
