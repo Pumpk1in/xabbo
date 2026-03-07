@@ -48,7 +48,7 @@ public partial class ProfanityFilterService : IProfanityFilterService
         ['r'] = "[r]",
         ['s'] = "[s5$§]",
         ['t'] = "[t7+]",
-        ['u'] = "[uùúûüx*]",
+        ['u'] = "[uvùúûüx*]",
         ['v'] = "[v]",
         ['w'] = "[w]",
         ['x'] = "[x]",
