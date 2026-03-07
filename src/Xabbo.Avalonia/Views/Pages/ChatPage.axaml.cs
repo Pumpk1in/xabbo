@@ -22,6 +22,7 @@ public partial class ChatPage : UserControl
             if (DataContext is ChatPageViewModel vm)
             {
                 vm.OpenHistoryFlyoutAction = () => HistoryButton?.Flyout?.ShowAt(HistoryButton);
+                vm.CloseHistoryFlyoutAction = () => HistoryButton?.Flyout?.Hide();
                 vm.ScrollToMessageAction = ScrollToMessage;
                 vm.FocusChatInputAction = () => ChatInputTextBox.Focus();
                 vm.ScrollToHistoryEntryAction = entry =>
@@ -95,18 +96,28 @@ public partial class ChatPage : UserControl
         if (DataContext is not ChatPageViewModel chatViewModel)
             return;
 
+        ChatMessageViewModel? clickedMessage = null;
+        if (e.Source is Control control)
+        {
+            var listBoxItem = control.FindAncestorOfType<ListBoxItem>();
+            if (listBoxItem?.DataContext is ChatMessageViewModel message)
+                clickedMessage = message;
+        }
+
         var selectedMessages = ListBoxMessages
             .SelectedItems?
             .OfType<ChatMessageViewModel>()
             .ToList() ?? new List<ChatMessageViewModel>();
 
-        if (selectedMessages.Count == 0 && e.Source is Control control)
+        if (clickedMessage is not null && !selectedMessages.Contains(clickedMessage))
         {
-            var listBoxItem = control.FindAncestorOfType<ListBoxItem>();
-            if (listBoxItem?.DataContext is ChatMessageViewModel message)
-            {
-                selectedMessages = new List<ChatMessageViewModel> { message };
-            }
+            ListBoxMessages.Selection.Clear();
+            ListBoxMessages.Selection.Select(ListBoxMessages.Items.IndexOf(clickedMessage));
+            selectedMessages = new List<ChatMessageViewModel> { clickedMessage };
+        }
+        else if (clickedMessage is null)
+        {
+            selectedMessages = new List<ChatMessageViewModel>();
         }
 
         chatViewModel.ContextSelection = selectedMessages.ToList();

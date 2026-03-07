@@ -166,10 +166,12 @@ public class ChatPageViewModel : PageViewModel
     public ReactiveCommand<Unit, Unit> ClearHistorySearchCmd { get; }
     public ReactiveCommand<string, Task> ExportHistoryCmd { get; }
     public ReactiveCommand<Unit, Unit> CopyHistoryEntriesCmd { get; }
+    public ReactiveCommand<string, Unit> CopyHistoryFieldCmd { get; }
     public ReactiveCommand<BanDuration, Task> BanHistoryUserCmd { get; }
     public ReactiveCommand<string, Task> OpenHistoryUserProfileCmd { get; }
     public ReactiveCommand<Unit, Unit> GoToHistoryMessageCmd { get; }
     public ReactiveCommand<Unit, Unit> SearchHistoryUserCmd { get; }
+    public ReactiveCommand<Unit, Task> AddHistoryToProfanityFilterCmd { get; }
 
     public SelectionModel<ChatHistoryEntry> HistorySelection { get; } = new SelectionModel<ChatHistoryEntry>()
     {
@@ -179,8 +181,9 @@ public class ChatPageViewModel : PageViewModel
     // Scroll to bottom command - will be set from view
     [Reactive] public ICommand? ScrollToBottomCmd { get; set; }
 
-    // Action to open history flyout - set from view
+    // Actions to open/close history flyout - set from view
     public Action? OpenHistoryFlyoutAction { get; set; }
+    public Action? CloseHistoryFlyoutAction { get; set; }
     public Action? FocusChatInputAction { get; set; }
     public Action<ChatHistoryEntry>? ScrollToHistoryEntryAction { get; set; }
 
@@ -356,7 +359,20 @@ public class ChatPageViewModel : PageViewModel
         SearchHistoryCmd = ReactiveCommand.CreateFromTask(SearchHistoryAsync);
         ClearHistorySearchCmd = ReactiveCommand.Create(ClearHistorySearch);
         ExportHistoryCmd = ReactiveCommand.Create<string, Task>(ExportHistoryAsync);
-        CopyHistoryEntriesCmd = ReactiveCommand.Create(CopyHistoryEntries);
+        var canCopyHistoryEntries = Observable
+            .FromEventPattern<EventHandler<SelectionModelSelectionChangedEventArgs<ChatHistoryEntry>>, SelectionModelSelectionChangedEventArgs<ChatHistoryEntry>>(
+                h => HistorySelection.SelectionChanged += h,
+                h => HistorySelection.SelectionChanged -= h)
+            .Select(_ => HistorySelection.SelectedItems.Any(e => e is not null))
+            .StartWith(false);
+        CopyHistoryEntriesCmd = ReactiveCommand.Create(CopyHistoryEntries, canCopyHistoryEntries);
+        var canCopyHistoryField = Observable
+            .FromEventPattern<EventHandler<SelectionModelSelectionChangedEventArgs<ChatHistoryEntry>>, SelectionModelSelectionChangedEventArgs<ChatHistoryEntry>>(
+                h => HistorySelection.SelectionChanged += h,
+                h => HistorySelection.SelectionChanged -= h)
+            .Select(_ => HistorySelection.SelectedItem is ChatHistoryEntry { Type: "message" })
+            .StartWith(false);
+        CopyHistoryFieldCmd = ReactiveCommand.Create<string>(CopyHistoryField, canCopyHistoryField);
         var canBanHistoryUser = Observable
             .FromEventPattern<EventHandler<SelectionModelSelectionChangedEventArgs<ChatHistoryEntry>>, SelectionModelSelectionChangedEventArgs<ChatHistoryEntry>>(
                 h => HistorySelection.SelectionChanged += h,
@@ -386,6 +402,13 @@ public class ChatPageViewModel : PageViewModel
                 && !string.IsNullOrEmpty(entry.Type == "action" ? entry.UserName : entry.Name))
             .StartWith(false);
         SearchHistoryUserCmd = ReactiveCommand.Create(SearchHistoryUser, canSearchHistoryUser);
+        var canAddHistoryToProfanity = Observable
+            .FromEventPattern<EventHandler<SelectionModelSelectionChangedEventArgs<ChatHistoryEntry>>, SelectionModelSelectionChangedEventArgs<ChatHistoryEntry>>(
+                h => HistorySelection.SelectionChanged += h,
+                h => HistorySelection.SelectionChanged -= h)
+            .Select(_ => HistorySelection.SelectedItem is ChatHistoryEntry { Type: "message" })
+            .StartWith(false);
+        AddHistoryToProfanityFilterCmd = ReactiveCommand.Create<Task>(AddHistoryToProfanityFilterAsync, canAddHistoryToProfanity);
         SearchUserInHistoryCmd = ReactiveCommand.Create(SearchUserInHistory, hasSingleContextMessage);
 
         // Clear chat commands
@@ -417,7 +440,7 @@ public class ChatPageViewModel : PageViewModel
             .SortAndBind(out _messages, SortExpressionComparer<ChatLogEntryViewModel>.Ascending(x => x.EntryId))
             .Subscribe();
 
-        CopySelectedEntriesCmd = ReactiveCommand.Create(CopySelectedEntries);
+        CopySelectedEntriesCmd = ReactiveCommand.Create(CopySelectedEntries, hasAnyContextMessage);
 
         // Chat input
         _isWhisperMode = this
@@ -512,7 +535,9 @@ public class ChatPageViewModel : PageViewModel
 
     private void CopySelectedEntries()
     {
-        _clipboard.SetText(string.Join("\n", Selection.SelectedItems));
+        if (ContextSelection is not { Count: > 0 } selection)
+            return;
+        _clipboard.SetText(string.Join("\n", selection));
     }
 
     public void SendChat()
@@ -825,6 +850,22 @@ public class ChatPageViewModel : PageViewModel
         if (_historyResults.Count == 0)
         {
             HistoryErrorMessage = "No results found for the specified criteria.";
+        }
+    }
+
+    private void CopyHistoryField(string field)
+    {
+        if (HistorySelection.SelectedItem is not ChatHistoryEntry { Type: "message" } entry)
+            return;
+
+        switch (field)
+        {
+            case "name":
+                _clipboard.SetText(entry.Name ?? "");
+                break;
+            case "message":
+                _clipboard.SetText(entry.Message ?? "");
+                break;
         }
     }
 
@@ -1367,6 +1408,58 @@ public class ChatPageViewModel : PageViewModel
                 _profanityFilter.AddWord(word);
             }
         }
+    }
+
+    private async Task AddHistoryToProfanityFilterAsync()
+    {
+        if (HistorySelection.SelectedItem is not ChatHistoryEntry { Type: "message" } entry)
+            return;
+
+        var textBox = new Avalonia.Controls.TextBox
+        {
+            Text = "",
+            Watermark = "Enter word to add...",
+            Width = 300
+        };
+
+        var stackPanel = new Avalonia.Controls.StackPanel
+        {
+            Spacing = 10,
+            Children =
+            {
+                new Avalonia.Controls.TextBlock
+                {
+                    Text = $"Message: \"{entry.Message}\"",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                    MaxWidth = 300
+                },
+                textBox
+            }
+        };
+
+        CloseHistoryFlyoutAction?.Invoke();
+
+        var result = await _dialog.ShowContentDialogAsync(
+            _dialog.CreateViewModel<MainViewModel>(),
+            new HanumanInstitute.MvvmDialogs.Avalonia.Fluent.ContentDialogSettings
+            {
+                Title = "Add to profanity filter",
+                Content = stackPanel,
+                PrimaryButtonText = "Add",
+                CloseButtonText = "Cancel",
+            }
+        );
+
+        if (result == FluentAvalonia.UI.Controls.ContentDialogResult.Primary)
+        {
+            var word = textBox.Text?.Trim();
+            if (!string.IsNullOrWhiteSpace(word))
+            {
+                _profanityFilter.AddWord(word);
+            }
+        }
+
+        OpenHistoryFlyoutAction?.Invoke();
     }
 
     private void RemoveFromProfanityFilter(string word)

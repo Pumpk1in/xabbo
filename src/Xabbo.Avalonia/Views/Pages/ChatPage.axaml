@@ -99,11 +99,14 @@
                        ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                 <ListBox.ContextFlyout>
                   <ui:FAMenuFlyout>
-                    <ui:MenuFlyoutItem
-                      Text="Copy"
+                    <ui:MenuFlyoutSubItem
+                      Text="Copy..."
                       IconSource="{icm:SymbolIconSource Symbol=Copy}"
-                      Command="{Binding CopyHistoryEntriesCmd}"
-                    />
+                    >
+                      <ui:MenuFlyoutItem Text="All" Command="{Binding CopyHistoryEntriesCmd}" IsEnabled="{Binding CopyHistoryEntriesCmd.CanExecute^}" />
+                      <ui:MenuFlyoutItem Text="Name" Command="{Binding CopyHistoryFieldCmd}" CommandParameter="name" IsEnabled="{Binding CopyHistoryFieldCmd.CanExecute^}" />
+                      <ui:MenuFlyoutItem Text="Message" Command="{Binding CopyHistoryFieldCmd}" CommandParameter="message" IsEnabled="{Binding CopyHistoryFieldCmd.CanExecute^}" />
+                    </ui:MenuFlyoutSubItem>
                     <ui:MenuFlyoutSeparator />
                     <ui:MenuFlyoutItem
                       Text="Go to message"
@@ -127,6 +130,13 @@
                       <ui:MenuFlyoutItem Text="On the web" Command="{Binding OpenHistoryUserProfileCmd}" CommandParameter="web" />
                       <ui:MenuFlyoutItem Text="On HabboWidgets" Command="{Binding OpenHistoryUserProfileCmd}" CommandParameter="habbowidgets" />
                     </ui:MenuFlyoutSubItem>
+                    <ui:MenuFlyoutSeparator />
+                    <ui:MenuFlyoutItem
+                      Text="Add to profanity filter..."
+                      IconSource="{icm:SymbolIconSource Symbol=TextBulletListSquareWarning}"
+                      IsEnabled="{Binding AddHistoryToProfanityFilterCmd.CanExecute^}"
+                      Command="{Binding AddHistoryToProfanityFilterCmd}"
+                    />
                     <ui:MenuFlyoutSubItem
                       Text="Ban"
                       IconSource="{icm:SymbolIconSource Symbol=PersonProhibited}"
@@ -235,13 +245,13 @@
             Text="Find" Command="{Binding FindUserCmd}"
           />
           <ui:MenuFlyoutSubItem
-            IsEnabled="{Binding CopyUserFieldCmd.CanExecute^}"
             IconSource="{icm:SymbolIconSource Symbol=Copy}"
             Text="Copy..."
           >
-            <ui:MenuFlyoutItem Text="Name" Command="{Binding CopyUserFieldCmd}" CommandParameter="name" />
-            <ui:MenuFlyoutItem Text="Message" Command="{Binding CopyUserFieldCmd}" CommandParameter="message" />
-            <ui:MenuFlyoutItem Text="Figure" Command="{Binding CopyUserFieldCmd}" CommandParameter="figure" />
+            <ui:MenuFlyoutItem Text="All" Command="{Binding CopySelectedEntriesCmd}" IsEnabled="{Binding CopySelectedEntriesCmd.CanExecute^}" />
+            <ui:MenuFlyoutItem Text="Name" Command="{Binding CopyUserFieldCmd}" CommandParameter="name" IsEnabled="{Binding CopyUserFieldCmd.CanExecute^}" />
+            <ui:MenuFlyoutItem Text="Message" Command="{Binding CopyUserFieldCmd}" CommandParameter="message" IsEnabled="{Binding CopyUserFieldCmd.CanExecute^}" />
+            <ui:MenuFlyoutItem Text="Figure" Command="{Binding CopyUserFieldCmd}" CommandParameter="figure" IsEnabled="{Binding CopyUserFieldCmd.CanExecute^}" />
           </ui:MenuFlyoutSubItem>
           <ui:MenuFlyoutSubItem
             Classes="modern"
