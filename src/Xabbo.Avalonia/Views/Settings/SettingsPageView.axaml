@@ -42,6 +42,11 @@
         </ui:SettingsExpanderItem>
         <ui:SettingsExpanderItem>
           <StackPanel Spacing="8">
+            <TextBlock
+              Text="Normal bubbles"
+              Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+              FontSize="12"
+            />
             <ListBox
               ItemsSource="{x:Static vm:SettingsPageViewModel.NormalBubbles}"
               SelectedItem="{Binding SelectedNormalBubble}"
@@ -82,7 +87,7 @@
             </ListBox>
             <Separator />
             <TextBlock
-              Text="Bulles spéciales (droits en jeu requis)"
+              Text="Special bubbles (required ingame permissions)"
               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
               FontSize="12"
             />
