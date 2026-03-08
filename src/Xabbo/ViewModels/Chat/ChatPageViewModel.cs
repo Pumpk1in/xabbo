@@ -844,7 +844,7 @@ public class ChatPageViewModel : PageViewModel
             whispersOnly: _lastSearchWhispersOnly ? true : null,
             fromDate: _lastSearchFromDate,
             toDate: _lastSearchToDate,
-            limit: 2500
+            limit: 5000
         ));
 
         var ownName = _profileManager.UserData?.Name;
