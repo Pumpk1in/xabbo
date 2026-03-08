@@ -19,7 +19,8 @@ public interface IChatHistoryService
         bool? whispersOnly = null,
         DateTime? fromDate = null,
         DateTime? toDate = null,
-        int? limit = null);
+        int? limit = null,
+        int? offset = null);
 
     /// <summary>
     /// Searches the chat history and returns total count along with limited results.
@@ -31,12 +32,19 @@ public interface IChatHistoryService
         bool? whispersOnly = null,
         DateTime? fromDate = null,
         DateTime? toDate = null,
-        int? limit = null);
+        int? limit = null,
+        int? offset = null);
 
     /// <summary>
     /// Re-scans all messages and updates has_profanity flags in the database.
     /// </summary>
     Task UpdateProfanityFlagsAsync(IProfanityFilterService profanityFilter);
+
+    /// <summary>
+    /// Returns the 0-based position of an entry by timestamp ordered DESC.
+    /// I.e., how many entries have a strictly newer timestamp.
+    /// </summary>
+    int GetEntryOffset(DateTime timestamp);
 
     /// <summary>
     /// Gets the total count of entries in the history.

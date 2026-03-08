@@ -46,6 +46,13 @@ public sealed class ChatHistoryEntry
         "room" => $"Entered: {RoomName} by {RoomOwner}",
         _ => ToString() ?? ""
     };
+
+    public string MessageText => Type switch
+    {
+        "message" when !string.IsNullOrEmpty(WhisperRecipient) => $"-> {WhisperRecipient}: {Message}",
+        "message" => Message ?? "",
+        _ => DisplayText
+    };
 }
 
 [JsonSerializable(typeof(List<ChatHistoryEntry>))]

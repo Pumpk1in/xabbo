@@ -28,7 +28,7 @@ public partial class ChatPage : UserControl
                 vm.ScrollToHistoryEntryAction = entry =>
                     Dispatcher.UIThread.Post(
                         () => HistoryResultsListBox?.ScrollIntoView(entry),
-                        DispatcherPriority.Background);
+                        DispatcherPriority.Loaded);
             }
         };
 

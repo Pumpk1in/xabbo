@@ -707,24 +707,50 @@ public class ChatPageViewModel : PageViewModel
             return;
 
         var target = entry.Timestamp;
-        var from = target.AddMinutes(-20);
-        var to = target.AddMinutes(20);
 
+        var fromDate = target.AddMinutes(-15);
+        var toDate = target.AddMinutes(5);
+
+        // Reset all filters and set date window
         HistorySearchUser = null;
         HistorySearchKeyword = null;
         HistorySearchProfanityOnly = false;
         HistorySearchWhispersOnly = false;
-        HistorySearchFromDate = from.Date;
-        HistorySearchFromTime = from.TimeOfDay;
-        HistorySearchToDate = to.Date;
-        HistorySearchToTime = to.TimeOfDay;
+        HistorySearchFromDate = fromDate.Date;
+        HistorySearchFromTime = fromDate.TimeOfDay;
+        HistorySearchToDate = toDate.Date;
+        HistorySearchToTime = toDate.TimeOfDay;
 
         OpenHistoryFlyoutAction?.Invoke();
-        await SearchHistoryAsync();
+
+        _historyResults.Clear();
+        HistorySelection.Clear();
+
+        var results = await Task.Run(() => _chatHistory.Search(fromDate: fromDate, toDate: toDate, limit: 2500));
+        var ownName = _profileManager.UserData?.Name;
+        foreach (var r in results)
+        {
+            if (!string.IsNullOrEmpty(r.Message))
+            {
+                var matches = _profanityFilter.FindMatches(r.Message);
+                if (matches.Count > 0)
+                {
+                    r.HasProfanity = true;
+                    r.MatchedWords = matches.Select(m => r.Message.Substring(m.Start, m.Length)).Distinct().ToList();
+                }
+            }
+            r.CanBan = r.Type == "message"
+                && !string.IsNullOrEmpty(r.Name)
+                && !r.Name.Equals(ownName, StringComparison.OrdinalIgnoreCase);
+            _historyResults.Add(r);
+        }
 
         var closest = _historyResults.MinBy(e => Math.Abs((e.Timestamp - target).TotalSeconds));
         if (closest is not null)
+        {
+            HistorySelection.Select(_historyResults.IndexOf(closest));
             ScrollToHistoryEntryAction?.Invoke(closest);
+        }
     }
 
     private void ClearHistorySearch()
@@ -737,6 +763,10 @@ public class ChatPageViewModel : PageViewModel
         HistorySearchFromTime = null;
         HistorySearchToDate = null;
         HistorySearchToTime = null;
+        _historyResults.Clear();
+        HistorySelection.Clear();
+        HistoryResultsTotal = 0;
+        HistoryResultsText = "Results: 0";
     }
 
     private async void SearchHistoryUser()
@@ -814,7 +844,7 @@ public class ChatPageViewModel : PageViewModel
             whispersOnly: _lastSearchWhispersOnly ? true : null,
             fromDate: _lastSearchFromDate,
             toDate: _lastSearchToDate,
-            limit: 5000
+            limit: 2500
         ));
 
         var ownName = _profileManager.UserData?.Name;

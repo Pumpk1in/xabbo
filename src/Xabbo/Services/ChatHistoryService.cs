@@ -156,9 +156,10 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
         bool? whispersOnly = null,
         DateTime? fromDate = null,
         DateTime? toDate = null,
-        int? limit = null)
+        int? limit = null,
+        int? offset = null)
     {
-        return SearchWithCount(userName, keyword, profanityOnly, whispersOnly, fromDate, toDate, limit).Results;
+        return SearchWithCount(userName, keyword, profanityOnly, whispersOnly, fromDate, toDate, limit, offset).Results;
     }
 
     public (IEnumerable<ChatHistoryEntry> Results, int TotalCount) SearchWithCount(
@@ -168,7 +169,8 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
         bool? whispersOnly = null,
         DateTime? fromDate = null,
         DateTime? toDate = null,
-        int? limit = null)
+        int? limit = null,
+        int? offset = null)
     {
         lock (_lock)
         {
@@ -214,7 +216,8 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
             // Single query: get total count via window function, with optional limit on rows returned
             using var cmd = _connection.CreateCommand();
             var limitClause = limit.HasValue ? $"LIMIT {limit.Value}" : "";
-            cmd.CommandText = $"SELECT *, COUNT(*) OVER() AS total_count FROM chat_history {whereClause} ORDER BY timestamp DESC {limitClause}";
+            var offsetClause = offset.HasValue ? $"OFFSET {offset.Value}" : "";
+            cmd.CommandText = $"SELECT *, COUNT(*) OVER() AS total_count FROM chat_history {whereClause} ORDER BY timestamp DESC {limitClause} {offsetClause}";
             cmd.Parameters.AddRange(parameters.ToArray());
 
             var results = new List<ChatHistoryEntry>();
@@ -303,6 +306,17 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
                 transaction.Commit();
             }
         });
+    }
+
+    public int GetEntryOffset(DateTime timestamp)
+    {
+        lock (_lock)
+        {
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = "SELECT COUNT(*) FROM chat_history WHERE timestamp > @ts";
+            cmd.Parameters.AddWithValue("@ts", new DateTimeOffset(timestamp).ToUnixTimeSeconds());
+            return Convert.ToInt32(cmd.ExecuteScalar());
+        }
     }
 
     public int GetEntryCount()

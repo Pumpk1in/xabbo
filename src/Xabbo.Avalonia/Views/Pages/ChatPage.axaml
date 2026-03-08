@@ -160,6 +160,8 @@
                   <ControlTheme TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
                     <Setter Property="Padding" Value="8,6" />
                     <Setter Property="Margin" Value="0,1" />
+                    <Setter Property="MinHeight" Value="62" />
+                    <Setter Property="VerticalContentAlignment" Value="Center" />
                     <Setter Property="CornerRadius" Value="4" />
                     <Setter Property="Background" Value="{DynamicResource SolidBackgroundFillColorBase}" />
                   </ControlTheme>
@@ -168,6 +170,7 @@
                   <DataTemplate DataType="models:ChatHistoryEntry">
                     <StackPanel Spacing="3">
                       <StackPanel Orientation="Horizontal" Spacing="5">
+                        <TextBlock FontSize="11" FontWeight="SemiBold" Foreground="#AA88FF" Text="{Binding Name}" IsVisible="{Binding Name, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                         <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="{Binding Timestamp, StringFormat='{}{0:g}'}" />
                         <TextBlock FontSize="11" Opacity="0.5" Text="{Binding Type, StringFormat='({0})'}" />
                         <ic:SymbolIcon Symbol="Warning" IconVariant="Filled" Foreground="#FFAA00" FontSize="13" IsVisible="{Binding HasProfanity}" />
@@ -175,7 +178,7 @@
                       <controls:HighlightedTextBlock
                         TextWrapping="Wrap"
                         FontSize="12"
-                        Text="{Binding DisplayText}"
+                        Text="{Binding MessageText}"
                         HighlightWords="{Binding MatchedWords}"
                         HighlightForeground="#FF6B6B"
                         IsWhisper="{Binding IsWhisper}"
