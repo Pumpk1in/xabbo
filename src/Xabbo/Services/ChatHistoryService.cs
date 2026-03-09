@@ -11,7 +11,7 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
     private readonly IAppPathProvider _pathProvider;
     private readonly SqliteConnection _connection;
     private readonly object _lock = new();
-    private int _entryCount;
+    private int _entryCount = -1;
 
     public ChatHistoryService(IAppPathProvider pathProvider)
     {
@@ -79,10 +79,6 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
         }
         catch (SqliteException) { /* Column already exists */ }
 
-        // Get initial count
-        using var countCmd = _connection.CreateCommand();
-        countCmd.CommandText = "SELECT COUNT(*) FROM chat_history";
-        _entryCount = Convert.ToInt32(countCmd.ExecuteScalar());
     }
 
     public void AddEntry(ChatHistoryEntry entry)
@@ -93,7 +89,8 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
             if (!EntryExists(entry))
             {
                 InsertEntry(entry);
-                _entryCount++;
+                if (_entryCount >= 0)
+                    _entryCount++;
             }
         }
     }
@@ -323,6 +320,12 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
     {
         lock (_lock)
         {
+            if (_entryCount < 0)
+            {
+                using var cmd = _connection.CreateCommand();
+                cmd.CommandText = "SELECT COUNT(*) FROM chat_history";
+                _entryCount = Convert.ToInt32(cmd.ExecuteScalar());
+            }
             return _entryCount;
         }
     }

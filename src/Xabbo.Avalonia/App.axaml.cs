@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using Splat;
 using ReactiveUI;
 using Avalonia;
@@ -44,6 +45,9 @@ public partial class App : Application
         Locator.Current.GetRequiredService<IFigureConverterService>();
         Locator.Current.GetRequiredService<CommandManager>();
         Locator.Current.GetRequiredService<ControllerInitializer>();
+
+        // Warm up the chat history DB on a background thread so it's ready before the user enters a room.
+        Task.Run(() => Locator.Current.GetService<IChatHistoryService>());
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
