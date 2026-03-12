@@ -38,6 +38,11 @@ public partial class ChatPage : UserControl
             flyout.Closed += (s, e) => { HistoryDimOverlay.Opacity = 0; HistoryDimOverlay.IsHitTestVisible = false; };
         }
 
+        if (ListBoxMessages.ContextFlyout is { } contextFlyout)
+        {
+            contextFlyout.Closed += (s, e) => { if (DataContext is ChatPageViewModel vm) vm.ContextSelection = null; };
+        }
+
         // Disable auto-scroll to focused item (prevents jumping to old selection on focus change)
         ListBoxMessages.TemplateApplied += (s, e) =>
         {

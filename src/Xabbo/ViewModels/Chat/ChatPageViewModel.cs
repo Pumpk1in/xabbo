@@ -534,13 +534,15 @@ public class ChatPageViewModel : PageViewModel
 
     private void CopySelectedEntries()
     {
-        IEnumerable<object> items = ContextSelection is { Count: > 0 } ctx
-            ? ctx
-            : Selection.SelectedItems.OfType<ChatLogEntryViewModel>();
-        var list = items.ToList();
-        if (list.Count == 0)
+        var items = Selection.SelectedItems
+            .Where(x => x is not null)
+            .Cast<ChatLogEntryViewModel>()
+            .ToList();
+        if (items.Count == 0 && ContextSelection is { Count: > 0 } ctx)
+            items = ctx.Cast<ChatLogEntryViewModel>().ToList();
+        if (items.Count == 0)
             return;
-        _clipboard.SetText(string.Join("\n", list));
+        _clipboard.SetText(string.Join("\n", items));
     }
 
     public void SendChat()
