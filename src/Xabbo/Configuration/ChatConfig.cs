@@ -1,4 +1,5 @@
 using ReactiveUI;
+using Xabbo.Core;
 
 namespace Xabbo.Configuration;
 
@@ -15,4 +16,9 @@ public sealed class ChatConfig : ReactiveObject
     [Reactive] public int BubbleStyle { get; set; } = 0;
     [Reactive] public ChatLogConfig Log { get; set; } = new();
     [Reactive] public ProfanityConfig Profanity { get; set; } = new();
+
+    [Reactive] public bool AntiSpam { get; set; } = true;
+    [Reactive] public int AntiSpamThreshold { get; set; } = 5;
+    [Reactive] public int AntiSpamWindowSeconds { get; set; } = 3;
+    [Reactive] public BanDuration AntiSpamBanDuration { get; set; } = BanDuration.Hour;
 }
