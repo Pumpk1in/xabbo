@@ -188,8 +188,23 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
 
             if (!string.IsNullOrWhiteSpace(userName))
             {
-                conditions.Add("(name LIKE @userName OR user_name LIKE @userName)");
-                parameters.Add(new SqliteParameter("@userName", $"%{userName}%"));
+                var tokens = userName.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+                if (tokens.Length == 1)
+                {
+                    conditions.Add("(name LIKE @userName0 OR user_name LIKE @userName0)");
+                    parameters.Add(new SqliteParameter("@userName0", $"%{tokens[0]}%"));
+                }
+                else
+                {
+                    var tokenClauses = new List<string>(tokens.Length);
+                    for (int i = 0; i < tokens.Length; i++)
+                    {
+                        string paramName = $"@userName{i}";
+                        tokenClauses.Add($"(name LIKE {paramName} OR user_name LIKE {paramName})");
+                        parameters.Add(new SqliteParameter(paramName, $"%{tokens[i]}%"));
+                    }
+                    conditions.Add("(" + string.Join(" OR ", tokenClauses) + ")");
+                }
             }
 
             if (!string.IsNullOrWhiteSpace(keyword))

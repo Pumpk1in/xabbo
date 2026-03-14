@@ -56,7 +56,7 @@
               <StackPanel Spacing="8">
                 <Grid ColumnDefinitions="70,*">
                   <TextBlock Grid.Column="0" Text="User:" VerticalAlignment="Center" />
-                  <TextBox x:Name="HistorySearchUserTextBox" Grid.Column="1" Classes="clearButton" Text="{Binding HistorySearchUser}" Watermark="Username..." />
+                  <TextBox x:Name="HistorySearchUserTextBox" Grid.Column="1" Classes="clearButton" Text="{Binding HistorySearchUser}" Watermark="Username(s) separated by spaces..." />
                 </Grid>
                 <Grid ColumnDefinitions="70,*">
                   <TextBlock Grid.Column="0" Text="Keyword:" VerticalAlignment="Center" />
