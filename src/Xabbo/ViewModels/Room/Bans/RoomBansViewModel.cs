@@ -140,7 +140,7 @@ public class RoomBansViewModel : ViewModelBase
     {
         HasLoaded = false;
 
-        _uiCtx.Invoke(_banCache.Clear);
+        _uiCtx.InvokeAsync(_banCache.Clear);
     }
 
     private async Task LoadBansAsync()
@@ -162,7 +162,7 @@ public class RoomBansViewModel : ViewModelBase
 
             var viewModels = users.Select(x => new RoomBanViewModel(x.Id, x.Name)).ToArray();
 
-            _uiCtx.Invoke(() =>
+            _ = _uiCtx.InvokeAsync(() =>
             {
                 foreach (var vm in viewModels)
                     _banCache.AddOrUpdate(vm);

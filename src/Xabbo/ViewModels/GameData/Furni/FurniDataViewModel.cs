@@ -53,7 +53,7 @@ public class FurniDataViewModel : ViewModelBase
         FurniData? furniData = _gameDataManager.Furni;
         if (furniData is null) return;
 
-        _uiContext.Invoke(() =>
+        _uiContext.InvokeAsync(() =>
         {
             foreach (FurniInfo info in furniData)
             {

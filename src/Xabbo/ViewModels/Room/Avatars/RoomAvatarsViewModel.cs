@@ -536,7 +536,7 @@ public class RoomAvatarsViewModel : ViewModelBase
 
     private void OnAvatarsUpdated(AvatarsEventArgs e)
     {
-        _uiContext.Invoke(() => {
+        _uiContext.InvokeAsync(() => {
             bool shouldRefresh = false;
 
             foreach (var avatar in e.Avatars)
@@ -564,12 +564,12 @@ public class RoomAvatarsViewModel : ViewModelBase
 
     private void OnLeftRoom()
     {
-        _uiContext.Invoke(_avatarCache.Clear);
+        _uiContext.InvokeAsync(_avatarCache.Clear);
     }
 
     private void OnAvatarsAdded(AvatarsEventArgs e)
     {
-        _uiContext.Invoke(() => {
+        _uiContext.InvokeAsync(() => {
             foreach (var avatar in e.Avatars)
             {
                 var vm = new AvatarViewModel(avatar) { IsOrigins = _ext.Session.Is(ClientType.Origins) };
@@ -601,7 +601,7 @@ public class RoomAvatarsViewModel : ViewModelBase
 
     private void OnAvatarRemoved(AvatarEventArgs e)
     {
-        _uiContext.Invoke(() => { _avatarCache.RemoveKey(e.Avatar.Index); });
+        _uiContext.InvokeAsync(() => { _avatarCache.RemoveKey(e.Avatar.Index); });
     }
 
     private void OnAvatarIdle(AvatarIdleEventArgs e)

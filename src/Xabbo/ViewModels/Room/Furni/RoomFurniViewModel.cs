@@ -532,7 +532,7 @@ public partial class RoomFurniViewModel : ViewModelBase
 
     private void ClearItems()
     {
-        _uiCtx.Invoke(() => {
+        _uiCtx.InvokeAsync(() => {
             _furniCache.Clear();
             _furniStackCache.Clear();
         });
