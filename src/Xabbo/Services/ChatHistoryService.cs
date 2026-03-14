@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Threading.Channels;
 using Microsoft.Data.Sqlite;
 using Xabbo.Models;
 using Xabbo.Models.Enums;
@@ -12,6 +13,10 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
     private readonly SqliteConnection _connection;
     private readonly object _lock = new();
     private int _entryCount = -1;
+
+    private readonly Channel<ChatHistoryEntry> _writeQueue = Channel.CreateUnbounded<ChatHistoryEntry>(
+        new UnboundedChannelOptions { SingleReader = true, AllowSynchronousContinuations = false });
+    private readonly Task _processTask;
 
     public ChatHistoryService(IAppPathProvider pathProvider)
     {
@@ -39,7 +44,28 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
         }
 
         InitializeDatabase();
+
+        _processTask = Task.Run(ProcessWriteQueueAsync);
     }
+
+    private async Task ProcessWriteQueueAsync()
+    {
+        await foreach (var entry in _writeQueue.Reader.ReadAllAsync())
+        {
+            lock (_lock)
+            {
+                if (!EntryExists(entry))
+                {
+                    InsertEntry(entry);
+                    if (_entryCount >= 0)
+                        _entryCount++;
+                }
+            }
+        }
+    }
+
+    public void EnqueueEntry(ChatHistoryEntry entry)
+        => _writeQueue.Writer.TryWrite(entry);
 
     private void InitializeDatabase()
     {
@@ -370,6 +396,8 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
 
     public void Dispose()
     {
+        _writeQueue.Writer.Complete();
+        _processTask.Wait(TimeSpan.FromSeconds(5));
         _connection.Close();
         _connection.Dispose();
     }

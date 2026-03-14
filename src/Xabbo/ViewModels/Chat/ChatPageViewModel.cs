@@ -1081,7 +1081,7 @@ public class ChatPageViewModel : PageViewModel
         };
         AppendLog(vm);
 
-        _chatHistory.AddEntry(new ChatHistoryEntry
+        _chatHistory.EnqueueEntry(new ChatHistoryEntry
         {
             Timestamp = vm.Timestamp,
             Type = "action",
@@ -1108,7 +1108,7 @@ public class ChatPageViewModel : PageViewModel
         AppendLog(vm);
 
         // Save to history
-        _chatHistory.AddEntry(new ChatHistoryEntry
+        _chatHistory.EnqueueEntry(new ChatHistoryEntry
         {
             Timestamp = vm.Timestamp,
             Type = "action",
@@ -1142,7 +1142,7 @@ public class ChatPageViewModel : PageViewModel
         AppendLog(vm);
 
         // Save to history (use actual name, not "You")
-        _chatHistory.AddEntry(new ChatHistoryEntry
+        _chatHistory.EnqueueEntry(new ChatHistoryEntry
         {
             Timestamp = vm.Timestamp,
             Type = "action",
@@ -1173,7 +1173,7 @@ public class ChatPageViewModel : PageViewModel
             AppendLog(vm);
 
             // Save to history
-            _chatHistory.AddEntry(new ChatHistoryEntry
+            _chatHistory.EnqueueEntry(new ChatHistoryEntry
             {
                 Timestamp = vm.Timestamp,
                 Type = "action",
@@ -1196,7 +1196,7 @@ public class ChatPageViewModel : PageViewModel
         AppendLog(vm);
 
         // Save to history
-        _chatHistory.AddEntry(new ChatHistoryEntry
+        _chatHistory.EnqueueEntry(new ChatHistoryEntry
         {
             Timestamp = vm.Timestamp,
             Type = "room",
@@ -1255,7 +1255,7 @@ public class ChatPageViewModel : PageViewModel
         AppendLog(vm);
 
         // Save to history (MatchedWords will be recalculated at search time for highlighting)
-        _chatHistory.AddEntry(new ChatHistoryEntry
+        _chatHistory.EnqueueEntry(new ChatHistoryEntry
         {
             Timestamp = vm.Timestamp,
             Type = "message",

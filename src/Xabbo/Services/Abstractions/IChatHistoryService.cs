@@ -5,9 +5,14 @@ namespace Xabbo.Services.Abstractions;
 public interface IChatHistoryService
 {
     /// <summary>
-    /// Adds a chat entry to the history.
+    /// Adds a chat entry to the history (blocking).
     /// </summary>
     void AddEntry(ChatHistoryEntry entry);
+
+    /// <summary>
+    /// Enqueues a chat entry for async write to the history (non-blocking).
+    /// </summary>
+    void EnqueueEntry(ChatHistoryEntry entry);
 
     /// <summary>
     /// Searches the chat history with optional filters.
