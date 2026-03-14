@@ -77,41 +77,52 @@ public class AvatarImage : TemplatedControl
         private set => SetAndRaise(DirectBitmapProperty, ref _directBitmap, value);
     }
 
-    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    private void UpdateImage()
     {
-        if (change.Property == FigureStringProperty ||
-            change.Property == DirectionProperty ||
-            change.Property == HeadOnlyProperty ||
-            change.Property == UserNameProperty)
-        {
-            Placeholder = $"avares://Xabbo.Avalonia/Assets/Images/Avatar/{(HeadOnly ? "head" : "body")}-{Direction}.png";
+        Placeholder = $"avares://Xabbo.Avalonia/Assets/Images/Avatar/{(HeadOnly ? "head" : "body")}-{Direction}.png";
 
-            if (string.IsNullOrWhiteSpace(FigureString) &&
-                string.IsNullOrWhiteSpace(UserName))
+        if (string.IsNullOrWhiteSpace(FigureString) &&
+            string.IsNullOrWhiteSpace(UserName))
+        {
+            DirectBitmap = null;
+            AvatarImageUrl = null;
+        }
+        else
+        {
+            var url = UrlHelper.AvatarImageUrl(
+                figure: FigureString,
+                direction: Direction,
+                headOnly: HeadOnly,
+                name: UserName
+            );
+
+            if (url is not null && XabboImageLoader.Instance.TryGetBitmap(url, out var cached))
             {
-                DirectBitmap = null;
+                DirectBitmap = cached;
                 AvatarImageUrl = null;
             }
             else
             {
-                var url = UrlHelper.AvatarImageUrl(
-                    figure: FigureString,
-                    direction: Direction,
-                    headOnly: HeadOnly,
-                    name: UserName
-                );
-
-                if (url is not null && XabboImageLoader.Instance.TryGetBitmap(url, out var cached))
-                {
-                    DirectBitmap = cached;
-                    AvatarImageUrl = null;
-                }
-                else
-                {
-                    DirectBitmap = null;
-                    AvatarImageUrl = url;
-                }
+                DirectBitmap = null;
+                AvatarImageUrl = url;
             }
+        }
+    }
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        if (change.Property == DataContextProperty)
+        {
+            // DataContext reassigned (ListBox item recycling): force re-check even if
+            // FigureString value is identical to what it was before recycling.
+            UpdateImage();
+        }
+        else if (change.Property == FigureStringProperty ||
+            change.Property == DirectionProperty ||
+            change.Property == HeadOnlyProperty ||
+            change.Property == UserNameProperty)
+        {
+            UpdateImage();
         }
 
         base.OnPropertyChanged(change);
