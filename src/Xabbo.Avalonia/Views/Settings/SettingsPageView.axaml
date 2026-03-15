@@ -256,6 +256,17 @@
           </StackPanel>
         </ui:SettingsExpanderItem>
       </ui:SettingsExpander>
+      <!-- Friends -->
+      <ui:SettingsExpander
+        Header="Friends"
+        IconSource="{icm:SymbolIconSource Symbol=People}"
+      >
+        <ui:SettingsExpanderItem Content="Notify when a tracked friend comes online">
+          <ui:SettingsExpanderItem.Footer>
+            <ToggleSwitch IsChecked="{Binding Config.Friends.NotifyOnline}" />
+          </ui:SettingsExpanderItem.Footer>
+        </ui:SettingsExpanderItem>
+      </ui:SettingsExpander>
       <ui:SettingsExpander
         Header="Debug"
         IsVisible="{DynamicResource IsDebug}"

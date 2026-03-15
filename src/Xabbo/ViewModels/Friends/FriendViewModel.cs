@@ -1,3 +1,6 @@
+using System.Reactive.Linq;
+using ReactiveUI;
+
 namespace Xabbo.ViewModels;
 
 public sealed partial class FriendViewModel : ViewModelBase
@@ -10,6 +13,13 @@ public sealed partial class FriendViewModel : ViewModelBase
 
     public bool IsOrigins { get; set; }
     [Reactive] public string? ModernFigure { get; set; }
+    [Reactive] public bool NotifyWhenOnline { get; set; }
 
-    public FriendViewModel() { }
+    public string NotifyMenuText => NotifyWhenOnline ? "Stop notifying when online" : "Notify when online";
+
+    public FriendViewModel()
+    {
+        this.WhenAnyValue(x => x.NotifyWhenOnline)
+            .Subscribe(_ => this.RaisePropertyChanged(nameof(NotifyMenuText)));
+    }
 }

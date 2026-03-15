@@ -11,12 +11,14 @@ using Humanizer;
 using HanumanInstitute.MvvmDialogs;
 using HanumanInstitute.MvvmDialogs.Avalonia.Fluent;
 
+using Splat;
 using Xabbo.Interceptor;
 using Xabbo.Messages.Flash;
 using Xabbo.Core;
 using Xabbo.Core.Game;
 using Xabbo.Core.Events;
 using Xabbo.Core.Messages.Outgoing;
+using Xabbo.Configuration;
 using Xabbo.Services.Abstractions;
 
 using Symbol = FluentIcons.Common.Symbol;
@@ -34,16 +36,21 @@ public sealed class FriendsPageViewModel : PageViewModel
     private readonly IInterceptor _interceptor;
     private readonly IFigureConverterService _figureConverter;
     private readonly FriendManager _friendManager;
+    private readonly IConfigProvider<AppConfig> _config;
     private readonly SourceCache<FriendViewModel, Id> _cache = new(key => key.Id);
+
+    private FriendsConfig FriendsConfig => _config.Value.Friends;
 
     private readonly ReadOnlyObservableCollection<FriendViewModel> _friends;
     public ReadOnlyObservableCollection<FriendViewModel> Friends => _friends;
 
     [Reactive] public bool IsLoading { get; set; } = true;
     [Reactive] public string FilterText { get; set; } = "";
-    [Reactive] public bool ShowOnlineOnly { get; set; }
+    [Reactive] public bool ShowOnlineOnly { get; set; } = true;
 
     public ReactiveCommand<FriendViewModel, Unit> FollowFriendCmd { get; }
+    public ReactiveCommand<FriendViewModel, Unit> ToggleNotifyCmd { get; }
+    public ReactiveCommand<FriendViewModel, Unit> RemoveSingleFriendCmd { get; }
     public ReactiveCommand<Unit, Unit> RemoveFriendsCmd { get; }
 
     public SelectionModel<FriendViewModel> Selection { get; } = new() { SingleSelect = false };
@@ -51,13 +58,15 @@ public sealed class FriendsPageViewModel : PageViewModel
     public FriendsPageViewModel(
         IUiContext uiContext, IDialogService dialogService,
         IInterceptor interceptor, IFigureConverterService figureConverter,
-        FriendManager friendManager)
+        FriendManager friendManager,
+        IConfigProvider<AppConfig> config)
     {
         _uiContext = uiContext;
         _dialogService = dialogService;
         _interceptor = interceptor;
         _figureConverter = figureConverter;
         _friendManager = friendManager;
+        _config = config;
 
         _figureConverter.Available += OnFigureConverterAvailable;
 
@@ -75,6 +84,8 @@ public sealed class FriendsPageViewModel : PageViewModel
             .Subscribe();
 
         FollowFriendCmd = ReactiveCommand.Create<FriendViewModel>(FollowFriend);
+        ToggleNotifyCmd = ReactiveCommand.Create<FriendViewModel>(ToggleNotify);
+        RemoveSingleFriendCmd = ReactiveCommand.CreateFromTask<FriendViewModel>(RemoveSingleFriendAsync);
         RemoveFriendsCmd = ReactiveCommand.CreateFromTask(
             RemoveSelectedFriendsAsync,
             Selection
@@ -82,6 +93,8 @@ public sealed class FriendsPageViewModel : PageViewModel
                 .Select(count => count.Value?.Count > 0)
                 .ObserveOn(RxApp.MainThreadScheduler)
         );
+
+        _config.Loaded += OnConfigLoaded;
 
         _friendManager.Loaded += OnFriendsLoaded;
         _friendManager.Cleared += OnFriendsCleared;
@@ -132,6 +145,8 @@ public sealed class FriendsPageViewModel : PageViewModel
             vm.ModernFigure = vm.Figure;
         }
 
+        vm.NotifyWhenOnline = FriendsConfig.NotifyOnlineIds.Contains((long)friend.Id);
+
         return vm;
     }
 
@@ -170,6 +185,12 @@ public sealed class FriendsPageViewModel : PageViewModel
         this.RaisePropertyChanged(nameof(Header));
     }
 
+    private void OnConfigLoaded()
+    {
+        foreach (var (_, vm) in _cache.KeyValues)
+            vm.NotifyWhenOnline = FriendsConfig.NotifyOnlineIds.Contains((long)vm.Id);
+    }
+
     private void OnFriendsLoaded()
     {
         foreach (var friend in _friendManager.Friends)
@@ -178,12 +199,55 @@ public sealed class FriendsPageViewModel : PageViewModel
     }
     private void OnFriendsCleared() => _cache.Clear();
     private void OnFriendAdded(FriendEventArgs args) => AddFriend(args.Friend);
-    private void OnFriendUpdated(FriendEventArgs args) => UpdateFriend(args.Friend);
+    private void OnFriendUpdated(FriendUpdatedEventArgs args)
+    {
+        UpdateFriend(args.Friend);
+        if (!args.Previous.IsOnline && args.Friend.IsOnline)
+            OnFriendCameOnline(args.Friend);
+    }
     private void OnFriendRemoved(FriendEventArgs args) => RemoveFriend(args.Friend.Id);
 
     private void FollowFriend(FriendViewModel friend)
     {
         _interceptor.Send(Out.FollowFriend, friend.Id);
+    }
+
+    private void ToggleNotify(FriendViewModel vm)
+    {
+        long id = (long)vm.Id;
+        if (FriendsConfig.NotifyOnlineIds.Remove(id))
+            vm.NotifyWhenOnline = false;
+        else
+        {
+            FriendsConfig.NotifyOnlineIds.Add(id);
+            vm.NotifyWhenOnline = true;
+        }
+        _config.Save();
+    }
+
+    private void OnFriendCameOnline(IFriend friend)
+    {
+        if (!FriendsConfig.NotifyOnline) return;
+        if (!FriendsConfig.NotifyOnlineIds.Contains((long)friend.Id)) return;
+        _uiContext.Invoke(() =>
+            Locator.Current.GetService<IApplicationManager>()?.ShowNotification(friend.Name, "is now online")
+        );
+    }
+
+    private async Task RemoveSingleFriendAsync(FriendViewModel friend)
+    {
+        var result = await _dialogService.ShowContentDialogAsync(_dialogService.CreateViewModel<MainViewModel>(), new ContentDialogSettings
+        {
+            Title = "Remove friend",
+            Content = $"Are you sure you wish to remove {friend.Name}?",
+            PrimaryButtonText = "Yes",
+            SecondaryButtonText = "No",
+        });
+
+        if (result is ContentDialogResult.Primary)
+        {
+            _interceptor.Send(new RemoveFriendsMsg([friend.Id]));
+        }
     }
 
     private async Task RemoveSelectedFriendsAsync()

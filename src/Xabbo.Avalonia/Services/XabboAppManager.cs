@@ -8,6 +8,7 @@ using Microsoft.Extensions.Hosting;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Controls.Notifications;
 using Avalonia.Threading;
 using Humanizer;
 
@@ -42,6 +43,7 @@ public sealed class XabboAppManager : IApplicationManager
     private readonly MainViewModel _mainViewModel;
     private readonly Lazy<MainWindow> _mainWindow;
 
+    private WindowNotificationManager? _notificationManager;
     private DisconnectReason _currentDisconnectReason = DisconnectReason.Unknown;
 
     private readonly CancellationTokenSource _extensionStopTokenSource;
@@ -229,6 +231,11 @@ public sealed class XabboAppManager : IApplicationManager
                     window.DataContext = Application.Current?.DataContext;
                     window.Closing += OnMainWindowClosing;
                     desktopLifetime.MainWindow = window;
+                    _notificationManager = new WindowNotificationManager(window)
+                    {
+                        Position = NotificationPosition.TopRight,
+                        MaxItems = 3
+                    };
                 });
             }
             else
@@ -273,8 +280,11 @@ public sealed class XabboAppManager : IApplicationManager
 
     public void ShowNotification(string title, string message)
     {
-        // Not implemented - would require platform-specific notification APIs
-        BringToFront();
+        Dispatcher.UIThread.Invoke(() => {
+            GetMainWindow(); // ensure manager is initialized
+            _notificationManager?.Show(new Notification(title, message,
+                NotificationType.Information, TimeSpan.FromSeconds(5)));
+        });
     }
 
     private void SetStatus(string status)

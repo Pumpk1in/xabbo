@@ -56,6 +56,23 @@
               ColumnDefinitions="Auto,*,Auto"
               Classes.offline="{Binding !IsOnline}"
             >
+              <Grid.ContextFlyout>
+                <ui:FAMenuFlyout>
+                  <ui:MenuFlyoutItem
+                    Text="{Binding NotifyMenuText}"
+                    IconSource="{icm:SymbolIconSource Symbol=Alert}"
+                    Command="{Binding #friendsPage.((vm:FriendsPageViewModel)DataContext).ToggleNotifyCmd}"
+                    CommandParameter="{Binding}"
+                  />
+                  <ui:MenuFlyoutSeparator />
+                  <ui:MenuFlyoutItem
+                    Text="Remove"
+                    IconSource="{icm:SymbolIconSource Symbol=PersonDelete}"
+                    Command="{Binding #friendsPage.((vm:FriendsPageViewModel)DataContext).RemoveSingleFriendCmd}"
+                    CommandParameter="{Binding}"
+                  />
+                </ui:FAMenuFlyout>
+              </Grid.ContextFlyout>
               <Grid.Styles>
                 <Style Selector=":is(Control).offline">
                   <Setter Property="Opacity" Value="0.5" />
@@ -89,6 +106,8 @@
                 <TextBlock
                   Text="{Binding Motto, Converter={StaticResource HabboStringConverter}}"
                   IsVisible="{Binding Motto, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                  FontStyle="Italic"
+                  Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                 />
               </StackPanel>
               <Button
