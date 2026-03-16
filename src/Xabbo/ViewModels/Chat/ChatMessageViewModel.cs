@@ -67,6 +67,9 @@ public class ChatMessageViewModel : ChatLogEntryViewModel
     public (string Name, int Minutes) MuteParam15 => (Name, 15);
     public (string Name, int Minutes) MuteParam30 => (Name, 30);
     public (string Name, int Minutes) MuteParam60 => (Name, 60);
+    public (string Name, int Minutes) MuteParam360 => (Name, 360);
+    public (string Name, int Minutes) MuteParam720 => (Name, 720);
+    public (string Name, int Minutes) MuteParam1440 => (Name, 1440);
 
     public (string Name, BanDuration Duration) BanParamHour => (Name, BanDuration.Hour);
     public (string Name, BanDuration Duration) BanParamDay => (Name, BanDuration.Day);

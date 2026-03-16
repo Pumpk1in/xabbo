@@ -461,7 +461,11 @@
                         <ui:MenuFlyoutItem Text="10 mins" Command="{Binding #ChatPageRoot.((vm:ChatPageViewModel)DataContext).MuteUserByNameCmd}" CommandParameter="{Binding MuteParam10}" />
                         <ui:MenuFlyoutItem Text="15 mins" Command="{Binding #ChatPageRoot.((vm:ChatPageViewModel)DataContext).MuteUserByNameCmd}" CommandParameter="{Binding MuteParam15}" />
                         <ui:MenuFlyoutItem Text="30 mins" Command="{Binding #ChatPageRoot.((vm:ChatPageViewModel)DataContext).MuteUserByNameCmd}" CommandParameter="{Binding MuteParam30}" />
+                        <ui:MenuFlyoutSeparator />
                         <ui:MenuFlyoutItem Text="1 hour" Command="{Binding #ChatPageRoot.((vm:ChatPageViewModel)DataContext).MuteUserByNameCmd}" CommandParameter="{Binding MuteParam60}" />
+                        <ui:MenuFlyoutItem Text="6 hours" Command="{Binding #ChatPageRoot.((vm:ChatPageViewModel)DataContext).MuteUserByNameCmd}" CommandParameter="{Binding MuteParam360}" />
+                        <ui:MenuFlyoutItem Text="12 hours" Command="{Binding #ChatPageRoot.((vm:ChatPageViewModel)DataContext).MuteUserByNameCmd}" CommandParameter="{Binding MuteParam720}" />
+                        <ui:MenuFlyoutItem Text="24 hours" Command="{Binding #ChatPageRoot.((vm:ChatPageViewModel)DataContext).MuteUserByNameCmd}" CommandParameter="{Binding MuteParam1440}" />
                       </ui:FAMenuFlyout>
                     </Button.Flyout>
                     <ic:SymbolIcon Symbol="ChatOff" FontSize="14" />
