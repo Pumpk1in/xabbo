@@ -10,6 +10,7 @@ public sealed class ConversationViewModel : ReactiveObject
 
     [Reactive] public string FriendName { get; set; } = "";
     [Reactive] public string FriendFigure { get; set; } = "";
+    [Reactive] public bool IsOnline { get; set; }
     [Reactive] public int UnreadCount { get; set; }
     [Reactive] public DateTimeOffset LastMessageTime { get; set; }
 

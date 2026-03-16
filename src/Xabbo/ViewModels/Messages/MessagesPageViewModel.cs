@@ -124,27 +124,33 @@ public sealed class MessagesPageViewModel : PageViewModel
 
     private void OnFriendUpdated(FriendUpdatedEventArgs e)
     {
-        if (e.Previous.Figure == e.Friend.Figure) return;
-        if (string.IsNullOrEmpty(e.Friend.Figure)) return;
         _uiContext.Invoke(() =>
         {
             var lookup = _cache.Lookup(e.Friend.Id);
-            if (lookup.HasValue)
-                lookup.Value.FriendFigure = e.Friend.Figure;
+            if (!lookup.HasValue) return;
+
+            var conv = lookup.Value;
+            conv.IsOnline = e.Friend.IsOnline;
+
+            if (e.Previous.Figure != e.Friend.Figure && !string.IsNullOrEmpty(e.Friend.Figure))
+                conv.FriendFigure = e.Friend.Figure;
         });
     }
 
     private void OnFriendsLoaded()
     {
-        // Met à jour les figures des conversations déjà créées depuis l'historique
+        // Met à jour les figures et statut online des conversations déjà créées depuis l'historique
         _uiContext.Invoke(() =>
         {
             foreach (var conv in _cache.Items)
             {
-                if (!string.IsNullOrEmpty(conv.FriendFigure)) continue;
-                var figure = _friendManager.GetFriend(conv.FriendId)?.Figure;
-                if (!string.IsNullOrEmpty(figure))
-                    conv.FriendFigure = figure;
+                var friend = _friendManager.GetFriend(conv.FriendId);
+                if (friend is null) continue;
+
+                conv.IsOnline = friend.IsOnline;
+
+                if (string.IsNullOrEmpty(conv.FriendFigure) && !string.IsNullOrEmpty(friend.Figure))
+                    conv.FriendFigure = friend.Figure;
             }
         });
     }
@@ -169,6 +175,7 @@ public sealed class MessagesPageViewModel : PageViewModel
                     {
                         FriendId = r.FriendId,
                         FriendName = r.FriendName,
+                        IsOnline = _friendManager.GetFriend(r.FriendId)?.IsOnline ?? false,
                         // FriendFigure intentionnellement vide — OnFriendsLoaded() le remplit
                         // une fois connecté, évitant des requêtes CDN prématurées au démarrage
                     };
@@ -192,11 +199,13 @@ public sealed class MessagesPageViewModel : PageViewModel
         var lookup = _cache.Lookup(friendId);
         if (lookup.HasValue) return lookup.Value;
 
+        var friend = _friendManager.GetFriend(friendId);
         var vm = new ConversationViewModel
         {
             FriendId = friendId,
             FriendName = friendName,
-            FriendFigure = _friendManager.GetFriend(friendId)?.Figure ?? "",
+            FriendFigure = friend?.Figure ?? "",
+            IsOnline = friend?.IsOnline ?? false,
             IsLoadingHistory = true,
         };
         _cache.AddOrUpdate(vm);
@@ -317,6 +326,7 @@ public sealed class MessagesPageViewModel : PageViewModel
         var conv = GetOrCreateConversationById(friend.Id, friend.Name);
         if (string.IsNullOrEmpty(conv.FriendFigure) && !string.IsNullOrEmpty(friend.Figure))
             conv.FriendFigure = friend.Figure;
+        conv.IsOnline = friend.IsOnline;
         return conv;
     }
 

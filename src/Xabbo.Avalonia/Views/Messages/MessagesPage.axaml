@@ -31,7 +31,7 @@
       >
         <ListBox.ItemTemplate>
           <DataTemplate x:DataType="vm:ConversationViewModel">
-            <Grid ColumnDefinitions="Auto,*,Auto" Margin="2,2"
+            <Grid ColumnDefinitions="Auto,Auto,*,Auto" Margin="2,2"
               Background="Transparent"
             >
               <Grid.ContextFlyout>
@@ -59,7 +59,18 @@
                   />
                 </ui:FAMenuFlyout>
               </Grid.ContextFlyout>
+              <ic:SymbolIcon
+                Grid.Column="0"
+                Symbol="CheckmarkCircle"
+                IconVariant="Filled"
+                FontSize="12"
+                Margin="-12,0,2,0"
+                Foreground="#44DD66"
+                IsVisible="{Binding IsOnline}"
+                VerticalAlignment="Center"
+              />
               <Grid
+                Grid.Column="1"
                 Margin="-2,-4,6,-4"
                 Width="46" Height="54"
               >
@@ -69,7 +80,7 @@
                   UserName="{Binding FriendName}"
                 />
               </Grid>
-              <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+              <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="2">
                 <TextBlock
                   FontWeight="Bold"
                   Classes="privacy"
@@ -85,7 +96,7 @@
                 />
               </StackPanel>
               <Border
-                Grid.Column="2"
+                Grid.Column="3"
                 VerticalAlignment="Center"
                 Margin="4,0,-8,0"
                 Background="{DynamicResource SystemAccentColor}"
