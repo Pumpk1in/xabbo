@@ -282,7 +282,7 @@ public sealed class XabboAppManager : IApplicationManager
     {
         Dispatcher.UIThread.Invoke(() => {
             GetMainWindow(); // ensure manager is initialized
-            _notificationManager?.Show(new Notification(title, message,
+            _notificationManager?.Show(new Notification($"{title} {message}", null,
                 NotificationType.Information, TimeSpan.FromSeconds(5)));
         });
     }
