@@ -86,7 +86,7 @@ public class ProfanityHighlightTextBlock : TextBlock
 
     // Inserts zero-width spaces every N chars in runs with no natural break points,
     // preventing Avalonia's TextWrapping from entering an infinite layout loop.
-    private static string InjectWordBreaks(string text, int every = 30)
+    private static string InjectWordBreaks(string text, int every = 10)
     {
         if (text.Length <= every || text.Contains(' ')) return text;
         var sb = new System.Text.StringBuilder(text.Length + text.Length / every);
