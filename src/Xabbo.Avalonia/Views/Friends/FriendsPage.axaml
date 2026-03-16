@@ -121,6 +121,7 @@
                 <TextBlock
                   Text="{Binding Motto, Converter={StaticResource HabboStringConverter}}"
                   IsVisible="{Binding Motto, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                  FontSize="11"
                   FontStyle="Italic"
                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                 />
