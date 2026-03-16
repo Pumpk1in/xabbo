@@ -36,6 +36,15 @@
             >
               <Grid.ContextFlyout>
                 <ui:FAMenuFlyout>
+                  <ui:MenuFlyoutSubItem
+                    IconSource="{icm:SymbolIconSource Symbol=Person}"
+                    Text="Open profile..."
+                  >
+                    <ui:MenuFlyoutItem Text="In-game" Command="{Binding #messagesPage.((vm:MessagesPageViewModel)DataContext).OpenProfileCmd}" CommandParameter="game" />
+                    <ui:MenuFlyoutItem Text="On the web" Command="{Binding #messagesPage.((vm:MessagesPageViewModel)DataContext).OpenProfileCmd}" CommandParameter="web" />
+                    <ui:MenuFlyoutItem Text="On HabboWidgets" Command="{Binding #messagesPage.((vm:MessagesPageViewModel)DataContext).OpenProfileCmd}" CommandParameter="habbowidgets" />
+                  </ui:MenuFlyoutSubItem>
+                  <ui:MenuFlyoutSeparator />
                   <ui:MenuFlyoutItem
                     Text="Hide conversation"
                     IconSource="{icm:SymbolIconSource Symbol=EyeOff}"
@@ -57,7 +66,6 @@
                 <controls:AvatarImage
                   HeadOnly="true"
                   FigureString="{Binding FriendFigure}"
-                  UserName="{Binding FriendName}"
                 />
               </Grid>
               <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">

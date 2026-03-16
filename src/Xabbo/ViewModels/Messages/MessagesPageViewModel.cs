@@ -1,10 +1,13 @@
 using System.Collections.ObjectModel;
 using System.Reactive;
 using System.Reactive.Linq;
+using System.Web;
 using DynamicData;
 using DynamicData.Binding;
 using ReactiveUI;
 using FluentAvalonia.UI.Controls;
+using HanumanInstitute.MvvmDialogs;
+using HanumanInstitute.MvvmDialogs.Avalonia.Fluent;
 using SymbolIconSource = FluentIcons.Avalonia.Fluent.SymbolIconSource;
 using Symbol = FluentIcons.Common.Symbol;
 
@@ -16,6 +19,7 @@ using Xabbo.Interceptor;
 using Xabbo.Messages;
 using Xabbo.Services.Abstractions;
 using Xabbo.Services;
+using Xabbo.Utility;
 
 namespace Xabbo.ViewModels;
 
@@ -26,7 +30,9 @@ public sealed class MessagesPageViewModel : PageViewModel
     public override IconSource? Icon { get; } = new SymbolIconSource { Symbol = Symbol.ChatMultiple };
 
     private readonly IUiContext _uiContext;
+    private readonly IDialogService _dialogService;
     private readonly IInterceptor _interceptor;
+    private readonly ILauncherService _launcher;
     private readonly FriendManager _friendManager;
     private readonly ProfileManager _profileManager;
     private readonly IPrivateMessageHistoryService _history;
@@ -46,16 +52,21 @@ public sealed class MessagesPageViewModel : PageViewModel
     public ReactiveCommand<Unit, Unit> SendReplyCmd { get; }
     public ReactiveCommand<ConversationViewModel, Unit> HideConversationCmd { get; }
     public ReactiveCommand<ConversationViewModel, Unit> DeleteConversationCmd { get; }
+    public ReactiveCommand<string, Task> OpenProfileCmd { get; }
 
     public MessagesPageViewModel(
         IUiContext uiContext,
+        IDialogService dialogService,
         IInterceptor interceptor,
+        ILauncherService launcher,
         FriendManager friendManager,
         ProfileManager profileManager,
         IPrivateMessageHistoryService history)
     {
         _uiContext = uiContext;
+        _dialogService = dialogService;
         _interceptor = interceptor;
+        _launcher = launcher;
         _friendManager = friendManager;
         _profileManager = profileManager;
         _history = history;
@@ -76,6 +87,7 @@ public sealed class MessagesPageViewModel : PageViewModel
         SendReplyCmd = ReactiveCommand.Create(SendReply, canSend);
         HideConversationCmd = ReactiveCommand.Create<ConversationViewModel>(HideConversation);
         DeleteConversationCmd = ReactiveCommand.CreateFromTask<ConversationViewModel>(DeleteConversationAsync);
+        OpenProfileCmd = ReactiveCommand.Create<string, Task>(OpenProfile);
 
         this.WhenAnyValue(x => x.TotalUnread)
             .Subscribe(_ =>
@@ -103,10 +115,23 @@ public sealed class MessagesPageViewModel : PageViewModel
             });
 
         _friendManager.Loaded += OnFriendsLoaded;
+        _friendManager.FriendUpdated += OnFriendUpdated;
         _friendManager.MessageReceived += OnMessageReceived;
         _interceptor.Intercept<SendConsoleMessageMsg>(OnSentConsoleMessage);
 
         _ = LoadHistoryAsync();
+    }
+
+    private void OnFriendUpdated(FriendUpdatedEventArgs e)
+    {
+        if (e.Previous.Figure == e.Friend.Figure) return;
+        if (string.IsNullOrEmpty(e.Friend.Figure)) return;
+        _uiContext.Invoke(() =>
+        {
+            var lookup = _cache.Lookup(e.Friend.Id);
+            if (lookup.HasValue)
+                lookup.Value.FriendFigure = e.Friend.Figure;
+        });
     }
 
     private void OnFriendsLoaded()
@@ -319,6 +344,37 @@ public sealed class MessagesPageViewModel : PageViewModel
     {
         HideConversation(conv);
         await _history.DeleteConversationAsync(conv.FriendId);
+    }
+
+    private async Task OpenProfile(string type)
+    {
+        var conv = SelectedConversation;
+        if (conv is null) return;
+
+        switch (type)
+        {
+            case "game":
+                var profile = await _interceptor.RequestAsync(new GetProfileByNameMsg(conv.FriendName), block: false);
+                if (!profile.DisplayInClient)
+                {
+                    await _dialogService.ShowContentDialogAsync(
+                        _dialogService.CreateViewModel<MainViewModel>(),
+                        new ContentDialogSettings
+                        {
+                            Title = "Failed to open profile",
+                            Content = $"{conv.FriendName}'s profile is not visible.",
+                            PrimaryButtonText = "OK",
+                        }
+                    );
+                }
+                break;
+            case "web":
+                _launcher.Launch($"https://{_interceptor.Session.Hotel.WebHost}/profile/{HttpUtility.UrlEncode(conv.FriendName)}");
+                break;
+            case "habbowidgets":
+                _launcher.Launch($"https://www.habbowidgets.com/habinfo/{_interceptor.Session.Hotel.Domain}/{HttpUtility.UrlEncode(conv.FriendName)}");
+                break;
+        }
     }
 
     private void SendReply()

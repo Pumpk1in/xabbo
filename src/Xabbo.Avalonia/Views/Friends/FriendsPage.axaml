@@ -57,13 +57,21 @@
               Classes.offline="{Binding !IsOnline}"
             >
               <Grid.ContextFlyout>
-                <ui:FAMenuFlyout>
+                <ui:FAMenuFlyout Opened="OnFriendFlyoutOpened">
                   <ui:MenuFlyoutItem
                     Text="Send private message"
                     IconSource="{icm:SymbolIconSource Symbol=ChatMultiple}"
                     Command="{Binding #friendsPage.((vm:FriendsPageViewModel)DataContext).SendPrivateMessageCmd}"
                     CommandParameter="{Binding}"
                   />
+                  <ui:MenuFlyoutSubItem
+                    IconSource="{icm:SymbolIconSource Symbol=Person}"
+                    Text="Open profile..."
+                  >
+                    <ui:MenuFlyoutItem Text="In-game" Command="{Binding #friendsPage.((vm:FriendsPageViewModel)DataContext).OpenProfileCmd}" CommandParameter="game" />
+                    <ui:MenuFlyoutItem Text="On the web" Command="{Binding #friendsPage.((vm:FriendsPageViewModel)DataContext).OpenProfileCmd}" CommandParameter="web" />
+                    <ui:MenuFlyoutItem Text="On HabboWidgets" Command="{Binding #friendsPage.((vm:FriendsPageViewModel)DataContext).OpenProfileCmd}" CommandParameter="habbowidgets" />
+                  </ui:MenuFlyoutSubItem>
                   <ui:MenuFlyoutSeparator />
                   <ui:MenuFlyoutItem
                     Text="{Binding NotifyMenuText}"

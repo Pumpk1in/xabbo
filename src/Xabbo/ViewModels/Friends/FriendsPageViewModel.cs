@@ -1,6 +1,7 @@
 ﻿using System.Collections.ObjectModel;
 using System.Reactive;
 using System.Reactive.Linq;
+using System.Web;
 using DynamicData;
 using DynamicData.Binding;
 using DynamicData.Kernel;
@@ -12,6 +13,7 @@ using HanumanInstitute.MvvmDialogs;
 using HanumanInstitute.MvvmDialogs.Avalonia.Fluent;
 
 using Splat;
+using Xabbo.Utility;
 using Xabbo.Interceptor;
 using Xabbo.Messages.Flash;
 using Xabbo.Core;
@@ -34,6 +36,7 @@ public sealed class FriendsPageViewModel : PageViewModel
     private readonly IUiContext _uiContext;
     private readonly IDialogService _dialogService;
     private readonly IInterceptor _interceptor;
+    private readonly ILauncherService _launcher;
     private readonly IFigureConverterService _figureConverter;
     private readonly FriendManager _friendManager;
     private readonly IConfigProvider<AppConfig> _config;
@@ -54,12 +57,16 @@ public sealed class FriendsPageViewModel : PageViewModel
     public ReactiveCommand<FriendViewModel, Unit> RemoveSingleFriendCmd { get; }
     public ReactiveCommand<Unit, Unit> RemoveFriendsCmd { get; }
     public ReactiveCommand<FriendViewModel, Unit> SendPrivateMessageCmd { get; }
+    public ReactiveCommand<string, Task> OpenProfileCmd { get; }
 
     public SelectionModel<FriendViewModel> Selection { get; } = new() { SingleSelect = false };
 
+    [Reactive] public FriendViewModel? ContextFriend { get; set; }
+
     public FriendsPageViewModel(
         IUiContext uiContext, IDialogService dialogService,
-        IInterceptor interceptor, IFigureConverterService figureConverter,
+        IInterceptor interceptor, ILauncherService launcher,
+        IFigureConverterService figureConverter,
         FriendManager friendManager,
         IConfigProvider<AppConfig> config,
         MessagesPageViewModel messagesPage)
@@ -67,6 +74,7 @@ public sealed class FriendsPageViewModel : PageViewModel
         _uiContext = uiContext;
         _dialogService = dialogService;
         _interceptor = interceptor;
+        _launcher = launcher;
         _figureConverter = figureConverter;
         _friendManager = friendManager;
         _config = config;
@@ -90,6 +98,7 @@ public sealed class FriendsPageViewModel : PageViewModel
         FollowFriendCmd = ReactiveCommand.Create<FriendViewModel>(FollowFriend);
         ToggleNotifyCmd = ReactiveCommand.Create<FriendViewModel>(ToggleNotify);
         SendPrivateMessageCmd = ReactiveCommand.Create<FriendViewModel>(SendPrivateMessage);
+        OpenProfileCmd = ReactiveCommand.Create<string, Task>(OpenProfile);
         RemoveSingleFriendCmd = ReactiveCommand.CreateFromTask<FriendViewModel>(RemoveSingleFriendAsync);
         RemoveFriendsCmd = ReactiveCommand.CreateFromTask(
             RemoveSelectedFriendsAsync,
@@ -221,6 +230,37 @@ public sealed class FriendsPageViewModel : PageViewModel
     {
         _messagesPage.OpenConversation(friend.Id, friend.Name, friend.ModernFigure ?? friend.Figure);
         Locator.Current.GetService<MainViewModel>()!.SelectedPage = _messagesPage;
+    }
+
+    private async Task OpenProfile(string type)
+    {
+        var friend = ContextFriend;
+        if (friend is null) return;
+
+        switch (type)
+        {
+            case "game":
+                var profile = await _interceptor.RequestAsync(new GetProfileByNameMsg(friend.Name), block: false);
+                if (!profile.DisplayInClient)
+                {
+                    await _dialogService.ShowContentDialogAsync(
+                        _dialogService.CreateViewModel<MainViewModel>(),
+                        new ContentDialogSettings
+                        {
+                            Title = "Failed to open profile",
+                            Content = $"{friend.Name}'s profile is not visible.",
+                            PrimaryButtonText = "OK",
+                        }
+                    );
+                }
+                break;
+            case "web":
+                _launcher.Launch($"https://{_interceptor.Session.Hotel.WebHost}/profile/{HttpUtility.UrlEncode(friend.Name)}");
+                break;
+            case "habbowidgets":
+                _launcher.Launch($"https://www.habbowidgets.com/habinfo/{_interceptor.Session.Hotel.Domain}/{HttpUtility.UrlEncode(friend.Name)}");
+                break;
+        }
     }
 
     private void ToggleNotify(FriendViewModel vm)
