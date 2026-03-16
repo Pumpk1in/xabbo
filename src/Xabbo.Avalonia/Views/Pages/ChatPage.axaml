@@ -455,6 +455,7 @@
                     Classes.flyout-open="{Binding #MuteBtn.Flyout.IsOpen}">
                     <Button.Flyout>
                       <ui:FAMenuFlyout>
+                        <ui:MenuFlyoutItem Text="1 min" Command="{Binding #ChatPageRoot.((vm:ChatPageViewModel)DataContext).MuteUserByNameCmd}" CommandParameter="{Binding MuteParam1}" />
                         <ui:MenuFlyoutItem Text="2 mins" Command="{Binding #ChatPageRoot.((vm:ChatPageViewModel)DataContext).MuteUserByNameCmd}" CommandParameter="{Binding MuteParam2}" />
                         <ui:MenuFlyoutItem Text="5 mins" Command="{Binding #ChatPageRoot.((vm:ChatPageViewModel)DataContext).MuteUserByNameCmd}" CommandParameter="{Binding MuteParam5}" />
                         <ui:MenuFlyoutItem Text="10 mins" Command="{Binding #ChatPageRoot.((vm:ChatPageViewModel)DataContext).MuteUserByNameCmd}" CommandParameter="{Binding MuteParam10}" />

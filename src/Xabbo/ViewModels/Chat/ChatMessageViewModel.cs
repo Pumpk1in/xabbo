@@ -60,6 +60,7 @@ public class ChatMessageViewModel : ChatLogEntryViewModel
     }
 
     // Quick action parameters (Name, Duration/BanType)
+    public (string Name, int Minutes) MuteParam1 => (Name, 1);
     public (string Name, int Minutes) MuteParam2 => (Name, 2);
     public (string Name, int Minutes) MuteParam5 => (Name, 5);
     public (string Name, int Minutes) MuteParam10 => (Name, 10);

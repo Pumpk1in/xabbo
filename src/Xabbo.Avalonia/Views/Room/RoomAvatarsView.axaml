@@ -128,11 +128,13 @@
                 IsEnabled="{Binding MuteUsersCmd.CanExecute^}"
                 IconSource="{icm:SymbolIconSource Symbol=ChatOff}"
               >
+                <ui:MenuFlyoutItem Text="1 min" Command="{Binding MuteUsersCmd}" CommandParameter="1" />
                 <ui:MenuFlyoutItem Text="2 mins" Command="{Binding MuteUsersCmd}" CommandParameter="2" />
                 <ui:MenuFlyoutItem Text="5 mins" Command="{Binding MuteUsersCmd}" CommandParameter="5" />
                 <ui:MenuFlyoutItem Text="10 mins" Command="{Binding MuteUsersCmd}" CommandParameter="10" />
                 <ui:MenuFlyoutItem Text="15 mins" Command="{Binding MuteUsersCmd}" CommandParameter="15" />
                 <ui:MenuFlyoutItem Text="30 mins" Command="{Binding MuteUsersCmd}" CommandParameter="30" />
+                <ui:MenuFlyoutSeparator />
                 <ui:MenuFlyoutItem Text="1 hour" Command="{Binding MuteUsersCmd}" CommandParameter="60" />
                 <ui:MenuFlyoutItem Text="6 hours" Command="{Binding MuteUsersCmd}" CommandParameter="360" />
                 <ui:MenuFlyoutItem Text="12 hours" Command="{Binding MuteUsersCmd}" CommandParameter="720" />
