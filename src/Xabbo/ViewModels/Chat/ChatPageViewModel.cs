@@ -563,6 +563,7 @@ public class ChatPageViewModel : PageViewModel
                 var recipient = WhisperRecipient?.Trim();
                 if (string.IsNullOrEmpty(recipient)) return;
                 _ext.Send(new WhisperMsg(recipient, text, Settings.Chat.BubbleStyle));
+                _lastSentWhisperRecipient = recipient;
                 RecordWhisperRecipient(recipient);
                 if (_roomManager.Room?.TryGetUserByName(recipient, out _) != true)
                     _xabbot.ShowMessage($"'{recipient}' is not in this room. Your whisper was sent but won't be seen.");
