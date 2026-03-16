@@ -169,7 +169,8 @@ public sealed class MessagesPageViewModel : PageViewModel
                     {
                         FriendId = r.FriendId,
                         FriendName = r.FriendName,
-                        FriendFigure = _friendManager.GetFriend(r.FriendId)?.Figure ?? "",
+                        // FriendFigure intentionnellement vide — OnFriendsLoaded() le remplit
+                        // une fois connecté, évitant des requêtes CDN prématurées au démarrage
                     };
                     _cache.AddOrUpdate(conv);
                 }
