@@ -413,7 +413,7 @@
                 Grid.Column="1"
                 Margin="0,-10,0,-10"
                 FigureString="{Binding FigureString}"
-                UserName="{Binding UserName}"
+                UserName="{Binding Name}"
                 HeadOnly="true"
                 ClipToBounds="false"
               />
