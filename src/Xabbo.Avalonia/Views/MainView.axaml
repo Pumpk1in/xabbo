@@ -29,6 +29,9 @@
       <DataTemplate DataType="vm:FriendsPageViewModel">
         <v:FriendsPage />
       </DataTemplate>
+      <DataTemplate DataType="vm:MessagesPageViewModel">
+        <v:MessagesPage />
+      </DataTemplate>
       <DataTemplate DataType="vm:WardrobePageViewModel">
         <v:WardrobePageView />
       </DataTemplate>

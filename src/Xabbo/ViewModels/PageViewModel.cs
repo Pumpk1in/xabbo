@@ -6,4 +6,5 @@ public abstract class PageViewModel : ViewModelBase
 {
     public abstract string Header { get; }
     public abstract IconSource? Icon { get; }
+    public virtual int BadgeCount => 0;
 }

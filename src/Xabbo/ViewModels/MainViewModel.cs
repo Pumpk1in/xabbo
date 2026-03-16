@@ -40,6 +40,7 @@ public class MainViewModel : ViewModelBase
         WardrobePageViewModel wardrobe,
         InventoryPageViewModel inventory,
         FriendsPageViewModel friends,
+        MessagesPageViewModel messages,
         ChatPageViewModel chat,
         RoomPageViewModel room,
         GameDataPageViewModel gameData,
@@ -48,11 +49,14 @@ public class MainViewModel : ViewModelBase
         ILauncherService launcher)
     {
         _config = config;
-        Pages = [general, wardrobe, inventory, friends, chat, room, gameData];
+        Pages = [general, wardrobe, inventory, friends, messages, chat, room, gameData];
         FooterPages = [info, settings];
         SelectedPage = general;
 
         _launcher = launcher;
+
+        this.WhenAnyValue(x => x.SelectedPage)
+            .Subscribe(page => messages.IsActive = ReferenceEquals(page, messages));
 
         ReportErrorCmd = ReactiveCommand.Create(ReportError);
     }

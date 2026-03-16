@@ -59,6 +59,13 @@
               <Grid.ContextFlyout>
                 <ui:FAMenuFlyout>
                   <ui:MenuFlyoutItem
+                    Text="Send private message"
+                    IconSource="{icm:SymbolIconSource Symbol=ChatMultiple}"
+                    Command="{Binding #friendsPage.((vm:FriendsPageViewModel)DataContext).SendPrivateMessageCmd}"
+                    CommandParameter="{Binding}"
+                  />
+                  <ui:MenuFlyoutSeparator />
+                  <ui:MenuFlyoutItem
                     Text="{Binding NotifyMenuText}"
                     IconSource="{icm:SymbolIconSource Symbol=Alert}"
                     Command="{Binding #friendsPage.((vm:FriendsPageViewModel)DataContext).ToggleNotifyCmd}"

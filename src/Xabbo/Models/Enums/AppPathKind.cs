@@ -6,5 +6,6 @@ public enum AppPathKind
     Wardrobe,
     RoomPasswords,
     ChatHistoryDb,
+    PrivateMessagesDb,
     DeferredBans,
 }

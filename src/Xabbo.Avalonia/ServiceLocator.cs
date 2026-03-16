@@ -120,6 +120,7 @@ public static class ViewModelLocator
         Splatr.RegisterLazySingleton<IPlacementFactory, PlacementFactory>();
         Splatr.RegisterLazySingleton<IProfanityFilterService, ProfanityFilterService>();
         Splatr.RegisterLazySingleton<IChatHistoryService, ChatHistoryService>();
+        Splatr.RegisterLazySingleton<IPrivateMessageHistoryService, PrivateMessageHistoryService>();
 
         // Xabbo core components
         Splatr.RegisterLazySingleton<ProfileManager>();
@@ -204,6 +205,7 @@ public static class ViewModelLocator
         Splatr.RegisterLazySingleton<ProfilePageViewModel>();
         Splatr.RegisterLazySingleton<WardrobePageViewModel>();
         Splatr.RegisterLazySingleton<FriendsPageViewModel>();
+        Splatr.RegisterLazySingleton<MessagesPageViewModel>();
         Splatr.RegisterLazySingleton<InventoryPageViewModel>();
         Splatr.RegisterLazySingleton<RoomPageViewModel>();
         Splatr.RegisterLazySingleton<NavigatorPageViewModel>();

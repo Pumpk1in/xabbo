@@ -37,6 +37,7 @@ public sealed class FriendsPageViewModel : PageViewModel
     private readonly IFigureConverterService _figureConverter;
     private readonly FriendManager _friendManager;
     private readonly IConfigProvider<AppConfig> _config;
+    private readonly MessagesPageViewModel _messagesPage;
     private readonly SourceCache<FriendViewModel, Id> _cache = new(key => key.Id);
 
     private FriendsConfig FriendsConfig => _config.Value.Friends;
@@ -52,6 +53,7 @@ public sealed class FriendsPageViewModel : PageViewModel
     public ReactiveCommand<FriendViewModel, Unit> ToggleNotifyCmd { get; }
     public ReactiveCommand<FriendViewModel, Unit> RemoveSingleFriendCmd { get; }
     public ReactiveCommand<Unit, Unit> RemoveFriendsCmd { get; }
+    public ReactiveCommand<FriendViewModel, Unit> SendPrivateMessageCmd { get; }
 
     public SelectionModel<FriendViewModel> Selection { get; } = new() { SingleSelect = false };
 
@@ -59,7 +61,8 @@ public sealed class FriendsPageViewModel : PageViewModel
         IUiContext uiContext, IDialogService dialogService,
         IInterceptor interceptor, IFigureConverterService figureConverter,
         FriendManager friendManager,
-        IConfigProvider<AppConfig> config)
+        IConfigProvider<AppConfig> config,
+        MessagesPageViewModel messagesPage)
     {
         _uiContext = uiContext;
         _dialogService = dialogService;
@@ -67,6 +70,7 @@ public sealed class FriendsPageViewModel : PageViewModel
         _figureConverter = figureConverter;
         _friendManager = friendManager;
         _config = config;
+        _messagesPage = messagesPage;
 
         _figureConverter.Available += OnFigureConverterAvailable;
 
@@ -85,6 +89,7 @@ public sealed class FriendsPageViewModel : PageViewModel
 
         FollowFriendCmd = ReactiveCommand.Create<FriendViewModel>(FollowFriend);
         ToggleNotifyCmd = ReactiveCommand.Create<FriendViewModel>(ToggleNotify);
+        SendPrivateMessageCmd = ReactiveCommand.Create<FriendViewModel>(SendPrivateMessage);
         RemoveSingleFriendCmd = ReactiveCommand.CreateFromTask<FriendViewModel>(RemoveSingleFriendAsync);
         RemoveFriendsCmd = ReactiveCommand.CreateFromTask(
             RemoveSelectedFriendsAsync,
@@ -210,6 +215,12 @@ public sealed class FriendsPageViewModel : PageViewModel
     private void FollowFriend(FriendViewModel friend)
     {
         _interceptor.Send(Out.FollowFriend, friend.Id);
+    }
+
+    private void SendPrivateMessage(FriendViewModel friend)
+    {
+        _messagesPage.OpenConversation(friend.Id, friend.Name, friend.ModernFigure ?? friend.Figure);
+        Locator.Current.GetService<MainViewModel>()!.SelectedPage = _messagesPage;
     }
 
     private void ToggleNotify(FriendViewModel vm)

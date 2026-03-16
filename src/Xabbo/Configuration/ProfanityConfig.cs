@@ -38,7 +38,7 @@ public sealed class ProfanityConfig : ReactiveObject
         "chier", "chieur", "chieurs", "chiennasse", "chinetoc", "chinetoque", "chintok", "chleuh", "chnoque",
         "coche", "con", "conard", "conasse", "conchier", "connard", "connarde", "connasse", "conne",
         "couille", "couilles", "couillon", "couillonner", "counifle", "courtaud",
-        "cretin", "crétin", "crevard", "crevure", "cricri", "crotte", "crotté", "crouillat", "crouille", "croûton", "cul",
+        "cretin", "crétin", "crevard", "crevure", "crotte", "crotté", "crouillat", "crouille", "croûton", "cul",
         "debile", "débile", "deguelasse", "déguelasse", "demerder", "démerder", "drouille",
         "ducon", "duconnot", "dugenoux", "dugland", "duschnock",
         "emmanche", "emmanché", "emmerder", "emmerdeur", "emmerdeuse",

@@ -1,0 +1,201 @@
+<UserControl
+  xmlns="https://github.com/avaloniaui"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+  xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+  xmlns:ui="using:FluentAvalonia.UI.Controls"
+  xmlns:ic="using:FluentIcons.Avalonia.Fluent"
+  xmlns:icm="using:FluentIcons.Avalonia.Fluent.MarkupExtensions"
+  xmlns:img="using:AsyncImageLoader"
+  xmlns:v="using:Xabbo.Avalonia.Views"
+  xmlns:vm="using:Xabbo.ViewModels"
+  xmlns:controls="using:Xabbo.Avalonia.Controls"
+  xmlns:behaviors="using:Xabbo.Avalonia.Behaviors"
+  x:DataType="vm:MessagesPageViewModel"
+  mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+  x:Class="Xabbo.Avalonia.Views.MessagesPage"
+  x:Name="messagesPage"
+>
+  <Grid ColumnDefinitions="220,*">
+
+    <!-- Left panel: conversation list -->
+    <Border
+      Grid.Column="0"
+      BorderThickness="0,0,1,0"
+      BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+    >
+      <ListBox
+        ItemsSource="{Binding Conversations}"
+        SelectedItem="{Binding SelectedConversation}"
+        Padding="2"
+      >
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="vm:ConversationViewModel">
+            <Grid ColumnDefinitions="Auto,*,Auto" Margin="2,2"
+              Background="Transparent"
+            >
+              <Grid.ContextFlyout>
+                <ui:FAMenuFlyout>
+                  <ui:MenuFlyoutItem
+                    Text="Hide conversation"
+                    IconSource="{icm:SymbolIconSource Symbol=EyeOff}"
+                    Command="{Binding #messagesPage.((vm:MessagesPageViewModel)DataContext).HideConversationCmd}"
+                    CommandParameter="{Binding}"
+                  />
+                  <ui:MenuFlyoutItem
+                    Text="Delete conversation"
+                    IconSource="{icm:SymbolIconSource Symbol=Delete}"
+                    Command="{Binding #messagesPage.((vm:MessagesPageViewModel)DataContext).DeleteConversationCmd}"
+                    CommandParameter="{Binding}"
+                  />
+                </ui:FAMenuFlyout>
+              </Grid.ContextFlyout>
+              <Grid
+                Margin="-2,-4,6,-4"
+                Width="46" Height="54"
+              >
+                <controls:AvatarImage
+                  HeadOnly="true"
+                  FigureString="{Binding FriendFigure}"
+                  UserName="{Binding FriendName}"
+                />
+              </Grid>
+              <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                <TextBlock
+                  FontWeight="Bold"
+                  Classes="privacy"
+                  Text="{Binding FriendName}"
+                />
+                <TextBlock
+                  Text="{Binding LastMessage.Content}"
+                  Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                  TextTrimming="CharacterEllipsis"
+                  MaxWidth="140"
+                  FontSize="11"
+                  IsVisible="{Binding LastMessage, Converter={x:Static ObjectConverters.IsNotNull}}"
+                />
+              </StackPanel>
+              <Border
+                Grid.Column="2"
+                VerticalAlignment="Center"
+                Margin="4,0,-8,0"
+                Background="{DynamicResource SystemAccentColor}"
+                CornerRadius="10"
+                Padding="5,2"
+                IsVisible="{Binding UnreadCount, Converter={x:Static ObjectConverters.IsNotNull}}"
+              >
+                <TextBlock
+                  Text="{Binding UnreadCount}"
+                  FontSize="11"
+                  FontWeight="Bold"
+                  Foreground="White"
+                />
+              </Border>
+            </Grid>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+    </Border>
+
+    <!-- Right panel: message thread + reply -->
+    <Grid
+      Grid.Column="1"
+      RowDefinitions="*,Auto"
+    >
+      <!-- Placeholder when no conversation selected -->
+      <TextBlock
+        Grid.Row="0"
+        Text="Select a conversation"
+        HorizontalAlignment="Center"
+        VerticalAlignment="Center"
+        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+        IsVisible="{Binding SelectedConversation, Converter={x:Static ObjectConverters.IsNull}}"
+      />
+
+      <!-- Message list -->
+      <ListBox
+        Grid.Row="0"
+        Padding="10,8"
+        ItemsSource="{Binding SelectedConversation.Messages}"
+        IsVisible="{Binding SelectedConversation, Converter={x:Static ObjectConverters.IsNotNull}}"
+        ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+        Name="MessagesList"
+      >
+        <Interaction.Behaviors>
+          <behaviors:AutoScrollBehavior />
+        </Interaction.Behaviors>
+        <ListBox.ItemContainerTheme>
+          <ControlTheme TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+            <Setter Property="Padding" Value="6,4" />
+            <Setter Property="Margin" Value="0,1" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Background" Value="{DynamicResource SolidBackgroundFillColorBase}" />
+          </ControlTheme>
+        </ListBox.ItemContainerTheme>
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="vm:PrivateMessageViewModel">
+            <StackPanel Spacing="1">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <TextBlock
+                  Text="{Binding SenderName}"
+                  FontWeight="SemiBold"
+                  FontSize="11"
+                  Foreground="#AA88FF"
+                  Classes="privacy"
+                  IsVisible="{Binding !IsFromMe}"
+                />
+                <TextBlock
+                  Text="{Binding SenderName}"
+                  FontWeight="SemiBold"
+                  FontSize="11"
+                  Foreground="White"
+                  Classes="privacy"
+                  IsVisible="{Binding IsFromMe}"
+                />
+                <TextBlock
+                  Text="{Binding Timestamp, StringFormat=\{0:HH:mm\}}"
+                  FontSize="10"
+                  Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                  VerticalAlignment="Bottom"
+                />
+              </StackPanel>
+              <TextBlock
+                Text="{Binding Content}"
+                TextWrapping="Wrap"
+              />
+            </StackPanel>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+
+      <!-- Reply bar -->
+      <Grid
+        Grid.Row="1"
+        ColumnDefinitions="*,Auto"
+        Margin="10,6,10,10"
+        IsVisible="{Binding SelectedConversation, Converter={x:Static ObjectConverters.IsNotNull}}"
+      >
+        <TextBox
+          Grid.Column="0"
+          Watermark="Write a message..."
+          Text="{Binding ReplyText}"
+          AcceptsReturn="False"
+        >
+          <TextBox.KeyBindings>
+            <KeyBinding Gesture="Return" Command="{Binding SendReplyCmd}" />
+          </TextBox.KeyBindings>
+        </TextBox>
+        <Button
+          Grid.Column="1"
+          Margin="6,0,0,0"
+          Command="{Binding SendReplyCmd}"
+          VerticalAlignment="Center"
+        >
+          <ic:SymbolIcon Symbol="Send" />
+        </Button>
+      </Grid>
+    </Grid>
+
+  </Grid>
+</UserControl>
