@@ -155,7 +155,7 @@ public class RoomBansViewModel : ViewModelBase
             HasLoaded = false;
             IsLoading = true;
 
-            var users = await _ext.RequestAsync(new GetBannedUsersMsg(currentRoomId), timeout: 3000);
+            var users = await _ext.RequestAsync(new GetBannedUsersMsg(currentRoomId), timeout: 10000);
             _banCache.Clear();
 
             Log.LogInformation("Loaded {Count} bans.", users.Length);

@@ -217,6 +217,11 @@
       <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
 
+    <!-- Friend online notification: violet background -->
+    <Style Selector="NotificationCard.information">
+      <Setter Property="Background" Value="#9b8aff" />
+    </Style>
+
     <!-- AdvancedImage -->
     <Style Selector="img|AdvancedImage.itemicon">
       <Setter Property="Width" Value="32" />

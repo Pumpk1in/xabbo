@@ -24,6 +24,7 @@ public sealed class ModerationCommands(RoomManager roomManager, IAppPathProvider
     private readonly ConcurrentDictionary<string, BanDuration> _banList = new(StringComparer.OrdinalIgnoreCase);
     private DeferredModerationData _deferredData = new();
     private ChatPageViewModel? _chatPage;
+    private CancellationTokenSource? _roomEntryCts;
 
     private void NotifyChatLog(string userName, string action)
     {
@@ -161,12 +162,41 @@ public sealed class ModerationCommands(RoomManager roomManager, IAppPathProvider
             foreach (var (userName, minutes) in roomMutes)
                 _muteList[userName] = minutes;
         }
+
+        // Schedule a silent ban list check to clean up deferred bans already applied
+        if (_deferredData.Bans.ContainsKey(roomId))
+        {
+            var cts = new CancellationTokenSource();
+            Interlocked.Exchange(ref _roomEntryCts, cts)?.Cancel();
+            _ = CheckDeferredBansAsync(roomId, cts.Token);
+        }
+        else
+        {
+            Interlocked.Exchange(ref _roomEntryCts, null)?.Cancel();
+        }
+    }
+
+    private async Task CheckDeferredBansAsync(long roomId, CancellationToken ct)
+    {
+        try
+        {
+            await Task.Delay(5000, ct);
+
+            if (ct.IsCancellationRequested) return;
+            if (!_roomManager.CanBan) return;
+            if (_roomManager.Room is not { Id: var currentRoomId } || (long)currentRoomId != roomId) return;
+
+            var users = await Ext.RequestAsync(new GetBannedUsersMsg(roomId), timeout: 10000, cancellationToken: ct);
+            CleanupDeferredBans(users.Select(u => u.Name), roomId);
+        }
+        catch { }
     }
 
     private void RoomManager_Left()
     {
         _muteList.Clear();
         _banList.Clear();
+        Interlocked.Exchange(ref _roomEntryCts, null)?.Cancel();
     }
 
     private void OnAvatarsAdded(AvatarsEventArgs e)
