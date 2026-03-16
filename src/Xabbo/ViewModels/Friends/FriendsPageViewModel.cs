@@ -84,6 +84,7 @@ public sealed class FriendsPageViewModel : PageViewModel
 
         _cache
             .Connect()
+            .AutoRefresh(x => x.IsOnline)
             .Filter(
                 this.WhenAnyValue(
                     x => x.FilterText,

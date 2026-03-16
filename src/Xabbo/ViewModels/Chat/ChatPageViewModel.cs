@@ -230,6 +230,7 @@ public class ChatPageViewModel : PageViewModel
         _roomManager.AvatarRemoved += OnAvatarRemoved;
         _roomManager.AvatarChat += RoomManager_AvatarChat;
         _roomManager.AvatarUpdated += RoomManager_AvatarUpdated;
+        _ext.Intercept<WhisperMsg>(msg => _lastSentWhisperRecipient = msg.Recipient);
         Observable
             .FromEvent(
                 h => _profanityFilter.PatternsChanged += h,
@@ -561,7 +562,6 @@ public class ChatPageViewModel : PageViewModel
             case ChatType.Whisper:
                 var recipient = WhisperRecipient?.Trim();
                 if (string.IsNullOrEmpty(recipient)) return;
-                _lastSentWhisperRecipient = recipient;
                 _ext.Send(new WhisperMsg(recipient, text, Settings.Chat.BubbleStyle));
                 RecordWhisperRecipient(recipient);
                 if (_roomManager.Room?.TryGetUserByName(recipient, out _) != true)
