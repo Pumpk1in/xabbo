@@ -28,8 +28,12 @@ public sealed class XabboImageLoader(HttpClient httpClient, bool disposeHttpClie
         Instance = new XabboImageLoader(client, false);
     }
 
+    public string WebHost { get; set; } = "www.habbo.com";
+
     public bool TryGetBitmap(string url, out Bitmap? bitmap)
         => _syncBitmapCache.TryGetValue(url, out bitmap);
+
+    public void ClearFailureCache() => _failureCache.Clear();
 
     protected override async Task<Bitmap?> LoadAsync(string url)
     {
@@ -58,7 +62,7 @@ public sealed class XabboImageLoader(HttpClient httpClient, bool disposeHttpClie
                 return cached;
 
             if (_failureCache.TryGetValue(url, out DateTime failureTime) &&
-                (DateTime.Now - failureTime).TotalMinutes < 5)
+                (DateTime.Now - failureTime).TotalSeconds < 30)
             {
                 return null;
             }

@@ -93,7 +93,8 @@ public class AvatarImage : TemplatedControl
                 figure: FigureString,
                 direction: Direction,
                 headOnly: HeadOnly,
-                name: UserName
+                name: UserName,
+                webHost: XabboImageLoader.Instance.WebHost
             );
 
             if (url is not null && XabboImageLoader.Instance.TryGetBitmap(url, out var cached))

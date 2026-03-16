@@ -5,7 +5,8 @@ namespace Xabbo.Utility;
 public static class UrlHelper
 {
     public static string? AvatarImageUrl(string? name = null, string? figure = null,
-        int direction = 2, int? headDirection = null, bool headOnly = false)
+        int direction = 2, int? headDirection = null, bool headOnly = false,
+        string webHost = "www.habbo.com")
     {
         headDirection ??= direction;
 
@@ -15,11 +16,14 @@ public static class UrlHelper
         if (headOnly)
             query.Add("headonly", "1");
         if (string.IsNullOrWhiteSpace(figure))
+        {
+            if (string.IsNullOrWhiteSpace(name)) return null;
             query.Add("user", name);
+        }
         else
             query.Add("figure", figure);
 
-        return $"https://habbo.com/habbo-imaging/avatarimage?{query}";
+        return $"https://{webHost}/habbo-imaging/avatarimage?{query}";
     }
 
     public static string FurniIconUrl(string identifier, int revision)

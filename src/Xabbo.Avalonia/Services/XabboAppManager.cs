@@ -298,6 +298,9 @@ public sealed class XabboAppManager : IApplicationManager
         _currentDisconnectReason = DisconnectReason.Unknown;
         _extension.Intercept<DisconnectReasonMsg>(HandleDisconnectReason);
 
+        XabboImageLoader.Instance.WebHost = e.Session.Hotel.WebHost;
+        XabboImageLoader.Instance.ClearFailureCache();
+
         _uiContext.Invoke(() =>
         {
             _application.Resources["IsConnecting"] = false;
