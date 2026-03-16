@@ -66,6 +66,7 @@
                 <controls:AvatarImage
                   HeadOnly="true"
                   FigureString="{Binding FriendFigure}"
+                  UserName="{Binding FriendName}"
                 />
               </Grid>
               <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
