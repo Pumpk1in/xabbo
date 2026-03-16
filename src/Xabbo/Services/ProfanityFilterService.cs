@@ -219,6 +219,23 @@ public partial class ProfanityFilterService : IProfanityFilterService
         return matches;
     }
 
+    public void SetCustomWords(IReadOnlyList<string> words)
+    {
+        // Suppress per-item notifications during batch update
+        if (_subscribedCollection != null)
+            _subscribedCollection.CollectionChanged -= OnCustomWordsChanged;
+
+        Config.CustomWords.Clear();
+        foreach (var word in words)
+            Config.CustomWords.Add(word);
+
+        // Re-subscribe and rebuild once
+        if (_subscribedCollection != null)
+            _subscribedCollection.CollectionChanged += OnCustomWordsChanged;
+
+        RebuildPatterns();
+    }
+
     public void AddWord(string word)
     {
         if (string.IsNullOrWhiteSpace(word))

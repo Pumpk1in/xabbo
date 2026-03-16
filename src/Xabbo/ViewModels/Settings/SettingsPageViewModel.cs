@@ -19,6 +19,7 @@ public sealed class SettingsPageViewModel : PageViewModel
 
     private readonly IConfigProvider<AppConfig> _config;
     private readonly IChatHistoryService _chatHistory;
+    private readonly IProfanityFilterService _profanityFilter;
     public AppConfig Config => _config.Value;
 
     public static IReadOnlyList<ChatBubbleOption> NormalBubbles { get; } = ChatBubbleOption.NormalBubbles;
@@ -32,10 +33,14 @@ public sealed class SettingsPageViewModel : PageViewModel
     public ReactiveCommand<Unit, Unit> ApplyCustomWordsCmd { get; }
     public ReactiveCommand<Unit, Unit> ClearHistoryCmd { get; }
 
-    public SettingsPageViewModel(IConfigProvider<AppConfig> config, IChatHistoryService chatHistory)
+    public SettingsPageViewModel(
+        IConfigProvider<AppConfig> config,
+        IChatHistoryService chatHistory,
+        IProfanityFilterService profanityFilter)
     {
         _config = config;
         _chatHistory = chatHistory;
+        _profanityFilter = profanityFilter;
 
         // Initialize text from current custom words
         RefreshCustomWordsText();
@@ -62,8 +67,8 @@ public sealed class SettingsPageViewModel : PageViewModel
             .WhereNotNull()
             .Subscribe(b => { SelectedNormalBubble = null; Config.Chat.BubbleStyle = b.Id; });
 
-        // Initialize history count
-        HistoryEntryCount = _chatHistory.GetEntryCount();
+        // Initialize history count (async to avoid blocking UI thread)
+        _ = RefreshHistoryCountAsync();
 
         ApplyCustomWordsCmd = ReactiveCommand.Create(ApplyCustomWords);
         ClearHistoryCmd = ReactiveCommand.Create(ClearHistory);
@@ -84,9 +89,15 @@ public sealed class SettingsPageViewModel : PageViewModel
         HistoryEntryCount = 0;
     }
 
-    public void RefreshHistoryCount()
+    public async void RefreshHistoryCount()
     {
-        HistoryEntryCount = _chatHistory.GetEntryCount();
+        await RefreshHistoryCountAsync();
+    }
+
+    private async Task RefreshHistoryCountAsync()
+    {
+        var count = await Task.Run(() => _chatHistory.GetEntryCount());
+        HistoryEntryCount = count;
     }
 
     private System.Collections.ObjectModel.ObservableCollection<string>? _subscribedCollection;
@@ -124,10 +135,7 @@ public sealed class SettingsPageViewModel : PageViewModel
             .Where(w => !string.IsNullOrWhiteSpace(w))
             .ToList();
 
-        Config.Profanity.CustomWords.Clear();
-        foreach (var word in words)
-        {
-            Config.Profanity.CustomWords.Add(word);
-        }
+        // Batch update: single rebuild instead of N+1 CollectionChanged events
+        _profanityFilter.SetCustomWords(words);
     }
 }

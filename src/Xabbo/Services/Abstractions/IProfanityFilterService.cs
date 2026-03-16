@@ -42,6 +42,11 @@ public interface IProfanityFilterService
     IReadOnlyList<string> GetCustomWords();
 
     /// <summary>
+    /// Replaces all custom words with the given list, rebuilding patterns only once.
+    /// </summary>
+    void SetCustomWords(IReadOnlyList<string> words);
+
+    /// <summary>
     /// Gets all configured words (default + custom).
     /// </summary>
     IReadOnlyList<string> GetAllWords();
