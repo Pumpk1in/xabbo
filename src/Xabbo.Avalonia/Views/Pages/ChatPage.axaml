@@ -366,6 +366,22 @@
           <Setter Property="Opacity" Value="1" />
           <Setter Property="IsHitTestVisible" Value="True" />
         </Style>
+        <Style Selector="ListBoxItem Border.moderation-overlay.no-mod">
+          <Setter Property="Opacity" Value="0" />
+          <Setter Property="IsHitTestVisible" Value="False" />
+        </Style>
+        <Style Selector="ListBoxItem:pointerover Border.moderation-overlay.no-mod">
+          <Setter Property="Opacity" Value="0" />
+          <Setter Property="IsHitTestVisible" Value="False" />
+        </Style>
+        <Style Selector="ic|SymbolIcon.profanity-icon">
+          <Setter Property="Opacity" Value="0" />
+          <Setter Property="IsHitTestVisible" Value="False" />
+        </Style>
+        <Style Selector="ic|SymbolIcon.profanity-icon.has-profanity">
+          <Setter Property="Opacity" Value="1" />
+          <Setter Property="IsHitTestVisible" Value="True" />
+        </Style>
         <Style Selector="Border.moderation-overlay Button:pointerover /template/ ContentPresenter">
           <Setter Property="Background" Value="#9b8aff" />
         </Style>
@@ -433,14 +449,14 @@
                   Classes.kick-open="{Binding #KickBtn.Flyout.IsOpen}"
                   Classes.mute-open="{Binding #MuteBtn.Flyout.IsOpen}"
                   Classes.ban-open="{Binding #BanBtn.Flyout.IsOpen}"
+                  Classes.no-mod="{Binding !ShowModerationButtons}"
                   HorizontalAlignment="Right"
                   VerticalAlignment="Center"
                   Background="{DynamicResource MenuFlyoutPresenterBackground}"
                   BorderBrush="{DynamicResource MenuFlyoutPresenterBorderBrush}"
                   BorderThickness="1"
                   CornerRadius="4"
-                  Padding="2"
-                  IsVisible="{Binding ShowModerationButtons}">
+                  Padding="2">
                 <StackPanel Orientation="Horizontal">
                   <Button x:Name="KickBtn" Padding="5" Margin="2,0,0,0" ToolTip.Tip="Kick user"
                     Classes.flyout-open="{Binding #KickBtn.Flyout.IsOpen}">
@@ -486,13 +502,14 @@
               </Panel>
               <ic:SymbolIcon
                 Grid.Column="3"
+                Classes="profanity-icon"
+                Classes.has-profanity="{Binding HasProfanity}"
                 Symbol="Warning"
                 IconVariant="Filled"
                 Foreground="#FFAA00"
                 FontSize="16"
                 VerticalAlignment="Center"
                 Margin="5,0,0,0"
-                IsVisible="{Binding HasProfanity}"
                 ToolTip.Tip="This message contains flagged words"
               />
             </Grid>
