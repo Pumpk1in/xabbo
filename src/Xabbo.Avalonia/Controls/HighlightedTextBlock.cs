@@ -5,6 +5,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
 using Avalonia.Media;
+using Avalonia.Threading;
 
 namespace Xabbo.Avalonia.Controls;
 
@@ -78,11 +79,39 @@ public class HighlightedTextBlock : TextBlock
 
     static HighlightedTextBlock()
     {
-        TextProperty.Changed.AddClassHandler<HighlightedTextBlock>((x, _) => x.UpdateInlines());
-        HighlightWordsProperty.Changed.AddClassHandler<HighlightedTextBlock>((x, _) => x.UpdateInlines());
-        HighlightForegroundProperty.Changed.AddClassHandler<HighlightedTextBlock>((x, _) => x.UpdateInlines());
-        IsWhisperProperty.Changed.AddClassHandler<HighlightedTextBlock>((x, _) => x.UpdateInlines());
-        WhisperRecipientProperty.Changed.AddClassHandler<HighlightedTextBlock>((x, _) => x.UpdateInlines());
+        TextProperty.Changed.AddClassHandler<HighlightedTextBlock>((x, _) => x.ScheduleUpdateInlines());
+        HighlightWordsProperty.Changed.AddClassHandler<HighlightedTextBlock>((x, _) => x.ScheduleUpdateInlines());
+        HighlightForegroundProperty.Changed.AddClassHandler<HighlightedTextBlock>((x, _) => x.ScheduleUpdateInlines());
+        IsWhisperProperty.Changed.AddClassHandler<HighlightedTextBlock>((x, _) => x.ScheduleUpdateInlines());
+        WhisperRecipientProperty.Changed.AddClassHandler<HighlightedTextBlock>((x, _) => x.ScheduleUpdateInlines());
+    }
+
+    private bool _updatePending;
+
+    private void ScheduleUpdateInlines()
+    {
+        if (_updatePending) return;
+        _updatePending = true;
+        Dispatcher.UIThread.Post(() =>
+        {
+            _updatePending = false;
+            UpdateInlines();
+        }, DispatcherPriority.Loaded);
+    }
+
+    // Inserts zero-width spaces every N chars in runs with no natural break points,
+    // preventing Avalonia's TextWrapping from entering an infinite layout loop.
+    private static string InjectWordBreaks(string text, int every = 10)
+    {
+        if (text.Length <= every || text.Contains(' ')) return text;
+        var sb = new System.Text.StringBuilder(text.Length + text.Length / every);
+        for (int i = 0; i < text.Length; i++)
+        {
+            sb.Append(text[i]);
+            if ((i + 1) % every == 0 && i + 1 < text.Length)
+                sb.Append('\u200B');
+        }
+        return sb.ToString();
     }
 
     private void UpdateInlines()
@@ -107,7 +136,7 @@ public class HighlightedTextBlock : TextBlock
 
             if (escapedWords.Count == 0)
             {
-                var run = new Run(text);
+                var run = new Run(InjectWordBreaks(text));
                 if (isWhisper) { run.FontStyle = FontStyle.Italic; run.Foreground = WhisperBrush; }
                 runs.Add(run);
             }
@@ -121,12 +150,12 @@ public class HighlightedTextBlock : TextBlock
                 {
                     if (match.Index > currentIndex)
                     {
-                        var run = new Run(text.Substring(currentIndex, match.Index - currentIndex));
+                        var run = new Run(InjectWordBreaks(text.Substring(currentIndex, match.Index - currentIndex)));
                         if (isWhisper) { run.FontStyle = FontStyle.Italic; run.Foreground = WhisperBrush; }
                         runs.Add(run);
                     }
 
-                    runs.Add(new Run(match.Value)
+                    runs.Add(new Run(InjectWordBreaks(match.Value))
                     {
                         Foreground = HighlightForeground,
                         FontWeight = FontWeight.SemiBold
@@ -137,7 +166,7 @@ public class HighlightedTextBlock : TextBlock
 
                 if (currentIndex < text.Length)
                 {
-                    var run = new Run(text.Substring(currentIndex));
+                    var run = new Run(InjectWordBreaks(text.Substring(currentIndex)));
                     if (isWhisper) { run.FontStyle = FontStyle.Italic; run.Foreground = WhisperBrush; }
                     runs.Add(run);
                 }

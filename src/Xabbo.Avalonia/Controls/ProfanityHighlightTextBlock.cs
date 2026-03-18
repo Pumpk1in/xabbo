@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
 using Avalonia.Media;
+using Avalonia.Threading;
 using Xabbo.ViewModels;
 
 namespace Xabbo.Avalonia.Controls;
@@ -77,11 +78,24 @@ public class ProfanityHighlightTextBlock : TextBlock
 
     static ProfanityHighlightTextBlock()
     {
-        SegmentsProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.UpdateInlines());
-        FallbackTextProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.UpdateInlines());
-        IsWhisperProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.UpdateInlines());
-        UsernameProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.UpdateInlines());
-        WhisperRecipientProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.UpdateInlines());
+        SegmentsProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.ScheduleUpdateInlines());
+        FallbackTextProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.ScheduleUpdateInlines());
+        IsWhisperProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.ScheduleUpdateInlines());
+        UsernameProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.ScheduleUpdateInlines());
+        WhisperRecipientProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.ScheduleUpdateInlines());
+    }
+
+    private bool _updatePending;
+
+    private void ScheduleUpdateInlines()
+    {
+        if (_updatePending) return;
+        _updatePending = true;
+        Dispatcher.UIThread.Post(() =>
+        {
+            _updatePending = false;
+            UpdateInlines();
+        }, DispatcherPriority.Loaded);
     }
 
     // Inserts zero-width spaces every N chars in runs with no natural break points,
