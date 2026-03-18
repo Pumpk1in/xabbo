@@ -87,6 +87,7 @@ public class HighlightedTextBlock : TextBlock
     }
 
     private bool _updatePending;
+    private (string? text, IReadOnlyList<string>? words, IBrush? brush, bool whisper, string? recipient) _lastState;
 
     private void ScheduleUpdateInlines()
     {
@@ -116,6 +117,10 @@ public class HighlightedTextBlock : TextBlock
 
     private void UpdateInlines()
     {
+        var state = (Text, HighlightWords, HighlightForeground, IsWhisper, WhisperRecipient);
+        if (state == _lastState) return;
+        _lastState = state;
+
         var runs = new List<Inline>();
 
         var text = Text;
@@ -173,9 +178,27 @@ public class HighlightedTextBlock : TextBlock
             }
         }
 
+        _measureDirty = true;
         Inlines?.Clear();
         if (runs.Count > 0)
             Inlines?.AddRange(runs);
+    }
+
+    // Cache measured size to prevent redundant text wrapping calculations
+    // across consecutive layout passes with the same available width.
+    private double _lastMeasureWidth = -1;
+    private Size _lastMeasureResult;
+    private bool _measureDirty = true;
+
+    protected override Size MeasureOverride(Size availableSize)
+    {
+        if (!_measureDirty && Math.Abs(availableSize.Width - _lastMeasureWidth) < 0.5)
+            return _lastMeasureResult;
+
+        _measureDirty = false;
+        _lastMeasureWidth = availableSize.Width;
+        _lastMeasureResult = base.MeasureOverride(availableSize);
+        return _lastMeasureResult;
     }
 
     protected override void OnInitialized()
