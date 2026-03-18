@@ -102,7 +102,7 @@
                 Background="{DynamicResource SystemAccentColor}"
                 CornerRadius="10"
                 Padding="5,2"
-                IsVisible="{Binding UnreadCount, Converter={x:Static ObjectConverters.IsNotNull}}"
+                IsVisible="{Binding UnreadCount, Converter={StaticResource GtConverter}, ConverterParameter=0}"
               >
                 <TextBlock
                   Text="{Binding UnreadCount}"
