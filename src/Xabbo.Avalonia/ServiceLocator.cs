@@ -82,7 +82,7 @@ public static class ViewModelLocator
     {
         Splatr.RegisterConstant(new GEarthOptions() with
         {
-            Name = "xabbo",
+            Name = "xabbo MOD-boost",
             Description = "enhanced habbo",
             Author = "b7 & Panda",
             Version = Assembly.GetEntryAssembly().GetVersionString(false)
