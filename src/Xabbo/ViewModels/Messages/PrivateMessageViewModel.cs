@@ -6,4 +6,5 @@ public sealed class PrivateMessageViewModel
     public string Content { get; init; } = "";
     public DateTimeOffset Timestamp { get; init; }
     public bool IsFromMe { get; init; }
+    public bool IsInvitation { get; init; }
 }

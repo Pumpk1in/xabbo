@@ -155,36 +155,58 @@
         </ListBox.ItemContainerTheme>
         <ListBox.ItemTemplate>
           <DataTemplate x:DataType="vm:PrivateMessageViewModel">
-            <StackPanel Spacing="1">
-              <StackPanel Orientation="Horizontal" Spacing="6">
+            <Border
+              BorderThickness="0"
+              BorderBrush="Transparent"
+              Padding="0"
+              Classes.invitation="{Binding IsInvitation}"
+            >
+              <Border.Styles>
+                <Style Selector="Border.invitation">
+                  <Setter Property="BorderThickness" Value="2,0,0,0" />
+                  <Setter Property="BorderBrush" Value="#AA88FF" />
+                  <Setter Property="Padding" Value="6,0,0,0" />
+                </Style>
+              </Border.Styles>
+              <StackPanel Spacing="1">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <TextBlock
+                    Text="{Binding SenderName}"
+                    FontWeight="SemiBold"
+                    FontSize="11"
+                    Foreground="#AA88FF"
+                    Classes="privacy"
+                    IsVisible="{Binding !IsFromMe}"
+                  />
+                  <TextBlock
+                    Text="{Binding SenderName}"
+                    FontWeight="SemiBold"
+                    FontSize="11"
+                    Foreground="White"
+                    Classes="privacy"
+                    IsVisible="{Binding IsFromMe}"
+                  />
+                  <TextBlock
+                    Text="{Binding Timestamp, StringFormat=\{0:HH:mm\}}"
+                    FontSize="10"
+                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                    VerticalAlignment="Bottom"
+                  />
+                  <TextBlock
+                    Text="INVITATION"
+                    FontSize="10"
+                    FontWeight="Bold"
+                    Foreground="#AA88FF"
+                    VerticalAlignment="Bottom"
+                    IsVisible="{Binding IsInvitation}"
+                  />
+                </StackPanel>
                 <TextBlock
-                  Text="{Binding SenderName}"
-                  FontWeight="SemiBold"
-                  FontSize="11"
-                  Foreground="#AA88FF"
-                  Classes="privacy"
-                  IsVisible="{Binding !IsFromMe}"
-                />
-                <TextBlock
-                  Text="{Binding SenderName}"
-                  FontWeight="SemiBold"
-                  FontSize="11"
-                  Foreground="White"
-                  Classes="privacy"
-                  IsVisible="{Binding IsFromMe}"
-                />
-                <TextBlock
-                  Text="{Binding Timestamp, StringFormat=\{0:HH:mm\}}"
-                  FontSize="10"
-                  Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                  VerticalAlignment="Bottom"
+                  Text="{Binding Content}"
+                  TextWrapping="Wrap"
                 />
               </StackPanel>
-              <TextBlock
-                Text="{Binding Content}"
-                TextWrapping="Wrap"
-              />
-            </StackPanel>
+            </Border>
           </DataTemplate>
         </ListBox.ItemTemplate>
       </ListBox>
@@ -192,12 +214,22 @@
       <!-- Reply bar -->
       <Grid
         Grid.Row="1"
-        ColumnDefinitions="*,Auto"
+        ColumnDefinitions="Auto,*,Auto"
         Margin="10,6,10,10"
         IsVisible="{Binding SelectedConversation, Converter={x:Static ObjectConverters.IsNotNull}}"
       >
-        <TextBox
+        <Button
           Grid.Column="0"
+          Margin="0,0,6,0"
+          Command="{Binding FollowFriendCmd}"
+          ToolTip.Tip="Follow friend"
+          Theme="{StaticResource TransparentButton}"
+          VerticalAlignment="Center"
+        >
+          <ic:SymbolIcon Symbol="DoorArrowLeft" Width="20" Height="20" />
+        </Button>
+        <TextBox
+          Grid.Column="1"
           Watermark="Write a message..."
           Text="{Binding ReplyText}"
           AcceptsReturn="False"
@@ -207,7 +239,7 @@
           </TextBox.KeyBindings>
         </TextBox>
         <Button
-          Grid.Column="1"
+          Grid.Column="2"
           Margin="6,0,0,0"
           Command="{Binding SendReplyCmd}"
           VerticalAlignment="Center"

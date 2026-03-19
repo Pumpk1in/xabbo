@@ -17,6 +17,7 @@ using Xabbo.Core.Events;
 using Xabbo.Core.Messages.Outgoing;
 using Xabbo.Interceptor;
 using Xabbo.Messages;
+using Xabbo.Messages.Flash;
 using Xabbo.Services.Abstractions;
 using Xabbo.Services;
 using Xabbo.Utility;
@@ -50,6 +51,7 @@ public sealed class MessagesPageViewModel : PageViewModel
     private bool _isSendingFromHere;
 
     public ReactiveCommand<Unit, Unit> SendReplyCmd { get; }
+    public ReactiveCommand<Unit, Unit> FollowFriendCmd { get; }
     public ReactiveCommand<ConversationViewModel, Unit> HideConversationCmd { get; }
     public ReactiveCommand<ConversationViewModel, Unit> DeleteConversationCmd { get; }
     public ReactiveCommand<string, Task> OpenProfileCmd { get; }
@@ -86,6 +88,11 @@ public sealed class MessagesPageViewModel : PageViewModel
             (conv, text) => conv is not null && !string.IsNullOrWhiteSpace(text));
 
         SendReplyCmd = ReactiveCommand.Create(SendReply, canSend);
+
+        var canFollow = this.WhenAnyValue(x => x.SelectedConversation)
+            .Select(conv => conv is not null);
+        FollowFriendCmd = ReactiveCommand.Create(FollowFriend, canFollow);
+
         HideConversationCmd = ReactiveCommand.Create<ConversationViewModel>(HideConversation);
         DeleteConversationCmd = ReactiveCommand.CreateFromTask<ConversationViewModel>(DeleteConversationAsync);
         OpenProfileCmd = ReactiveCommand.Create<string, Task>(OpenProfile);
@@ -118,6 +125,7 @@ public sealed class MessagesPageViewModel : PageViewModel
         _friendManager.Loaded += OnFriendsLoaded;
         _friendManager.FriendUpdated += OnFriendUpdated;
         _friendManager.MessageReceived += OnMessageReceived;
+        _friendManager.RoomInviteReceived += OnRoomInviteReceived;
         _interceptor.Intercept<SendConsoleMessageMsg>(OnSentConsoleMessage);
 
         _ = LoadHistoryAsync();
@@ -271,7 +279,7 @@ public sealed class MessagesPageViewModel : PageViewModel
                 vm.Messages.Add(msg);
             }
 
-            vm.LastMessageTime = timestamp;
+            UpdateLastMessageTime(vm, timestamp);
 
             if (!IsActive || !ReferenceEquals(SelectedConversation, vm))
             {
@@ -279,6 +287,48 @@ public sealed class MessagesPageViewModel : PageViewModel
                 TotalUnread++;
             }
         });
+    }
+
+    private void OnRoomInviteReceived(RoomInviteEventArgs e)
+    {
+        var timestamp = DateTimeOffset.Now;
+
+        _uiContext.Invoke(() =>
+        {
+            var vm = GetOrCreateConversation(e.Friend);
+            var msg = new PrivateMessageViewModel
+            {
+                SenderName = e.Friend.Name,
+                Content = e.Message,
+                Timestamp = timestamp,
+                IsFromMe = false,
+                IsInvitation = true,
+            };
+
+            if (vm.IsLoadingHistory)
+            {
+                vm.PendingMessages.Add(msg);
+            }
+            else
+            {
+                vm.Messages.Add(msg);
+            }
+
+            UpdateLastMessageTime(vm, timestamp);
+
+            if (!IsActive || !ReferenceEquals(SelectedConversation, vm))
+            {
+                vm.UnreadCount++;
+                TotalUnread++;
+            }
+        });
+    }
+
+    private void FollowFriend()
+    {
+        var conv = SelectedConversation;
+        if (conv is null) return;
+        _interceptor.Send(Out.FollowFriend, conv.FriendId);
     }
 
     private void OnSentConsoleMessage(SendConsoleMessageMsg msg)
@@ -313,7 +363,7 @@ public sealed class MessagesPageViewModel : PageViewModel
                 _history.Enqueue(friend.Id, friend.Name, myName, msg.Message, timestamp, isFromMe: true);
                 conv.Messages.Add(pm);
             }
-            conv.LastMessageTime = timestamp;
+            UpdateLastMessageTime(conv, timestamp);
 
             // Replied from game = conversation is read
             TotalUnread -= conv.UnreadCount;
@@ -417,8 +467,20 @@ public sealed class MessagesPageViewModel : PageViewModel
             Timestamp = timestamp,
             IsFromMe = true,
         });
-        conv.LastMessageTime = timestamp;
+        UpdateLastMessageTime(conv, timestamp);
 
         ReplyText = "";
+    }
+
+    /// <summary>
+    /// Updates LastMessageTime while preserving the selected conversation,
+    /// because DynamicData SortAndBind re-sorts on AutoRefresh which resets ListBox selection.
+    /// </summary>
+    private void UpdateLastMessageTime(ConversationViewModel conv, DateTimeOffset timestamp)
+    {
+        var selected = SelectedConversation;
+        conv.LastMessageTime = timestamp;
+        if (selected is not null && !ReferenceEquals(SelectedConversation, selected))
+            SelectedConversation = selected;
     }
 }
