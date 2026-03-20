@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
@@ -77,6 +78,22 @@ public class ProfanityHighlightTextBlock : TextBlock
     private static readonly IBrush ProfanityBrush = new SolidColorBrush(Color.Parse("#FF4444"));
     private static readonly IBrush WhisperBrush = new SolidColorBrush(Color.Parse("#a495ff"));
 
+    // DEBUG: layout loop diagnostics
+    private static readonly string _logPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "xabbo_layout_debug.log");
+    private static int _globalMeasureCount;
+    private static DateTime _lastResetTime = DateTime.UtcNow;
+
+    private static void Log(string msg)
+    {
+        try
+        {
+            var line = $"[{DateTime.Now:HH:mm:ss.fff}] {msg}";
+            File.AppendAllText(_logPath, line + Environment.NewLine);
+        }
+        catch { }
+    }
+
     static ProfanityHighlightTextBlock()
     {
         SegmentsProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.ScheduleUpdateInlines());
@@ -93,6 +110,7 @@ public class ProfanityHighlightTextBlock : TextBlock
     {
         if (_updatePending) return;
         _updatePending = true;
+        Log($"ScheduleUpdateInlines: posting for '{FallbackText?.Substring(0, Math.Min(FallbackText?.Length ?? 0, 30))}...'");
         Dispatcher.UIThread.Post(() =>
         {
             _updatePending = false;
@@ -118,8 +136,13 @@ public class ProfanityHighlightTextBlock : TextBlock
     private void UpdateInlines()
     {
         var state = (Segments, FallbackText, IsWhisper, Username, WhisperRecipient);
-        if (state == _lastState) return;
+        if (state == _lastState)
+        {
+            Log($"UpdateInlines: SKIPPED (state unchanged) for '{FallbackText?.Substring(0, Math.Min(FallbackText?.Length ?? 0, 30))}...'");
+            return;
+        }
         _lastState = state;
+        Log($"UpdateInlines: EXECUTING for '{FallbackText?.Substring(0, Math.Min(FallbackText?.Length ?? 0, 30))}...' whisper={IsWhisper}");
 
         var runs = new List<Inline>();
 
@@ -197,14 +220,40 @@ public class ProfanityHighlightTextBlock : TextBlock
     private Size _lastMeasureResult;
     private bool _measureDirty = true;
 
+    private int _instanceMeasureCount;
+    private string _instanceId = Guid.NewGuid().ToString("N")[..6];
+
     protected override Size MeasureOverride(Size availableSize)
     {
-        if (!_measureDirty && Math.Abs(availableSize.Width - _lastMeasureWidth) < 0.5)
-            return _lastMeasureResult;
+        _instanceMeasureCount++;
+        var now = DateTime.UtcNow;
+        // Reset global counter every second
+        if ((now - _lastResetTime).TotalSeconds > 1.0)
+        {
+            _globalMeasureCount = 0;
+            _lastResetTime = now;
+        }
+        _globalMeasureCount++;
 
+        var textPreview = FallbackText?.Substring(0, Math.Min(FallbackText?.Length ?? 0, 20)) ?? "(null)";
+
+        if (!_measureDirty && Math.Abs(availableSize.Width - _lastMeasureWidth) < 0.5)
+        {
+            if (_globalMeasureCount > 10)
+                Log($"MeasureOverride CACHED [{_instanceId}] #{_instanceMeasureCount} (global:{_globalMeasureCount}/s) w={availableSize.Width:F1} -> {_lastMeasureResult.Width:F1}x{_lastMeasureResult.Height:F1} '{textPreview}'");
+            return _lastMeasureResult;
+        }
+
+        var oldWidth = _lastMeasureWidth;
+        var oldResult = _lastMeasureResult;
         _measureDirty = false;
         _lastMeasureWidth = availableSize.Width;
         _lastMeasureResult = base.MeasureOverride(availableSize);
+
+        var heightChanged = Math.Abs(_lastMeasureResult.Height - oldResult.Height) > 0.5;
+        if (_globalMeasureCount > 5 || heightChanged)
+            Log($"MeasureOverride CALC  [{_instanceId}] #{_instanceMeasureCount} (global:{_globalMeasureCount}/s) w={availableSize.Width:F1} (was {oldWidth:F1}) -> {_lastMeasureResult.Width:F1}x{_lastMeasureResult.Height:F1} (was {oldResult.Height:F1}) heightChanged={heightChanged} dirty={_measureDirty} '{textPreview}'");
+
         return _lastMeasureResult;
     }
 
