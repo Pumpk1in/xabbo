@@ -23,6 +23,21 @@ public interface IPrivateMessageHistoryService
     /// Deletes all messages for a given friend from the database.
     /// </summary>
     Task DeleteConversationAsync(Id friendId);
+
+    /// <summary>
+    /// Marks a conversation as hidden. It will reappear when a new message arrives.
+    /// </summary>
+    void HideConversation(Id friendId);
+
+    /// <summary>
+    /// Marks a conversation as visible again.
+    /// </summary>
+    void UnhideConversation(Id friendId);
+
+    /// <summary>
+    /// Returns the set of hidden friend IDs.
+    /// </summary>
+    Task<HashSet<Id>> LoadHiddenConversationsAsync();
 }
 
 public sealed record PrivateMessageRecord(

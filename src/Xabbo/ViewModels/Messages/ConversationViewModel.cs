@@ -6,6 +6,8 @@ namespace Xabbo.ViewModels;
 
 public sealed class ConversationViewModel : ReactiveObject
 {
+    public const int MaxMessages = 150;
+
     public Id FriendId { get; init; }
 
     [Reactive] public string FriendName { get; set; } = "";
@@ -13,6 +15,7 @@ public sealed class ConversationViewModel : ReactiveObject
     [Reactive] public bool IsOnline { get; set; }
     [Reactive] public int UnreadCount { get; set; }
     [Reactive] public DateTimeOffset LastMessageTime { get; set; }
+    [Reactive] public bool HasRealMessages { get; set; }
 
     public ObservableCollection<PrivateMessageViewModel> Messages { get; } = [];
 
@@ -22,5 +25,21 @@ public sealed class ConversationViewModel : ReactiveObject
     /// True while history is being loaded from DB. New incoming messages are held in PendingMessages.
     /// </summary>
     public bool IsLoadingHistory { get; set; }
+
+    /// <summary>
+    /// True once conversation history has been fully loaded from DB.
+    /// </summary>
+    public bool IsHistoryLoaded { get; set; }
+
     public List<PrivateMessageViewModel> PendingMessages { get; } = [];
+
+    public void AddMessage(PrivateMessageViewModel msg)
+    {
+        Messages.Add(msg);
+        while (Messages.Count > MaxMessages)
+            Messages.RemoveAt(0);
+        if (!msg.IsInvitation)
+            HasRealMessages = true;
+        this.RaisePropertyChanged(nameof(LastMessage));
+    }
 }

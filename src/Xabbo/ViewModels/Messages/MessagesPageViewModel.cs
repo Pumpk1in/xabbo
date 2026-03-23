@@ -39,6 +39,7 @@ public sealed class MessagesPageViewModel : PageViewModel
     private readonly IPrivateMessageHistoryService _history;
 
     private readonly SourceCache<ConversationViewModel, Id> _cache = new(x => x.FriendId);
+    private HashSet<Id> _hiddenIds = [];
 
     private readonly ReadOnlyObservableCollection<ConversationViewModel> _conversations;
     public ReadOnlyObservableCollection<ConversationViewModel> Conversations => _conversations;
@@ -76,6 +77,8 @@ public sealed class MessagesPageViewModel : PageViewModel
         _cache
             .Connect()
             .AutoRefresh(x => x.LastMessageTime)
+            .AutoRefresh(x => x.HasRealMessages)
+            .Filter(x => x.HasRealMessages)
             .ObserveOn(RxApp.MainThreadScheduler)
             .SortAndBind(
                 out _conversations,
@@ -107,7 +110,10 @@ public sealed class MessagesPageViewModel : PageViewModel
         this.WhenAnyValue(x => x.SelectedConversation)
             .Subscribe(conv =>
             {
-                if (conv is null || !IsActive) return;
+                if (conv is null) return;
+                if (!conv.IsHistoryLoaded && !conv.IsLoadingHistory)
+                    _ = LoadConversationHistoryAsync(conv);
+                if (!IsActive) return;
                 TotalUnread -= conv.UnreadCount;
                 if (TotalUnread < 0) TotalUnread = 0;
                 conv.UnreadCount = 0;
@@ -128,7 +134,13 @@ public sealed class MessagesPageViewModel : PageViewModel
         _friendManager.RoomInviteReceived += OnRoomInviteReceived;
         _interceptor.Intercept<SendConsoleMessageMsg>(OnSentConsoleMessage);
 
-        _ = LoadHistoryAsync();
+        _ = InitAsync();
+    }
+
+    private async Task InitAsync()
+    {
+        _hiddenIds = await _history.LoadHiddenConversationsAsync();
+        await LoadHistoryAsync();
     }
 
     private void OnFriendUpdated(FriendUpdatedEventArgs e)
@@ -171,6 +183,9 @@ public sealed class MessagesPageViewModel : PageViewModel
         {
             foreach (var r in records)
             {
+                if (_hiddenIds.Contains(r.FriendId))
+                    continue;
+
                 // Crée ou récupère la conversation sans déclencher LoadConversationHistoryAsync
                 var lookup = _cache.Lookup(r.FriendId);
                 ConversationViewModel conv;
@@ -185,12 +200,10 @@ public sealed class MessagesPageViewModel : PageViewModel
                         FriendId = r.FriendId,
                         FriendName = r.FriendName,
                         IsOnline = _friendManager.GetFriend(r.FriendId)?.IsOnline ?? false,
-                        // FriendFigure intentionnellement vide — OnFriendsLoaded() le remplit
-                        // une fois connecté, évitant des requêtes CDN prématurées au démarrage
                     };
                     _cache.AddOrUpdate(conv);
                 }
-                conv.Messages.Add(new PrivateMessageViewModel
+                conv.AddMessage(new PrivateMessageViewModel
                 {
                     SenderName = r.SenderName,
                     Content = r.Content,
@@ -208,6 +221,9 @@ public sealed class MessagesPageViewModel : PageViewModel
         var lookup = _cache.Lookup(friendId);
         if (lookup.HasValue) return lookup.Value;
 
+        if (_hiddenIds.Remove(friendId))
+            _history.UnhideConversation(friendId);
+
         var friend = _friendManager.GetFriend(friendId);
         var vm = new ConversationViewModel
         {
@@ -215,7 +231,6 @@ public sealed class MessagesPageViewModel : PageViewModel
             FriendName = friendName,
             FriendFigure = friend?.Figure ?? "",
             IsOnline = friend?.IsOnline ?? false,
-            IsLoadingHistory = true,
         };
         _cache.AddOrUpdate(vm);
         _ = LoadConversationHistoryAsync(vm);
@@ -224,30 +239,32 @@ public sealed class MessagesPageViewModel : PageViewModel
 
     private async Task LoadConversationHistoryAsync(ConversationViewModel conv)
     {
+        conv.IsLoadingHistory = true;
         var records = await _history.LoadConversationAsync(conv.FriendId);
         _uiContext.Invoke(() =>
         {
             if (!_cache.Lookup(conv.FriendId).HasValue) return;
 
+            // Replace the preview message with full history
+            conv.Messages.Clear();
             foreach (var r in records)
             {
-                conv.Messages.Add(new PrivateMessageViewModel
+                conv.AddMessage(new PrivateMessageViewModel
                 {
                     SenderName = r.SenderName,
                     Content = r.Content,
                     Timestamp = r.Timestamp,
                     IsFromMe = r.IsFromMe,
                 });
-                if (r.Timestamp > conv.LastMessageTime)
-                    conv.LastMessageTime = r.Timestamp;
             }
 
-            // Flush les messages arrivés pendant le chargement — on les enqueue maintenant en DB
+            // Flush messages that arrived during loading
             conv.IsLoadingHistory = false;
+            conv.IsHistoryLoaded = true;
             foreach (var m in conv.PendingMessages)
             {
                 _history.Enqueue(conv.FriendId, conv.FriendName, m.SenderName, m.Content, m.Timestamp, m.IsFromMe);
-                conv.Messages.Add(m);
+                conv.AddMessage(m);
             }
             conv.PendingMessages.Clear();
         });
@@ -276,7 +293,7 @@ public sealed class MessagesPageViewModel : PageViewModel
             else
             {
                 _history.Enqueue(e.Friend.Id, e.Friend.Name, e.Friend.Name, e.Message.Content, timestamp, isFromMe: false);
-                vm.Messages.Add(msg);
+                vm.AddMessage(msg);
             }
 
             UpdateLastMessageTime(vm, timestamp);
@@ -311,7 +328,7 @@ public sealed class MessagesPageViewModel : PageViewModel
             }
             else
             {
-                vm.Messages.Add(msg);
+                vm.AddMessage(msg);
             }
 
             UpdateLastMessageTime(vm, timestamp);
@@ -361,7 +378,7 @@ public sealed class MessagesPageViewModel : PageViewModel
             else
             {
                 _history.Enqueue(friend.Id, friend.Name, myName, msg.Message, timestamp, isFromMe: true);
-                conv.Messages.Add(pm);
+                conv.AddMessage(pm);
             }
             UpdateLastMessageTime(conv, timestamp);
 
@@ -399,12 +416,20 @@ public sealed class MessagesPageViewModel : PageViewModel
             SelectedConversation = null;
         TotalUnread -= conv.UnreadCount;
         if (TotalUnread < 0) TotalUnread = 0;
+        _hiddenIds.Add(conv.FriendId);
+        _history.HideConversation(conv.FriendId);
         _cache.RemoveKey(conv.FriendId);
     }
 
     private async Task DeleteConversationAsync(ConversationViewModel conv)
     {
-        HideConversation(conv);
+        if (ReferenceEquals(SelectedConversation, conv))
+            SelectedConversation = null;
+        TotalUnread -= conv.UnreadCount;
+        if (TotalUnread < 0) TotalUnread = 0;
+        _hiddenIds.Remove(conv.FriendId);
+        _history.UnhideConversation(conv.FriendId);
+        _cache.RemoveKey(conv.FriendId);
         await _history.DeleteConversationAsync(conv.FriendId);
     }
 
@@ -460,7 +485,7 @@ public sealed class MessagesPageViewModel : PageViewModel
 
         _history.Enqueue(conv.FriendId, conv.FriendName, myName, text, timestamp, isFromMe: true);
 
-        conv.Messages.Add(new PrivateMessageViewModel
+        conv.AddMessage(new PrivateMessageViewModel
         {
             SenderName = myName,
             Content = text,

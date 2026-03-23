@@ -56,6 +56,10 @@ public sealed class PrivateMessageHistoryService : IPrivateMessageHistoryService
             );
             CREATE INDEX IF NOT EXISTS idx_pm_friend_id   ON private_messages(friend_id);
             CREATE INDEX IF NOT EXISTS idx_pm_timestamp   ON private_messages(timestamp);
+
+            CREATE TABLE IF NOT EXISTS hidden_conversations (
+                friend_id INTEGER PRIMARY KEY
+            );
             """;
         cmd.ExecuteNonQuery();
     }
@@ -97,10 +101,16 @@ public sealed class PrivateMessageHistoryService : IPrivateMessageHistoryService
             lock (_lock)
             {
                 using var cmd = _connection.CreateCommand();
+                // Only load the latest message per conversation for the sidebar preview
                 cmd.CommandText = """
-                    SELECT timestamp, friend_id, friend_name, sender_name, content, is_from_me
-                    FROM private_messages
-                    ORDER BY timestamp ASC
+                    SELECT p.timestamp, p.friend_id, p.friend_name, p.sender_name, p.content, p.is_from_me
+                    FROM private_messages p
+                    INNER JOIN (
+                        SELECT friend_id, MAX(id) AS max_id
+                        FROM private_messages
+                        GROUP BY friend_id
+                    ) latest ON p.id = latest.max_id
+                    ORDER BY p.timestamp DESC
                     """;
 
                 var results = new List<PrivateMessageRecord>();
@@ -130,8 +140,12 @@ public sealed class PrivateMessageHistoryService : IPrivateMessageHistoryService
                 using var cmd = _connection.CreateCommand();
                 cmd.CommandText = """
                     SELECT timestamp, friend_id, friend_name, sender_name, content, is_from_me
-                    FROM private_messages
-                    WHERE friend_id = @friendId
+                    FROM (
+                        SELECT * FROM private_messages
+                        WHERE friend_id = @friendId
+                        ORDER BY id DESC
+                        LIMIT 150
+                    ) sub
                     ORDER BY timestamp ASC
                     """;
                 cmd.Parameters.AddWithValue("@friendId", (long)friendId);
@@ -164,6 +178,45 @@ public sealed class PrivateMessageHistoryService : IPrivateMessageHistoryService
                 cmd.CommandText = "DELETE FROM private_messages WHERE friend_id = @friendId";
                 cmd.Parameters.AddWithValue("@friendId", (long)friendId);
                 cmd.ExecuteNonQuery();
+            }
+        });
+    }
+
+    public void HideConversation(Id friendId)
+    {
+        lock (_lock)
+        {
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = "INSERT OR IGNORE INTO hidden_conversations (friend_id) VALUES (@friendId)";
+            cmd.Parameters.AddWithValue("@friendId", (long)friendId);
+            cmd.ExecuteNonQuery();
+        }
+    }
+
+    public void UnhideConversation(Id friendId)
+    {
+        lock (_lock)
+        {
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = "DELETE FROM hidden_conversations WHERE friend_id = @friendId";
+            cmd.Parameters.AddWithValue("@friendId", (long)friendId);
+            cmd.ExecuteNonQuery();
+        }
+    }
+
+    public Task<HashSet<Id>> LoadHiddenConversationsAsync()
+    {
+        return Task.Run(() =>
+        {
+            lock (_lock)
+            {
+                using var cmd = _connection.CreateCommand();
+                cmd.CommandText = "SELECT friend_id FROM hidden_conversations";
+                var result = new HashSet<Id>();
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                    result.Add((Id)reader.GetInt64(0));
+                return result;
             }
         });
     }

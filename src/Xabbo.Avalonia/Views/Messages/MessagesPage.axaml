@@ -141,6 +141,11 @@
         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
         Name="MessagesList"
       >
+        <ListBox.ItemsPanel>
+          <ItemsPanelTemplate>
+            <StackPanel />
+          </ItemsPanelTemplate>
+        </ListBox.ItemsPanel>
         <Interaction.Behaviors>
           <behaviors:AutoScrollBehavior />
         </Interaction.Behaviors>
