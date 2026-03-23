@@ -163,9 +163,12 @@ public class ProfanityHighlightTextBlock : TextBlock
         // Add username prefix if provided
         if (!string.IsNullOrEmpty(username))
         {
+            var boldFont = new FontFamily("fonts:#IBM Plex Sans");
             var usernameRun = new Run(InjectWordBreaks(username))
             {
-                FontWeight = FontWeight.Bold
+                FontFamily = boldFont,
+                FontWeight = FontWeight.Bold,
+                FontSize = 13
             };
             if (IsWhisper)
                 usernameRun.Foreground = WhisperBrush;
@@ -177,11 +180,12 @@ public class ProfanityHighlightTextBlock : TextBlock
                 runs.Add(new Run($" -> {InjectWordBreaks(WhisperRecipient)}")
                 {
                     FontStyle = FontStyle.Italic,
-                    Foreground = WhisperBrush
+                    Foreground = WhisperBrush,
+                    FontSize = 13
                 });
             }
 
-            var separatorRun = new Run(": ");
+            var separatorRun = new Run(":  ") { FontSize = 13 };
             if (IsWhisper)
             {
                 separatorRun.FontStyle = FontStyle.Italic;
