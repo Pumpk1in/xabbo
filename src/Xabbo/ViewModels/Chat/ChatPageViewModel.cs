@@ -413,7 +413,7 @@ public class ChatPageViewModel : PageViewModel
 
         // Clear chat commands
         ClearAllMessagesCmd = ReactiveCommand.Create(ClearAllMessages);
-        KeepLast60MinCmd = ReactiveCommand.Create(KeepLast60Min);
+        KeepLast60MinCmd = ReactiveCommand.Create(() => KeepLastMessages());
 
         // Scroll to bottom when unchecking a filter
         this.WhenAnyValue(x => x.WhispersOnly)
@@ -480,6 +480,7 @@ public class ChatPageViewModel : PageViewModel
                 && _roomManager.Room?.TryGetUserByName(name.Trim(), out _) == true)
             .ObserveOn(RxApp.MainThreadScheduler)
             .ToProperty(this, x => x.IsRecipientInRoom);
+
     }
 
     // Combined filter for text search, whispers only, and profanity only
@@ -808,15 +809,16 @@ public class ChatPageViewModel : PageViewModel
         await SearchHistoryAsync();
     }
 
-    private void ClearAllMessages()
+    public void ClearAllMessages()
     {
         _cache.Clear();
     }
 
-    private void KeepLast60Min()
+    public void KeepLastMessages(int keepCount = 150)
     {
-        var cutoff = DateTime.Now.AddMinutes(-60);
-        var toRemove = _cache.Items.Where(m => m.Timestamp < cutoff).Select(m => m.EntryId).ToList();
+        var allIds = _cache.Items.OrderByDescending(m => m.EntryId).Select(m => m.EntryId).ToList();
+        if (allIds.Count <= keepCount) return;
+        var toRemove = allIds.Skip(keepCount).ToList();
         _cache.RemoveKeys(toRemove);
     }
 

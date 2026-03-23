@@ -1,3 +1,4 @@
+using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Windows.Input;
 using Avalonia;
@@ -48,7 +49,20 @@ public class ScrollToBottom : Behavior<TemplatedControl>
 
     private void OnScrollToEnd()
     {
-        _scrollViewer?.ScrollToEnd();
+        if (AssociatedObject is ListBox listBox && listBox.Items.Count > 0)
+        {
+            var lastItem = listBox.Items[listBox.Items.Count - 1];
+            listBox.ScrollIntoView(lastItem!);
+            if (listBox.Scroll is IScrollable scrollable)
+            {
+                var maxOffset = scrollable.Extent.Height - scrollable.Viewport.Height;
+                scrollable.Offset = new Vector(scrollable.Offset.X, Math.Max(0, maxOffset));
+            }
+        }
+        else
+        {
+            _scrollViewer?.ScrollToEnd();
+        }
     }
 
     [RequiresUnreferencedCode("override: This functionality is not compatible with trimming.")]

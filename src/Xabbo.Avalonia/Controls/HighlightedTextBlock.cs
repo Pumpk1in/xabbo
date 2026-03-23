@@ -192,7 +192,7 @@ public class HighlightedTextBlock : TextBlock
 
     protected override Size MeasureOverride(Size availableSize)
     {
-        if (!_measureDirty && Math.Abs(availableSize.Width - _lastMeasureWidth) < 0.5)
+        if (!_measureDirty && Math.Abs(availableSize.Width - _lastMeasureWidth) < 3.0)
             return _lastMeasureResult;
 
         _measureDirty = false;

@@ -222,7 +222,7 @@
         <Button.Flyout>
           <ui:FAMenuFlyout>
             <ui:MenuFlyoutItem Text="Clear all" Command="{Binding ClearAllMessagesCmd}" IconSource="{icm:SymbolIconSource Symbol=Delete}" />
-            <ui:MenuFlyoutItem Text="Keep last 60 min" Command="{Binding KeepLast60MinCmd}" IconSource="{icm:SymbolIconSource Symbol=Clock}" />
+            <ui:MenuFlyoutItem Text="Keep last 150 messages" Command="{Binding KeepLast60MinCmd}" IconSource="{icm:SymbolIconSource Symbol=Clock}" />
           </ui:FAMenuFlyout>
         </Button.Flyout>
         <ic:SymbolIcon Symbol="Delete" FontSize="16" />
@@ -233,6 +233,7 @@
          Selection="{Binding Selection}"
          Padding="10"
          SelectionMode="Multiple"
+         ScrollViewer.VerticalScrollBarVisibility="Visible"
          x:DataType="vm:ChatPageViewModel"
          ContextRequested="OnContextRequested"
          behaviors:ScrollToBottom.Command="{Binding ScrollToBottomCmd, Mode=OneWayToSource}">

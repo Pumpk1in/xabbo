@@ -29,6 +29,8 @@ public partial class ChatPage : UserControl
                     Dispatcher.UIThread.Post(
                         () => HistoryResultsListBox?.ScrollIntoView(entry),
                         DispatcherPriority.Loaded);
+                Controls.ProfanityHighlightTextBlock.PruneAction = () => vm.KeepLastMessages();
+                Controls.ProfanityHighlightTextBlock.PurgeTotalAction = () => vm.ClearAllMessages();
             }
         };
 

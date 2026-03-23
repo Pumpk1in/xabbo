@@ -78,11 +78,21 @@ public class ProfanityHighlightTextBlock : TextBlock
     private static readonly IBrush ProfanityBrush = new SolidColorBrush(Color.Parse("#FF4444"));
     private static readonly IBrush WhisperBrush = new SolidColorBrush(Color.Parse("#a495ff"));
 
-    // DEBUG: layout loop diagnostics
-    private static readonly string _logPath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "xabbo_layout_debug.log");
+    // DEBUG: only log when layout activity becomes dangerous (>50 measures/s)
+    private static readonly string _logPath = @"C:\Users\odele\OneDrive\Bureau\xabbo_layout_debug.log";
     private static int _globalMeasureCount;
     private static DateTime _lastResetTime = DateTime.UtcNow;
+    private static bool _alarmLogged;
+    private static DateTime _lastBurstEndTime = DateTime.UtcNow;
+    private static bool _pruneScheduled;
+    private static int _consecutiveBurstCount;
+    private static int _purgeCount;
+
+    /// <summary>
+    /// Assigned by ChatPage to trigger a KeepLastMessages() purge when a layout loop is detected.
+    /// </summary>
+    public static Action? PruneAction { get; set; }
+    public static Action? PurgeTotalAction { get; set; }
 
     private static void Log(string msg)
     {
@@ -96,6 +106,7 @@ public class ProfanityHighlightTextBlock : TextBlock
 
     static ProfanityHighlightTextBlock()
     {
+        try { File.WriteAllText(_logPath, $"[{DateTime.Now:HH:mm:ss.fff}] Session started{Environment.NewLine}"); } catch { }
         SegmentsProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.ScheduleUpdateInlines());
         FallbackTextProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.ScheduleUpdateInlines());
         IsWhisperProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.ScheduleUpdateInlines());
@@ -110,7 +121,6 @@ public class ProfanityHighlightTextBlock : TextBlock
     {
         if (_updatePending) return;
         _updatePending = true;
-        Log($"ScheduleUpdateInlines: posting for '{FallbackText?.Substring(0, Math.Min(FallbackText?.Length ?? 0, 30))}...'");
         Dispatcher.UIThread.Post(() =>
         {
             _updatePending = false;
@@ -135,21 +145,25 @@ public class ProfanityHighlightTextBlock : TextBlock
 
     private void UpdateInlines()
     {
-        var state = (Segments, FallbackText, IsWhisper, Username, WhisperRecipient);
-        if (state == _lastState)
-        {
-            Log($"UpdateInlines: SKIPPED (state unchanged) for '{FallbackText?.Substring(0, Math.Min(FallbackText?.Length ?? 0, 30))}...'");
+        var segments = Segments;
+        var fallback = FallbackText;
+        var username = Username;
+
+        // Skip update when control has no content (e.g. virtualizer recycling with null bindings).
+        // This prevents dozens of InvalidateMeasure() calls from piling up in a single render cycle.
+        if (segments is null or { Count: 0 } && string.IsNullOrEmpty(fallback) && string.IsNullOrEmpty(username))
             return;
-        }
+
+        var state = (segments, fallback, IsWhisper, username, WhisperRecipient);
+        if (state == _lastState) return;
         _lastState = state;
-        Log($"UpdateInlines: EXECUTING for '{FallbackText?.Substring(0, Math.Min(FallbackText?.Length ?? 0, 30))}...' whisper={IsWhisper}");
 
         var runs = new List<Inline>();
 
         // Add username prefix if provided
-        if (!string.IsNullOrEmpty(Username))
+        if (!string.IsNullOrEmpty(username))
         {
-            var usernameRun = new Run(InjectWordBreaks(Username))
+            var usernameRun = new Run(InjectWordBreaks(username))
             {
                 FontWeight = FontWeight.Bold
             };
@@ -176,10 +190,9 @@ public class ProfanityHighlightTextBlock : TextBlock
             runs.Add(separatorRun);
         }
 
-        var segments = Segments;
         if (segments is null or { Count: 0 })
         {
-            var fallbackRun = new Run(InjectWordBreaks(FallbackText ?? string.Empty));
+            var fallbackRun = new Run(InjectWordBreaks(fallback ?? string.Empty));
             if (IsWhisper)
             {
                 fallbackRun.FontStyle = FontStyle.Italic;
@@ -220,40 +233,81 @@ public class ProfanityHighlightTextBlock : TextBlock
     private Size _lastMeasureResult;
     private bool _measureDirty = true;
 
-    private int _instanceMeasureCount;
-    private string _instanceId = Guid.NewGuid().ToString("N")[..6];
-
     protected override Size MeasureOverride(Size availableSize)
     {
-        _instanceMeasureCount++;
         var now = DateTime.UtcNow;
-        // Reset global counter every second
         if ((now - _lastResetTime).TotalSeconds > 1.0)
         {
+            if (_globalMeasureCount > 250)
+            {
+                _consecutiveBurstCount++;
+                var msSinceLastBurst = (_lastResetTime - _lastBurstEndTime).TotalMilliseconds;
+                Log($"BURST ended: {_globalMeasureCount} measures in last second (consecutive: {_consecutiveBurstCount}, gap: {msSinceLastBurst:F0}ms)");
+
+                // 3+ consecutive bursts = layout loop not converging → trigger purge
+                if (_consecutiveBurstCount >= 3 && !_pruneScheduled)
+                {
+                    _pruneScheduled = true;
+                    _purgeCount++;
+                    try
+                    {
+                        if (_purgeCount >= 2 && PurgeTotalAction != null)
+                        {
+                            Log($"LOOP DETECTED ({_consecutiveBurstCount} consecutive bursts, purge #{_purgeCount}): clearing ALL messages");
+                            PurgeTotalAction.Invoke();
+                            Log($"TOTAL PURGE executed successfully");
+                        }
+                        else if (PruneAction != null)
+                        {
+                            Log($"LOOP DETECTED ({_consecutiveBurstCount} consecutive bursts, purge #{_purgeCount}): keeping last 150 messages");
+                            PruneAction.Invoke();
+                            Log($"PURGE executed successfully");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log($"PURGE failed: {ex.Message}");
+                    }
+                    _pruneScheduled = false;
+                    _consecutiveBurstCount = 0;
+                }
+
+                _lastBurstEndTime = _lastResetTime;
+            }
+            else
+            {
+                // Burst didn't reach threshold — reset counters
+                _consecutiveBurstCount = 0;
+                _purgeCount = 0;
+            }
             _globalMeasureCount = 0;
             _lastResetTime = now;
+            _alarmLogged = false;
         }
         _globalMeasureCount++;
 
-        var textPreview = FallbackText?.Substring(0, Math.Min(FallbackText?.Length ?? 0, 20)) ?? "(null)";
-
-        if (!_measureDirty && Math.Abs(availableSize.Width - _lastMeasureWidth) < 0.5)
+        // Log the first time we cross the danger threshold in a given second
+        if (_globalMeasureCount == 250 && !_alarmLogged)
         {
-            if (_globalMeasureCount > 10)
-                Log($"MeasureOverride CACHED [{_instanceId}] #{_instanceMeasureCount} (global:{_globalMeasureCount}/s) w={availableSize.Width:F1} -> {_lastMeasureResult.Width:F1}x{_lastMeasureResult.Height:F1} '{textPreview}'");
-            return _lastMeasureResult;
+            _alarmLogged = true;
+            var textPreview = FallbackText?.Substring(0, Math.Min(FallbackText?.Length ?? 0, 40)) ?? "(null)";
+            Log($"ALARM: 250+ measures/s reached! w={availableSize.Width:F1} '{textPreview}'");
         }
 
-        var oldWidth = _lastMeasureWidth;
-        var oldResult = _lastMeasureResult;
+        // Log every measure above 50/s with details
+        if (_globalMeasureCount > 250)
+        {
+            var textPreview = FallbackText?.Substring(0, Math.Min(FallbackText?.Length ?? 0, 30)) ?? "(null)";
+            var cached = !_measureDirty && Math.Abs(availableSize.Width - _lastMeasureWidth) < 3.0;
+            Log($"  [{_globalMeasureCount}] w={availableSize.Width:F1} (was {_lastMeasureWidth:F1}) cached={cached} dirty={_measureDirty} '{textPreview}'");
+        }
+
+        if (!_measureDirty && Math.Abs(availableSize.Width - _lastMeasureWidth) < 3.0)
+            return _lastMeasureResult;
+
         _measureDirty = false;
         _lastMeasureWidth = availableSize.Width;
         _lastMeasureResult = base.MeasureOverride(availableSize);
-
-        var heightChanged = Math.Abs(_lastMeasureResult.Height - oldResult.Height) > 0.5;
-        if (_globalMeasureCount > 5 || heightChanged)
-            Log($"MeasureOverride CALC  [{_instanceId}] #{_instanceMeasureCount} (global:{_globalMeasureCount}/s) w={availableSize.Width:F1} (was {oldWidth:F1}) -> {_lastMeasureResult.Width:F1}x{_lastMeasureResult.Height:F1} (was {oldResult.Height:F1}) heightChanged={heightChanged} dirty={_measureDirty} '{textPreview}'");
-
         return _lastMeasureResult;
     }
 
