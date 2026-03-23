@@ -245,10 +245,17 @@ public sealed class MessagesPageViewModel : PageViewModel
         {
             if (!_cache.Lookup(conv.FriendId).HasValue) return;
 
-            // Replace the preview message with full history
+            // Preserve invitations (not persisted in DB) before replacing
+            var invitations = conv.Messages.Where(m => m.IsInvitation).ToList();
+
+            // Replace the preview message with full history + invitations merged by timestamp
             conv.Messages.Clear();
+            int invIdx = 0;
             foreach (var r in records)
             {
+                while (invIdx < invitations.Count && invitations[invIdx].Timestamp <= r.Timestamp)
+                    conv.AddMessage(invitations[invIdx++]);
+
                 conv.AddMessage(new PrivateMessageViewModel
                 {
                     SenderName = r.SenderName,
@@ -257,13 +264,16 @@ public sealed class MessagesPageViewModel : PageViewModel
                     IsFromMe = r.IsFromMe,
                 });
             }
+            while (invIdx < invitations.Count)
+                conv.AddMessage(invitations[invIdx++]);
 
             // Flush messages that arrived during loading
             conv.IsLoadingHistory = false;
             conv.IsHistoryLoaded = true;
             foreach (var m in conv.PendingMessages)
             {
-                _history.Enqueue(conv.FriendId, conv.FriendName, m.SenderName, m.Content, m.Timestamp, m.IsFromMe);
+                if (!m.IsInvitation)
+                    _history.Enqueue(conv.FriendId, conv.FriendName, m.SenderName, m.Content, m.Timestamp, m.IsFromMe);
                 conv.AddMessage(m);
             }
             conv.PendingMessages.Clear();
