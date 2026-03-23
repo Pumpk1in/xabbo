@@ -77,8 +77,6 @@ public sealed class MessagesPageViewModel : PageViewModel
         _cache
             .Connect()
             .AutoRefresh(x => x.LastMessageTime)
-            .AutoRefresh(x => x.HasRealMessages)
-            .Filter(x => x.HasRealMessages)
             .ObserveOn(RxApp.MainThreadScheduler)
             .SortAndBind(
                 out _conversations,

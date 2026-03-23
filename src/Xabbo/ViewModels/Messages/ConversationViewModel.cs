@@ -15,7 +15,6 @@ public sealed class ConversationViewModel : ReactiveObject
     [Reactive] public bool IsOnline { get; set; }
     [Reactive] public int UnreadCount { get; set; }
     [Reactive] public DateTimeOffset LastMessageTime { get; set; }
-    [Reactive] public bool HasRealMessages { get; set; }
 
     public ObservableCollection<PrivateMessageViewModel> Messages { get; } = [];
 
@@ -38,8 +37,6 @@ public sealed class ConversationViewModel : ReactiveObject
         Messages.Add(msg);
         while (Messages.Count > MaxMessages)
             Messages.RemoveAt(0);
-        if (!msg.IsInvitation)
-            HasRealMessages = true;
         this.RaisePropertyChanged(nameof(LastMessage));
     }
 }
