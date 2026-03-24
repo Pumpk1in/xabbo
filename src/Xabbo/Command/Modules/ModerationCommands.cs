@@ -212,7 +212,7 @@ public sealed class ModerationCommands(RoomManager roomManager, IAppPathProvider
                     Ext.Send(new KickGroupMemberMsg(data.GroupId, user.Id));
                     ShowMessage($"Kicking user '{user.Name}' from room group");
                     NotifyChatLog(user.Name, "kicked from room group");
-                    await Task.Delay(1000);
+                    await Task.Delay(1500);
                 }
                 ShowMessage($"Banning user '{user.Name}'");
                 NotifyChatLog(user.Name, "banned (deferred)");
@@ -419,7 +419,7 @@ public sealed class ModerationCommands(RoomManager roomManager, IAppPathProvider
                 Ext.Send(new KickGroupMemberMsg(data.GroupId, user.Id));
                 ShowMessage($"Kicking user '{user.Name}' from room group");
                 NotifyChatLog(user.Name, "kicked from room group");
-                await Task.Delay(1000);
+                await Task.Delay(1500);
             }
             ShowMessage($"Banning user '{user.Name}' {durationString}");
             NotifyChatLog(user.Name, $"banned {durationString}");

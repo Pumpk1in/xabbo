@@ -153,7 +153,7 @@ public partial class RoomModerationController : ControllerBase
         if (_roomManager.Room?.Data is { IsGroupRoom: true } data && Session.Is(ClientType.Modern))
         {
             Send(new KickGroupMemberMsg(data.GroupId, userId));
-            await Task.Delay(1000);
+            await Task.Delay(1500);
         }
     }
 
