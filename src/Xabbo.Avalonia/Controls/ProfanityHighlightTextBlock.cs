@@ -77,6 +77,7 @@ public class ProfanityHighlightTextBlock : TextBlock
 
     private static readonly IBrush ProfanityBrush = new SolidColorBrush(Color.Parse("#FF4444"));
     private static readonly IBrush WhisperBrush = new SolidColorBrush(Color.Parse("#a495ff"));
+    private static readonly IBrush UsernameBrush = new SolidColorBrush(Color.Parse("#9995ff"));
 
     // DEBUG: only log when layout activity becomes dangerous (>50 measures/s)
     private static readonly string _logPath = @"C:\Users\odele\OneDrive\Bureau\xabbo_layout_debug.log";
@@ -168,10 +169,9 @@ public class ProfanityHighlightTextBlock : TextBlock
             {
                 FontFamily = boldFont,
                 FontWeight = FontWeight.Bold,
-                FontSize = 13
+                FontSize = 13,
+                Foreground = IsWhisper ? WhisperBrush : UsernameBrush
             };
-            if (IsWhisper)
-                usernameRun.Foreground = WhisperBrush;
             runs.Add(usernameRun);
 
             // For outgoing whispers, show "Name -> Recipient: msg" (all italic/purple, no bold)
@@ -185,11 +185,14 @@ public class ProfanityHighlightTextBlock : TextBlock
                 });
             }
 
-            var separatorRun = new Run(":  ") { FontSize = 13 };
+            var separatorRun = new Run(":  ")
+            {
+                FontSize = 13,
+                Foreground = IsWhisper ? WhisperBrush : UsernameBrush
+            };
             if (IsWhisper)
             {
                 separatorRun.FontStyle = FontStyle.Italic;
-                separatorRun.Foreground = WhisperBrush;
             }
             runs.Add(separatorRun);
         }
