@@ -19,6 +19,23 @@ public class AutoScrollBehavior : Behavior<ListBox>
 {
     private ScrollViewer? _scrollViewer;
     private bool _shouldStayAtBottom = true;
+
+    /// <summary>
+    /// Temporarily suspends autoscroll (e.g. during GoToMessage).
+    /// Resets automatically when user scrolls to bottom.
+    /// </summary>
+    /// <summary>
+    /// Scrolls to a specific item and suspends autoscroll.
+    /// Use for GoToMessage to prevent autoscroll from overriding the targeted scroll.
+    /// </summary>
+    public void ScrollToItem(object item)
+    {
+        _shouldStayAtBottom = false;
+        _scrollPending = false; // cancel any pending scroll-to-bottom
+        _isProgrammaticScroll = true;
+        AssociatedObject?.ScrollIntoView(item);
+        _isProgrammaticScroll = false;
+    }
     private bool _isProgrammaticScroll;
     private bool _scrollPending;
     private DateTime _lastAddTime;
@@ -94,8 +111,12 @@ public class AutoScrollBehavior : Behavior<ListBox>
             {
                 Dispatcher.UIThread.Post(() =>
                 {
+                    if (!_shouldStayAtBottom) return; // cancelled by ScrollToItem
                     NudgeScroll();
-                    DispatcherTimer.RunOnce(() => ScrollToBottom(), TimeSpan.FromMilliseconds(100));
+                    DispatcherTimer.RunOnce(() =>
+                    {
+                        if (_shouldStayAtBottom) ScrollToBottom();
+                    }, TimeSpan.FromMilliseconds(100));
                 }, DispatcherPriority.Loaded);
             }
             return;
@@ -120,9 +141,13 @@ public class AutoScrollBehavior : Behavior<ListBox>
         Dispatcher.UIThread.Post(() =>
         {
             _scrollPending = false;
+            if (!_shouldStayAtBottom) return; // cancelled by ScrollToItem
             ScrollToBottom();
             if (!IsAtBottom())
-                DispatcherTimer.RunOnce(() => ScrollToBottom(), TimeSpan.FromMilliseconds(100));
+                DispatcherTimer.RunOnce(() =>
+                {
+                    if (_shouldStayAtBottom) ScrollToBottom();
+                }, TimeSpan.FromMilliseconds(100));
         }, DispatcherPriority.Loaded);
     }
 

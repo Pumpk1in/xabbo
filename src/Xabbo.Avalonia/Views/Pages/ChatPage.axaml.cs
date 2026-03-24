@@ -5,7 +5,9 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using Avalonia.Xaml.Interactivity;
 using FluentAvalonia.UI.Controls;
+using Xabbo.Avalonia.Behaviors;
 using Xabbo.Models;
 using Xabbo.ViewModels;
 
@@ -91,10 +93,14 @@ public partial class ChatPage : UserControl
 
     private void ScrollToMessage(ChatLogEntryViewModel message)
     {
-        // Wait for filters to be applied before scrolling
+        var autoScroll = Interaction.GetBehaviors(ListBoxMessages)
+            .OfType<AutoScrollBehavior>()
+            .FirstOrDefault();
+
+        // Wait for filters to be applied, then scroll to the target message
         Dispatcher.UIThread.Post(() =>
         {
-            ListBoxMessages?.ScrollIntoView(message);
+            autoScroll?.ScrollToItem(message);
         }, DispatcherPriority.Background);
     }
 
