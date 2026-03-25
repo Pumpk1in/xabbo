@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
@@ -79,11 +78,10 @@ public class ProfanityHighlightTextBlock : TextBlock
     private static readonly IBrush WhisperBrush = new SolidColorBrush(Color.Parse("#a495ff"));
     private static readonly IBrush UsernameBrush = new SolidColorBrush(Color.Parse("#9995ff"));
 
-    // DEBUG: only log when layout activity becomes dangerous (>50 measures/s)
-    private static readonly string _logPath = @"C:\Users\odele\OneDrive\Bureau\xabbo_layout_debug.log";
+    // Layout loop detection: counts MeasureOverride calls per second.
+    // 3 consecutive seconds with >250 calls = layout loop → trigger purge.
     private static int _globalMeasureCount;
     private static DateTime _lastResetTime = DateTime.UtcNow;
-    private static bool _alarmLogged;
     private static DateTime _lastBurstEndTime = DateTime.UtcNow;
     private static bool _pruneScheduled;
     private static int _consecutiveBurstCount;
@@ -95,19 +93,8 @@ public class ProfanityHighlightTextBlock : TextBlock
     public static Action? PruneAction { get; set; }
     public static Action? PurgeTotalAction { get; set; }
 
-    private static void Log(string msg)
-    {
-        try
-        {
-            var line = $"[{DateTime.Now:HH:mm:ss.fff}] {msg}";
-            File.AppendAllText(_logPath, line + Environment.NewLine);
-        }
-        catch { }
-    }
-
     static ProfanityHighlightTextBlock()
     {
-        try { File.WriteAllText(_logPath, $"[{DateTime.Now:HH:mm:ss.fff}] Session started{Environment.NewLine}"); } catch { }
         SegmentsProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.ScheduleUpdateInlines());
         FallbackTextProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.ScheduleUpdateInlines());
         IsWhisperProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.ScheduleUpdateInlines());
@@ -248,8 +235,6 @@ public class ProfanityHighlightTextBlock : TextBlock
             if (_globalMeasureCount > 250)
             {
                 _consecutiveBurstCount++;
-                var msSinceLastBurst = (_lastResetTime - _lastBurstEndTime).TotalMilliseconds;
-                Log($"BURST ended: {_globalMeasureCount} measures in last second (consecutive: {_consecutiveBurstCount}, gap: {msSinceLastBurst:F0}ms)");
 
                 // 3+ consecutive bursts = layout loop not converging → trigger purge
                 if (_consecutiveBurstCount >= 3 && !_pruneScheduled)
@@ -259,22 +244,11 @@ public class ProfanityHighlightTextBlock : TextBlock
                     try
                     {
                         if (_purgeCount >= 2 && PurgeTotalAction != null)
-                        {
-                            Log($"LOOP DETECTED ({_consecutiveBurstCount} consecutive bursts, purge #{_purgeCount}): clearing ALL messages");
                             PurgeTotalAction.Invoke();
-                            Log($"TOTAL PURGE executed successfully");
-                        }
-                        else if (PruneAction != null)
-                        {
-                            Log($"LOOP DETECTED ({_consecutiveBurstCount} consecutive bursts, purge #{_purgeCount}): keeping last 150 messages");
-                            PruneAction.Invoke();
-                            Log($"PURGE executed successfully");
-                        }
+                        else
+                            PruneAction?.Invoke();
                     }
-                    catch (Exception ex)
-                    {
-                        Log($"PURGE failed: {ex.Message}");
-                    }
+                    catch { }
                     _pruneScheduled = false;
                     _consecutiveBurstCount = 0;
                 }
@@ -283,31 +257,13 @@ public class ProfanityHighlightTextBlock : TextBlock
             }
             else
             {
-                // Burst didn't reach threshold — reset counters
                 _consecutiveBurstCount = 0;
                 _purgeCount = 0;
             }
             _globalMeasureCount = 0;
             _lastResetTime = now;
-            _alarmLogged = false;
         }
         _globalMeasureCount++;
-
-        // Log the first time we cross the danger threshold in a given second
-        if (_globalMeasureCount == 250 && !_alarmLogged)
-        {
-            _alarmLogged = true;
-            var textPreview = FallbackText?.Substring(0, Math.Min(FallbackText?.Length ?? 0, 40)) ?? "(null)";
-            Log($"ALARM: 250+ measures/s reached! w={availableSize.Width:F1} '{textPreview}'");
-        }
-
-        // Log every measure above 50/s with details
-        if (_globalMeasureCount > 250)
-        {
-            var textPreview = FallbackText?.Substring(0, Math.Min(FallbackText?.Length ?? 0, 30)) ?? "(null)";
-            var cached = !_measureDirty && Math.Abs(availableSize.Width - _lastMeasureWidth) < 3.0;
-            Log($"  [{_globalMeasureCount}] w={availableSize.Width:F1} (was {_lastMeasureWidth:F1}) cached={cached} dirty={_measureDirty} '{textPreview}'");
-        }
 
         if (!_measureDirty && Math.Abs(availableSize.Width - _lastMeasureWidth) < 3.0)
             return _lastMeasureResult;
