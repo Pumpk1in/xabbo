@@ -24,6 +24,7 @@ public interface IChatHistoryService
         bool? whispersOnly = null,
         DateTime? fromDate = null,
         DateTime? toDate = null,
+        string? roomName = null,
         int? limit = null,
         int? offset = null);
 
@@ -37,6 +38,7 @@ public interface IChatHistoryService
         bool? whispersOnly = null,
         DateTime? fromDate = null,
         DateTime? toDate = null,
+        string? roomName = null,
         int? limit = null,
         int? offset = null);
 
@@ -50,6 +52,11 @@ public interface IChatHistoryService
     /// I.e., how many entries have a strictly newer timestamp.
     /// </summary>
     int GetEntryOffset(DateTime timestamp);
+
+    /// <summary>
+    /// Gets distinct room names from the history, ordered alphabetically.
+    /// </summary>
+    List<string> GetDistinctRoomNames();
 
     /// <summary>
     /// Gets the total count of entries in the history.

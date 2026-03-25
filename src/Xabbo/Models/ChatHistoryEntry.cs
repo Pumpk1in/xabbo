@@ -23,7 +23,8 @@ public sealed class ChatHistoryEntry
     public string? UserName { get; init; }
     public string? Action { get; init; }
 
-    // For room type
+    // Room context (set on all entry types)
+    public long? RoomId { get; init; }
     public string? RoomName { get; init; }
     public string? RoomOwner { get; init; }
 

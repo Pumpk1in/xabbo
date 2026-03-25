@@ -105,6 +105,15 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
         }
         catch (SqliteException) { /* Column already exists */ }
 
+        // Add room_id column if it doesn't exist (migration)
+        try
+        {
+            using var alterCmd = _connection.CreateCommand();
+            alterCmd.CommandText = "ALTER TABLE chat_history ADD COLUMN room_id INTEGER";
+            alterCmd.ExecuteNonQuery();
+        }
+        catch (SqliteException) { /* Column already exists */ }
+
     }
 
     public void AddEntry(ChatHistoryEntry entry)
@@ -151,8 +160,8 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
     {
         using var cmd = _connection.CreateCommand();
         cmd.CommandText = """
-            INSERT INTO chat_history (timestamp, type, name, message, chat_type, is_whisper, whisper_recipient, has_profanity, matched_words, user_name, action, room_name, room_owner)
-            VALUES (@timestamp, @type, @name, @message, @chatType, @isWhisper, @whisperRecipient, @hasProfanity, @matchedWords, @userName, @action, @roomName, @roomOwner)
+            INSERT INTO chat_history (timestamp, type, name, message, chat_type, is_whisper, whisper_recipient, has_profanity, matched_words, user_name, action, room_name, room_owner, room_id)
+            VALUES (@timestamp, @type, @name, @message, @chatType, @isWhisper, @whisperRecipient, @hasProfanity, @matchedWords, @userName, @action, @roomName, @roomOwner, @roomId)
             """;
 
         cmd.Parameters.AddWithValue("@timestamp", new DateTimeOffset(entry.Timestamp).ToUnixTimeSeconds());
@@ -168,6 +177,7 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
         cmd.Parameters.AddWithValue("@action", (object?)entry.Action ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@roomName", (object?)entry.RoomName ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@roomOwner", (object?)entry.RoomOwner ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@roomId", entry.RoomId.HasValue ? (object)entry.RoomId.Value : DBNull.Value);
 
         cmd.ExecuteNonQuery();
     }
@@ -179,10 +189,11 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
         bool? whispersOnly = null,
         DateTime? fromDate = null,
         DateTime? toDate = null,
+        string? roomName = null,
         int? limit = null,
         int? offset = null)
     {
-        return SearchWithCount(userName, keyword, profanityOnly, whispersOnly, fromDate, toDate, limit, offset).Results;
+        return SearchWithCount(userName, keyword, profanityOnly, whispersOnly, fromDate, toDate, roomName, limit, offset).Results;
     }
 
     public (IEnumerable<ChatHistoryEntry> Results, int TotalCount) SearchWithCount(
@@ -192,6 +203,7 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
         bool? whispersOnly = null,
         DateTime? fromDate = null,
         DateTime? toDate = null,
+        string? roomName = null,
         int? limit = null,
         int? offset = null)
     {
@@ -249,6 +261,12 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
                 conditions.Add("is_whisper = 1");
             }
 
+            if (!string.IsNullOrWhiteSpace(roomName))
+            {
+                conditions.Add("room_name LIKE @roomName");
+                parameters.Add(new SqliteParameter("@roomName", $"%{roomName}%"));
+            }
+
             var whereClause = conditions.Count > 0 ? "WHERE " + string.Join(" AND ", conditions) : "";
 
             // Single query: get total count via window function, with optional limit on rows returned
@@ -294,6 +312,7 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
             MatchedWords = matchedWords,
             UserName = reader["user_name"] as string,
             Action = reader["action"] as string,
+            RoomId = reader["room_id"] is long roomId ? roomId : null,
             RoomName = reader["room_name"] as string,
             RoomOwner = reader["room_owner"] as string,
         };
@@ -354,6 +373,23 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
             cmd.CommandText = "SELECT COUNT(*) FROM chat_history WHERE timestamp > @ts";
             cmd.Parameters.AddWithValue("@ts", new DateTimeOffset(timestamp).ToUnixTimeSeconds());
             return Convert.ToInt32(cmd.ExecuteScalar());
+        }
+    }
+
+    public List<string> GetDistinctRoomNames()
+    {
+        lock (_lock)
+        {
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = "SELECT DISTINCT room_name FROM chat_history WHERE room_name IS NOT NULL ORDER BY room_name";
+            var names = new List<string>();
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                if (reader.GetString(0) is { Length: > 0 } name)
+                    names.Add(name);
+            }
+            return names;
         }
     }
 

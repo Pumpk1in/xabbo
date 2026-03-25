@@ -141,6 +141,8 @@ public class ChatPageViewModel : PageViewModel
     [Reactive] public string? HistorySearchKeyword { get; set; }
     [Reactive] public bool HistorySearchProfanityOnly { get; set; }
     [Reactive] public bool HistorySearchWhispersOnly { get; set; }
+    [Reactive] public string? HistorySearchRoom { get; set; }
+    [Reactive] public List<string> HistoryRoomSuggestions { get; set; } = [];
     [Reactive] public DateTime? HistorySearchFromDate { get; set; }
     [Reactive] public TimeSpan? HistorySearchFromTime { get; set; }
     [Reactive] public DateTime? HistorySearchToDate { get; set; }
@@ -158,6 +160,7 @@ public class ChatPageViewModel : PageViewModel
     private string? _lastSearchKeyword;
     private bool _lastSearchProfanityOnly;
     private bool _lastSearchWhispersOnly;
+    private string? _lastSearchRoom;
     private DateTime? _lastSearchFromDate;
     private DateTime? _lastSearchToDate;
 
@@ -718,6 +721,7 @@ public class ChatPageViewModel : PageViewModel
         // Reset all filters and set date window
         HistorySearchUser = null;
         HistorySearchKeyword = null;
+        HistorySearchRoom = null;
         HistorySearchProfanityOnly = false;
         HistorySearchWhispersOnly = false;
         HistorySearchFromDate = fromDate.Date;
@@ -745,7 +749,10 @@ public class ChatPageViewModel : PageViewModel
             }
             r.CanBan = r.Type == "message"
                 && !string.IsNullOrEmpty(r.Name)
-                && !r.Name.Equals(ownName, StringComparison.OrdinalIgnoreCase);
+                && !r.Name.Equals(ownName, StringComparison.OrdinalIgnoreCase)
+                && r.RoomId.HasValue
+                && r.RoomId == (long?)_roomManager.Room?.Id
+                && _moderation.CanBan;
             _historyResults.Add(r);
         }
 
@@ -761,6 +768,7 @@ public class ChatPageViewModel : PageViewModel
     {
         HistorySearchUser = null;
         HistorySearchKeyword = null;
+        HistorySearchRoom = null;
         HistorySearchProfanityOnly = false;
         HistorySearchWhispersOnly = false;
         HistorySearchFromDate = null;
@@ -771,6 +779,11 @@ public class ChatPageViewModel : PageViewModel
         HistorySelection.Clear();
         HistoryResultsTotal = 0;
         HistoryResultsText = "Results: 0";
+    }
+
+    public async void RefreshHistoryRoomSuggestions()
+    {
+        HistoryRoomSuggestions = await Task.Run(() => _chatHistory.GetDistinctRoomNames());
     }
 
     private async void SearchHistoryUser()
@@ -832,6 +845,7 @@ public class ChatPageViewModel : PageViewModel
         _lastSearchKeyword = string.IsNullOrWhiteSpace(HistorySearchKeyword) ? null : HistorySearchKeyword;
         _lastSearchProfanityOnly = HistorySearchProfanityOnly;
         _lastSearchWhispersOnly = HistorySearchWhispersOnly;
+        _lastSearchRoom = string.IsNullOrWhiteSpace(HistorySearchRoom) ? null : HistorySearchRoom;
 
         // Combine date + time
         _lastSearchFromDate = HistorySearchFromDate;
@@ -849,6 +863,7 @@ public class ChatPageViewModel : PageViewModel
             whispersOnly: _lastSearchWhispersOnly ? true : null,
             fromDate: _lastSearchFromDate,
             toDate: _lastSearchToDate,
+            roomName: _lastSearchRoom,
             limit: 5000
         ));
 
@@ -866,10 +881,13 @@ public class ChatPageViewModel : PageViewModel
                     entry.MatchedWords = matches.Select(m => entry.Message.Substring(m.Start, m.Length)).Distinct().ToList();
                 }
             }
-            // Ban is only available on message entries that are not from the local user
+            // Ban is only available on message entries in the current room with mod rights
             entry.CanBan = entry.Type == "message"
                 && !string.IsNullOrEmpty(entry.Name)
-                && !entry.Name.Equals(ownName, StringComparison.OrdinalIgnoreCase);
+                && !entry.Name.Equals(ownName, StringComparison.OrdinalIgnoreCase)
+                && entry.RoomId.HasValue
+                && entry.RoomId == (long?)_roomManager.Room?.Id
+                && _moderation.CanBan;
             _historyResults.Add(entry);
         }
 
@@ -973,6 +991,7 @@ public class ChatPageViewModel : PageViewModel
             whispersOnly: _lastSearchWhispersOnly ? true : null,
             fromDate: _lastSearchFromDate,
             toDate: _lastSearchToDate,
+            roomName: _lastSearchRoom,
             limit: null // No limit for export
         ).ToList();
 
@@ -1089,7 +1108,9 @@ public class ChatPageViewModel : PageViewModel
             Timestamp = vm.Timestamp,
             Type = "action",
             UserName = userName,
-            Action = action
+            Action = action,
+            RoomId = (long?)_roomManager.Room?.Id,
+            RoomName = _roomManager.Room?.Data?.Name,
         });
     }
 
@@ -1116,7 +1137,9 @@ public class ChatPageViewModel : PageViewModel
             Timestamp = vm.Timestamp,
             Type = "action",
             UserName = e.Avatar.Name,
-            Action = "entered the room"
+            Action = "entered the room",
+            RoomId = (long?)_roomManager.Room?.Id,
+            RoomName = _roomManager.Room?.Data?.Name,
         });
 
         if (IsWhisperMode)
@@ -1150,7 +1173,9 @@ public class ChatPageViewModel : PageViewModel
             Timestamp = vm.Timestamp,
             Type = "action",
             UserName = e.Avatar.Name,
-            Action = "left the room"
+            Action = "left the room",
+            RoomId = (long?)_roomManager.Room?.Id,
+            RoomName = _roomManager.Room?.Data?.Name,
         });
 
         if (IsWhisperMode)
@@ -1181,7 +1206,9 @@ public class ChatPageViewModel : PageViewModel
                 Timestamp = vm.Timestamp,
                 Type = "action",
                 UserName = e.Avatar.Name,
-                Action = action
+                Action = action,
+                RoomId = (long?)_roomManager.Room?.Id,
+                RoomName = _roomManager.Room?.Data?.Name,
             });
         }
     }
@@ -1203,6 +1230,7 @@ public class ChatPageViewModel : PageViewModel
         {
             Timestamp = vm.Timestamp,
             Type = "room",
+            RoomId = (long)e.Room.Id,
             RoomName = roomName,
             RoomOwner = roomOwner
         });
@@ -1268,6 +1296,8 @@ public class ChatPageViewModel : PageViewModel
             IsWhisper = isWhisper,
             WhisperRecipient = whisperRecipient,
             HasProfanity = hasProfanity,
+            RoomId = (long?)room?.Id,
+            RoomName = room?.Data?.Name,
         });
     }
 

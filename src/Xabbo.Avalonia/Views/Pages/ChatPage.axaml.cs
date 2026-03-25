@@ -58,6 +58,11 @@ public partial class ChatPage : UserControl
 
         ChatInputTextBox.KeyDown += OnChatInputKeyDown;
         WhisperRecipientBox.KeyDown += OnWhisperRecipientKeyDown;
+        HistorySearchRoomBox.GotFocus += (s, e) =>
+        {
+            if (DataContext is ChatPageViewModel vm)
+                vm.RefreshHistoryRoomSuggestions();
+        };
 
         // Select a recent whisper recipient from the flyout
         RecentWhispersList.SelectionChanged += (s, e) =>
