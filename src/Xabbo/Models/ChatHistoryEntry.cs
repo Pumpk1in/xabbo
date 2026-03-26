@@ -48,6 +48,12 @@ public sealed class ChatHistoryEntry
         _ => ToString() ?? ""
     };
 
+    [JsonIgnore]
+    public string RoomLabel =>
+        string.IsNullOrEmpty(RoomName) ? $"({Type})"
+        : RoomName.Length > 30 ? $"({RoomName[..30]}…)"
+        : $"({RoomName})";
+
     public string MessageText => Type switch
     {
         "message" when !string.IsNullOrEmpty(WhisperRecipient) => $"-> {WhisperRecipient}: {Message}",
