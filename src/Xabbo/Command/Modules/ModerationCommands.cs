@@ -214,8 +214,9 @@ public sealed class ModerationCommands(RoomManager roomManager, IAppPathProvider
                     NotifyChatLog(user.Name, "kicked from room group");
                     await Task.Delay(1500);
                 }
-                ShowMessage($"Banning user '{user.Name}'");
-                NotifyChatLog(user.Name, "banned (deferred)");
+                string durationString = FormatBanDuration(banDuration);
+                ShowMessage($"Banning user '{user.Name}' {durationString}");
+                NotifyChatLog(user.Name, $"banned {durationString} (deferred)");
                 await Task.Delay(100);
                 BanUser(user, banDuration);
                 _banList.TryRemove(user.Name, out _);
@@ -385,7 +386,6 @@ public sealed class ModerationCommands(RoomManager roomManager, IAppPathProvider
         if (args.Length < 1) return;
 
         var banDuration = BanDuration.Hour;
-        string durationString = "for an hour";
 
         if (args.Length > 1)
         {
@@ -393,15 +393,12 @@ public sealed class ModerationCommands(RoomManager roomManager, IAppPathProvider
             {
                 case "hour":
                     banDuration = BanDuration.Hour;
-                    durationString = "for an hour";
                     break;
                 case "day":
                     banDuration = BanDuration.Day;
-                    durationString = "for a day";
                     break;
                 case "perm":
                     banDuration = BanDuration.Permanent;
-                    durationString = "permanently";
                     break;
                 default:
                     ShowMessage($"Unknown ban type '{args[1]}'.");
@@ -409,6 +406,7 @@ public sealed class ModerationCommands(RoomManager roomManager, IAppPathProvider
             }
         }
 
+        string durationString = FormatBanDuration(banDuration);
         string userName = args[0];
 
         if (_roomManager.Room is not null &&
@@ -432,4 +430,12 @@ public sealed class ModerationCommands(RoomManager roomManager, IAppPathProvider
             AddToBanList(userName, banDuration);
         }
     }
+
+    private static string FormatBanDuration(BanDuration duration) => duration switch
+    {
+        BanDuration.Hour => "for an hour",
+        BanDuration.Day => "for a day",
+        BanDuration.Permanent => "permanently",
+        _ => "for an hour"
+    };
 }
