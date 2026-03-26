@@ -418,12 +418,12 @@
         </DataTemplate>
         <DataTemplate DataType="vm:ChatLogAvatarActionViewModel">
           <Grid Margin="10,0" ColumnDefinitions="*,Auto,*">
-            <Separator Margin="0" Grid.Column="0" />
-            <TextBlock Grid.Column="1" Margin="10,0" MaxWidth="500" TextWrapping="Wrap">
+            <Separator Margin="0" Grid.Column="0" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" Margin="10,0" MaxWidth="500" TextWrapping="Wrap" VerticalAlignment="Center">
               <Run Classes="privacy" Text="{Binding UserName}" />
               <Run Text="{Binding Action}" />
             </TextBlock>
-            <Separator Margin="0" Grid.Column="2" />
+            <Separator Margin="0" Grid.Column="2" VerticalAlignment="Center" />
           </Grid>
         </DataTemplate>
         <DataTemplate DataType="vm:ChatMessageViewModel">
@@ -532,7 +532,7 @@
         <ControlTheme TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}" x:DataType="vm:ChatLogEntryViewModel">
           <Setter Property="Padding" Value="0" />
           <Setter Property="MinHeight" Value="50" />
-          <Setter Property="VerticalContentAlignment" Value="Stretch" />
+          <Setter Property="VerticalContentAlignment" Value="Center" />
         </ControlTheme>
       </ListBox.ItemContainerTheme>
       <ListBox.ItemTemplate>
