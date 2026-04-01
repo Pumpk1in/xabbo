@@ -1,5 +1,7 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
@@ -38,7 +40,12 @@ public partial class ChatPage : UserControl
 
         if (HistoryButton.Flyout is { } flyout)
         {
-            flyout.Opened += (s, e) => { HistoryDimOverlay.Opacity = 0.5; HistoryDimOverlay.IsHitTestVisible = true; };
+            flyout.Opened += (s, e) =>
+            {
+                HistoryDimOverlay.Opacity = 0.5;
+                HistoryDimOverlay.IsHitTestVisible = true;
+                UpdateHistoryFlyoutMaxHeight();
+            };
             flyout.Closed += (s, e) => { HistoryDimOverlay.Opacity = 0; HistoryDimOverlay.IsHitTestVisible = false; };
         }
 
@@ -178,6 +185,14 @@ public partial class ChatPage : UserControl
 
         RemoveFromFilterSubMenu.ItemsSource = menuItems;
         RemoveFromFilterSubMenu.IsVisible = true;
+    }
+
+    private void UpdateHistoryFlyoutMaxHeight()
+    {
+        if (this.FindAncestorOfType<Window>() is not { } window) return;
+        var buttonPos = HistoryButton.TranslatePoint(new Point(0, HistoryButton.Bounds.Height), window) ?? new Point(0, 0);
+        double availableHeight = window.Bounds.Height - buttonPos.Y;
+        HistoryFlyoutPanel.MaxHeight = Math.Max(500, availableHeight * 0.80);
     }
 
     private void OnHistoryOverlayPressed(object? sender, PointerPressedEventArgs e)

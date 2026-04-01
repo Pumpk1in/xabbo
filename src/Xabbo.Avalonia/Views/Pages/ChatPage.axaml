@@ -47,13 +47,20 @@
       <Button x:Name="HistoryButton" Grid.Column="4" Margin="10,0,0,0" VerticalAlignment="Center" Padding="8" ToolTip.Tip="Search history">
         <Button.Flyout>
           <Flyout Placement="BottomEdgeAlignedRight">
-            <StackPanel Width="420" Spacing="10" x:DataType="vm:ChatPageViewModel" DataContext="{Binding #ChatPageRoot.DataContext}">
-              <StackPanel.Resources>
+            <Flyout.FlyoutPresenterTheme>
+              <ControlTheme TargetType="FlyoutPresenter" BasedOn="{StaticResource {x:Type FlyoutPresenter}}">
+                <Setter Property="MaxHeight" Value="Infinity" />
+              </ControlTheme>
+            </Flyout.FlyoutPresenterTheme>
+            <Grid x:Name="HistoryFlyoutPanel" Width="420"
+                  RowDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto,Auto"
+                  x:DataType="vm:ChatPageViewModel" DataContext="{Binding #ChatPageRoot.DataContext}">
+              <Grid.Resources>
                 <x:Double x:Key="TimePickerThemeMinWidth">0</x:Double>
                 <x:Double x:Key="TimePickerThemeMaxWidth">120</x:Double>
-              </StackPanel.Resources>
-              <TextBlock Text="Chat History Search" FontWeight="Bold" FontSize="16" />
-              <StackPanel Spacing="8">
+              </Grid.Resources>
+              <TextBlock Grid.Row="0" Text="Chat History Search" FontWeight="Bold" FontSize="16" Margin="0,0,0,10" />
+              <StackPanel Grid.Row="1" Spacing="8" Margin="0,0,0,10">
                 <Grid ColumnDefinitions="70,*">
                   <TextBlock Grid.Column="0" Text="User:" VerticalAlignment="Center" />
                   <TextBox x:Name="HistorySearchUserTextBox" Grid.Column="1" Classes="clearButton" Text="{Binding HistorySearchUser}" Watermark="Username(s) separated by spaces..." />
@@ -89,7 +96,7 @@
                               ClockIdentifier="24HourClock" />
                 </Grid>
               </StackPanel>
-              <Grid ColumnDefinitions="Auto,Auto,*">
+              <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,*" Margin="0,0,0,10">
                 <CheckBox Grid.Column="0" IsChecked="{Binding HistorySearchProfanityOnly}" Content="Profanity only" />
                 <CheckBox Grid.Column="1" IsChecked="{Binding HistorySearchWhispersOnly}" Content="Whispers only" Margin="10,0,0,0" />
                 <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="4">
@@ -99,13 +106,14 @@
                   <Button Content="Search" Command="{Binding SearchHistoryCmd}" />
                 </StackPanel>
               </Grid>
-              <Separator />
-              <TextBlock Text="{Binding HistoryResultsText}" FontWeight="SemiBold" />
+              <Separator Grid.Row="3" Margin="0,0,0,10" />
+              <TextBlock Grid.Row="4" Text="{Binding HistoryResultsText}" FontWeight="SemiBold" Margin="0,0,0,10" />
               <ListBox x:Name="HistoryResultsListBox"
+                       Grid.Row="5"
                        ItemsSource="{Binding HistoryResults}"
                        Selection="{Binding HistorySelection}"
                        SelectionMode="Multiple"
-                       MaxHeight="350" MinHeight="100"
+                       MinHeight="100"
                        ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                 <ListBox.ContextFlyout>
                   <ui:FAMenuFlyout>
@@ -199,17 +207,19 @@
               </ListBox>
               <!-- Error message displayed inline -->
               <Border
+                Grid.Row="6"
                 IsVisible="{Binding HistoryErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                 Background="#44FF6B6B"
                 CornerRadius="4"
                 Padding="10,8"
+                Margin="0,10,0,0"
               >
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <ic:SymbolIcon Symbol="Warning" Foreground="#FF6B6B" FontSize="14" />
                   <TextBlock Text="{Binding HistoryErrorMessage}" Foreground="#FF6B6B" TextWrapping="Wrap" />
                 </StackPanel>
               </Border>
-              <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right">
+              <StackPanel Grid.Row="7" Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" Margin="0,10,0,0">
                 <Button Command="{Binding ExportHistoryCmd}" CommandParameter="txt">
                   <StackPanel Orientation="Horizontal" Spacing="5">
                     <ic:SymbolIcon Symbol="Document" FontSize="12" />
@@ -223,7 +233,7 @@
                   </StackPanel>
                 </Button>
               </StackPanel>
-            </StackPanel>
+            </Grid>
           </Flyout>
         </Button.Flyout>
         <ic:SymbolIcon Symbol="History" FontSize="16" />
