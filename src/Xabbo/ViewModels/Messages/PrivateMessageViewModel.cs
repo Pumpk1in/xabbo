@@ -7,4 +7,7 @@ public sealed class PrivateMessageViewModel
     public DateTimeOffset Timestamp { get; init; }
     public bool IsFromMe { get; init; }
     public bool IsInvitation { get; init; }
+
+    public override string ToString() =>
+        $"[{Timestamp:HH:mm}] {SenderName}: {Content}";
 }

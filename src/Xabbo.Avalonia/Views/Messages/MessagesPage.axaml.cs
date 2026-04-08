@@ -18,7 +18,11 @@ public partial class MessagesPage : UserControl
             if (DataContext is MessagesPageViewModel vm)
             {
                 vm.WhenAnyValue(x => x.SelectedConversation)
-                    .Subscribe(_ => ScrollMessagesToBottom());
+                    .Subscribe(_ =>
+                    {
+                        vm.MessageSelection.Clear();
+                        ScrollMessagesToBottom();
+                    });
             }
         };
     }

@@ -1,7 +1,9 @@
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Reactive;
 using System.Reactive.Linq;
 using System.Web;
+using Avalonia.Controls.Selection;
 using DynamicData;
 using DynamicData.Binding;
 using ReactiveUI;
@@ -34,6 +36,7 @@ public sealed class MessagesPageViewModel : PageViewModel
     private readonly IDialogService _dialogService;
     private readonly IInterceptor _interceptor;
     private readonly ILauncherService _launcher;
+    private readonly IClipboardService _clipboard;
     private readonly FriendManager _friendManager;
     private readonly ProfileManager _profileManager;
     private readonly IPrivateMessageHistoryService _history;
@@ -49,8 +52,14 @@ public sealed class MessagesPageViewModel : PageViewModel
     [Reactive] public int TotalUnread { get; private set; }
     [Reactive] public bool IsActive { get; set; }
 
+    public SelectionModel<PrivateMessageViewModel> MessageSelection { get; } = new SelectionModel<PrivateMessageViewModel>()
+    {
+        SingleSelect = false
+    };
+
     private bool _isSendingFromHere;
 
+    public ReactiveCommand<Unit, Unit> CopySelectedMessagesCmd { get; }
     public ReactiveCommand<Unit, Unit> SendReplyCmd { get; }
     public ReactiveCommand<Unit, Unit> FollowFriendCmd { get; }
     public ReactiveCommand<ConversationViewModel, Unit> HideConversationCmd { get; }
@@ -62,6 +71,7 @@ public sealed class MessagesPageViewModel : PageViewModel
         IDialogService dialogService,
         IInterceptor interceptor,
         ILauncherService launcher,
+        IClipboardService clipboard,
         FriendManager friendManager,
         ProfileManager profileManager,
         IPrivateMessageHistoryService history)
@@ -70,6 +80,7 @@ public sealed class MessagesPageViewModel : PageViewModel
         _dialogService = dialogService;
         _interceptor = interceptor;
         _launcher = launcher;
+        _clipboard = clipboard;
         _friendManager = friendManager;
         _profileManager = profileManager;
         _history = history;
@@ -89,6 +100,7 @@ public sealed class MessagesPageViewModel : PageViewModel
             (conv, text) => conv is not null && !string.IsNullOrWhiteSpace(text));
 
         SendReplyCmd = ReactiveCommand.Create(SendReply, canSend);
+        CopySelectedMessagesCmd = ReactiveCommand.Create(CopySelectedMessages);
 
         var canFollow = this.WhenAnyValue(x => x.SelectedConversation)
             .Select(conv => conv is not null);
@@ -503,6 +515,16 @@ public sealed class MessagesPageViewModel : PageViewModel
         UpdateLastMessageTime(conv, timestamp);
 
         ReplyText = "";
+    }
+
+    private void CopySelectedMessages()
+    {
+        var items = MessageSelection.SelectedItems
+            .Where(x => x is not null)
+            .Cast<PrivateMessageViewModel>()
+            .ToList();
+        if (items.Count == 0) return;
+        _clipboard.SetText(string.Join("\n", items));
     }
 
     /// <summary>
