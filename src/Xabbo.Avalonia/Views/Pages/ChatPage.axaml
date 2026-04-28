@@ -67,34 +67,70 @@
                 </Grid>
                 <Grid ColumnDefinitions="70,*">
                   <TextBlock Grid.Column="0" Text="Keyword:" VerticalAlignment="Center" />
-                  <TextBox Grid.Column="1" Classes="clearButton" Text="{Binding HistorySearchKeyword}" Watermark="Search text..." />
+                  <TextBox Grid.Column="1" Classes="clearButton" Text="{Binding HistorySearchKeyword}" Watermark="Words or &quot;exact phrase&quot;..." />
                 </Grid>
                 <Grid ColumnDefinitions="70,*">
-                  <TextBlock Grid.Column="0" Text="Room:" VerticalAlignment="Center" />
-                  <AutoCompleteBox x:Name="HistorySearchRoomBox" Grid.Column="1"
-                    Text="{Binding HistorySearchRoom, Mode=TwoWay}"
-                    ItemsSource="{Binding HistoryRoomSuggestions}"
-                    FilterMode="ContainsOrdinal"
-                    MinimumPrefixLength="1"
-                    Watermark="Room name..."
-                    MaxDropDownHeight="200" />
+                  <TextBlock Grid.Column="0" Text="Period:" VerticalAlignment="Center" />
+                  <ItemsControl Grid.Column="1">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate>
+                        <WrapPanel />
+                      </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <Button Content="Last hour" Command="{Binding ApplyHistoryPresetCmd}"
+                            CommandParameter="{x:Static vm:HistoryRangePreset.LastHour}"
+                            Padding="8,4" Margin="0,0,4,4" FontSize="12" />
+                    <Button Content="Last 4h" Command="{Binding ApplyHistoryPresetCmd}"
+                            CommandParameter="{x:Static vm:HistoryRangePreset.Last4Hours}"
+                            Padding="8,4" Margin="0,0,4,4" FontSize="12" />
+                    <Button Content="Today" Command="{Binding ApplyHistoryPresetCmd}"
+                            CommandParameter="{x:Static vm:HistoryRangePreset.Today}"
+                            Padding="8,4" Margin="0,0,4,4" FontSize="12" />
+                    <Button Content="Yesterday" Command="{Binding ApplyHistoryPresetCmd}"
+                            CommandParameter="{x:Static vm:HistoryRangePreset.Yesterday}"
+                            Padding="8,4" Margin="0,0,4,4" FontSize="12" />
+                    <Button Content="Last 7 days" Command="{Binding ApplyHistoryPresetCmd}"
+                            CommandParameter="{x:Static vm:HistoryRangePreset.Last7Days}"
+                            Padding="8,4" Margin="0,0,4,4" FontSize="12" />
+                  </ItemsControl>
                 </Grid>
-                <Grid ColumnDefinitions="70,Auto,8,Auto">
-                  <TextBlock Grid.Column="0" Text="From:" VerticalAlignment="Center" />
-                  <CalendarDatePicker Grid.Column="1" SelectedDate="{Binding HistorySearchFromDate}" FontSize="12" MinWidth="165" />
-                  <TimePicker Grid.Column="3" SelectedTime="{Binding HistorySearchFromTime}" FontSize="12"
-                              Width="100"
-                              IsEnabled="{Binding HistorySearchFromDate, Converter={x:Static ObjectConverters.IsNotNull}}"
-                              ClockIdentifier="24HourClock" />
-                </Grid>
-                <Grid ColumnDefinitions="70,Auto,8,Auto">
-                  <TextBlock Grid.Column="0" Text="To:" VerticalAlignment="Center" />
-                  <CalendarDatePicker Grid.Column="1" SelectedDate="{Binding HistorySearchToDate}" FontSize="12" MinWidth="165" />
-                  <TimePicker Grid.Column="3" SelectedTime="{Binding HistorySearchToTime}" FontSize="12"
-                              Width="100"
-                              IsEnabled="{Binding HistorySearchToDate, Converter={x:Static ObjectConverters.IsNotNull}}"
-                              ClockIdentifier="24HourClock" />
-                </Grid>
+                <Expander Header="{Binding AdvancedHeaderText}" IsExpanded="False" HorizontalAlignment="Stretch" Padding="8,4" MinHeight="0" FontSize="12">
+                  <Expander.Styles>
+                    <Style Selector="Expander ToggleButton">
+                      <Setter Property="MinHeight" Value="0" />
+                      <Setter Property="Height" Value="28" />
+                      <Setter Property="Padding" Value="8,2" />
+                    </Style>
+                  </Expander.Styles>
+                  <StackPanel Spacing="8" Margin="0,4,0,0">
+                    <Grid ColumnDefinitions="70,*">
+                      <TextBlock Grid.Column="0" Text="Room:" VerticalAlignment="Center" />
+                      <AutoCompleteBox x:Name="HistorySearchRoomBox" Grid.Column="1"
+                        Text="{Binding HistorySearchRoom, Mode=TwoWay}"
+                        ItemsSource="{Binding HistoryRoomSuggestions}"
+                        FilterMode="ContainsOrdinal"
+                        MinimumPrefixLength="1"
+                        Watermark="Room name..."
+                        MaxDropDownHeight="200" />
+                    </Grid>
+                    <Grid ColumnDefinitions="70,Auto,8,Auto">
+                      <TextBlock Grid.Column="0" Text="From:" VerticalAlignment="Center" />
+                      <CalendarDatePicker Grid.Column="1" SelectedDate="{Binding HistorySearchFromDate}" FontSize="12" MinWidth="165" />
+                      <TimePicker Grid.Column="3" SelectedTime="{Binding HistorySearchFromTime}" FontSize="12"
+                                  Width="100"
+                                  IsEnabled="{Binding HistorySearchFromDate, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                  ClockIdentifier="24HourClock" />
+                    </Grid>
+                    <Grid ColumnDefinitions="70,Auto,8,Auto">
+                      <TextBlock Grid.Column="0" Text="To:" VerticalAlignment="Center" />
+                      <CalendarDatePicker Grid.Column="1" SelectedDate="{Binding HistorySearchToDate}" FontSize="12" MinWidth="165" />
+                      <TimePicker Grid.Column="3" SelectedTime="{Binding HistorySearchToTime}" FontSize="12"
+                                  Width="100"
+                                  IsEnabled="{Binding HistorySearchToDate, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                  ClockIdentifier="24HourClock" />
+                    </Grid>
+                  </StackPanel>
+                </Expander>
               </StackPanel>
               <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,*" Margin="0,0,0,10">
                 <CheckBox Grid.Column="0" IsChecked="{Binding HistorySearchProfanityOnly}" Content="Profanity only" />

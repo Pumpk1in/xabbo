@@ -147,6 +147,10 @@ public class ChatPageViewModel : PageViewModel
     [Reactive] public TimeSpan? HistorySearchFromTime { get; set; }
     [Reactive] public DateTime? HistorySearchToDate { get; set; }
     [Reactive] public TimeSpan? HistorySearchToTime { get; set; }
+    [Reactive] public HistoryRangePreset? SelectedHistoryPreset { get; set; }
+
+    private ObservableAsPropertyHelper<string>? _advancedHeaderText;
+    public string AdvancedHeaderText => _advancedHeaderText?.Value ?? "Advanced";
 
     private readonly ObservableCollection<ChatHistoryEntry> _historyResults = [];
     public ObservableCollection<ChatHistoryEntry> HistoryResults => _historyResults;
@@ -166,6 +170,7 @@ public class ChatPageViewModel : PageViewModel
 
     public ReactiveCommand<Unit, Unit> SearchHistoryCmd { get; }
     public ReactiveCommand<Unit, Unit> ClearHistorySearchCmd { get; }
+    public ReactiveCommand<HistoryRangePreset, Unit> ApplyHistoryPresetCmd { get; }
     public ReactiveCommand<string, Task> ExportHistoryCmd { get; }
     public ReactiveCommand<Unit, Unit> CopyHistoryEntriesCmd { get; }
     public ReactiveCommand<string, Unit> CopyHistoryFieldCmd { get; }
@@ -361,6 +366,12 @@ public class ChatPageViewModel : PageViewModel
         // History commands
         SearchHistoryCmd = ReactiveCommand.CreateFromTask(SearchHistoryAsync);
         ClearHistorySearchCmd = ReactiveCommand.Create(ClearHistorySearch);
+        ApplyHistoryPresetCmd = ReactiveCommand.Create<HistoryRangePreset>(ApplyHistoryPreset);
+
+        _advancedHeaderText = this
+            .WhenAnyValue(x => x.SelectedHistoryPreset)
+            .Select(p => p is null ? "Advanced" : $"Advanced · {FormatPreset(p.Value)}")
+            .ToProperty(this, x => x.AdvancedHeaderText);
         ExportHistoryCmd = ReactiveCommand.Create<string, Task>(ExportHistoryAsync);
         var canCopyHistoryEntries = Observable
             .FromEventPattern<EventHandler<SelectionModelSelectionChangedEventArgs<ChatHistoryEntry>>, SelectionModelSelectionChangedEventArgs<ChatHistoryEntry>>(
@@ -490,7 +501,7 @@ public class ChatPageViewModel : PageViewModel
     private Func<ChatLogEntryViewModel, bool> CreateCombinedFilter(string? filterText, bool whispersOnly, bool profanityOnly)
     {
         var hasTextFilter = !string.IsNullOrWhiteSpace(filterText);
-        var keywords = hasTextFilter ? ParseKeywords(filterText!) : null;
+        var keywords = hasTextFilter ? KeywordParser.Parse(filterText!) : null;
 
         return vm =>
         {
@@ -775,11 +786,60 @@ public class ChatPageViewModel : PageViewModel
         HistorySearchFromTime = null;
         HistorySearchToDate = null;
         HistorySearchToTime = null;
+        SelectedHistoryPreset = null;
         _historyResults.Clear();
         HistorySelection.Clear();
         HistoryResultsTotal = 0;
         HistoryResultsText = "Results: 0";
     }
+
+    private void ApplyHistoryPreset(HistoryRangePreset preset)
+    {
+        var now = DateTime.Now;
+        DateTime from, to;
+
+        switch (preset)
+        {
+            case HistoryRangePreset.LastHour:
+                from = now.AddHours(-1);
+                to = now;
+                break;
+            case HistoryRangePreset.Last4Hours:
+                from = now.AddHours(-4);
+                to = now;
+                break;
+            case HistoryRangePreset.Today:
+                from = now.Date;
+                to = now;
+                break;
+            case HistoryRangePreset.Yesterday:
+                from = now.Date.AddDays(-1);
+                to = now.Date.AddTicks(-1);
+                break;
+            case HistoryRangePreset.Last7Days:
+                from = now.AddDays(-7);
+                to = now;
+                break;
+            default:
+                return;
+        }
+
+        HistorySearchFromDate = from.Date;
+        HistorySearchFromTime = from.TimeOfDay;
+        HistorySearchToDate = to.Date;
+        HistorySearchToTime = to.TimeOfDay;
+        SelectedHistoryPreset = preset;
+    }
+
+    private static string FormatPreset(HistoryRangePreset preset) => preset switch
+    {
+        HistoryRangePreset.LastHour => "Last hour",
+        HistoryRangePreset.Last4Hours => "Last 4 hours",
+        HistoryRangePreset.Today => "Today",
+        HistoryRangePreset.Yesterday => "Yesterday",
+        HistoryRangePreset.Last7Days => "Last 7 days",
+        _ => "Custom"
+    };
 
     public async void RefreshHistoryRoomSuggestions()
     {
@@ -1043,50 +1103,6 @@ public class ChatPageViewModel : PageViewModel
     }
 
     private long NextEntryId() => Interlocked.Increment(ref _currentMessageId);
-
-    private static List<string> ParseKeywords(string filterText)
-    {
-        var keywords = new List<string>();
-        var inQuotes = false;
-        var currentWord = new StringBuilder();
-        
-        for (int i = 0; i < filterText.Length; i++)
-        {
-            char c = filterText[i];
-            
-            if (c == '"')
-            {
-                if (inQuotes)
-                {
-                    if (currentWord.Length > 0)
-                    {
-                        keywords.Add(currentWord.ToString());
-                        currentWord.Clear();
-                    }
-                }
-                inQuotes = !inQuotes;
-            }
-            else if (c == ' ' && !inQuotes)
-            {
-                if (currentWord.Length > 0)
-                {
-                    keywords.Add(currentWord.ToString());
-                    currentWord.Clear();
-                }
-            }
-            else
-            {
-                currentWord.Append(c);
-            }
-        }
-        
-        if (currentWord.Length > 0)
-        {
-            keywords.Add(currentWord.ToString());
-        }
-        
-        return keywords;
-    }
 
     private void AppendLog(ChatLogEntryViewModel vm)
     {

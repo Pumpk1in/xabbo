@@ -4,6 +4,7 @@ using Microsoft.Data.Sqlite;
 using Xabbo.Models;
 using Xabbo.Models.Enums;
 using Xabbo.Services.Abstractions;
+using Xabbo.Utility;
 
 namespace Xabbo.Services;
 
@@ -247,8 +248,23 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
 
             if (!string.IsNullOrWhiteSpace(keyword))
             {
-                conditions.Add("(message LIKE @keyword OR action LIKE @keyword)");
-                parameters.Add(new SqliteParameter("@keyword", $"%{keyword}%"));
+                var tokens = KeywordParser.Parse(keyword);
+                if (tokens.Count == 1)
+                {
+                    conditions.Add("(message LIKE @keyword0 OR action LIKE @keyword0)");
+                    parameters.Add(new SqliteParameter("@keyword0", $"%{tokens[0]}%"));
+                }
+                else if (tokens.Count > 1)
+                {
+                    var tokenClauses = new List<string>(tokens.Count);
+                    for (int i = 0; i < tokens.Count; i++)
+                    {
+                        string p = $"@keyword{i}";
+                        tokenClauses.Add($"(message LIKE {p} OR action LIKE {p})");
+                        parameters.Add(new SqliteParameter(p, $"%{tokens[i]}%"));
+                    }
+                    conditions.Add("(" + string.Join(" OR ", tokenClauses) + ")");
+                }
             }
 
             if (profanityOnly == true)
