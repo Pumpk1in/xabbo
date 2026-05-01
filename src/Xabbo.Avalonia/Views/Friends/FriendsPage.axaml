@@ -32,6 +32,7 @@
       </DockPanel>
       <ListBox
         x:Name="FriendsList"
+        Classes="flat"
         Grid.Row="1"
         Padding="6"
         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
@@ -55,11 +56,12 @@
           <Style Selector="ListBoxItem">
             <Setter Property="Padding" Value="0" />
             <Setter Property="Margin" Value="4" />
+            <Setter Property="VerticalAlignment" Value="Top" />
           </Style>
         </ListBox.Styles>
         <ListBox.ItemsPanel>
           <ItemsPanelTemplate>
-            <UniformGrid Columns="{Binding Path=Columns, ElementName=friendsPage}" />
+            <UniformGrid Columns="{Binding Path=Columns, ElementName=friendsPage}" VerticalAlignment="Top" />
           </ItemsPanelTemplate>
         </ListBox.ItemsPanel>
         <ListBox.ItemTemplate>
