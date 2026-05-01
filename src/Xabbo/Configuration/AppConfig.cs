@@ -16,4 +16,6 @@ public sealed partial class AppConfig : ReactiveObject
     [Reactive] public ViewConfig View { get; set; } = new();
 
     [Reactive] public FriendsConfig Friends { get; set; } = new();
+
+    [Reactive] public AiConfig Ai { get; set; } = new();
 }

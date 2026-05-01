@@ -20,6 +20,7 @@
 
   <ItemGroup Label="GitVersion">
     <PackageReference Include="GitVersion.MsBuild" Version="6.0.2" PrivateAssets="all" />
+    <PackageReference Include="Markdown.Avalonia" Version="11.0.2" />
   </ItemGroup>
 
   <ItemGroup Label="Avalonia">

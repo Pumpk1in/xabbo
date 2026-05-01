@@ -45,6 +45,9 @@ public partial class ChatPage : UserControl
                 HistoryDimOverlay.Opacity = 0.5;
                 HistoryDimOverlay.IsHitTestVisible = true;
                 UpdateHistoryFlyoutMaxHeight();
+
+                if (DataContext is ChatPageViewModel vm)
+                    _ = vm.RefreshOllamaAvailabilityAsync();
             };
             flyout.Closed += (s, e) => { HistoryDimOverlay.Opacity = 0; HistoryDimOverlay.IsHitTestVisible = false; };
         }

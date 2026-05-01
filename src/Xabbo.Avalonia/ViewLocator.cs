@@ -11,5 +11,6 @@ public class ViewLocator : StrongViewLocator
     {
         Register<MainViewModel, MainWindow>();
         Register<OfferItemsViewModel, OfferItemsView>();
+        Register<ChatSummaryDialogViewModel, ChatSummaryDialogView>();
     }
 }

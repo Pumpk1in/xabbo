@@ -113,6 +113,9 @@ public static class ViewModelLocator
 
         // Xabbo services
         Splatr.RegisterLazySingleton<IHabboApi, HabboApi>();
+        Splatr.RegisterLazySingleton<IOllamaService, OllamaService>();
+        Splatr.RegisterLazySingleton<IGeminiService, GeminiService>();
+        Splatr.RegisterLazySingleton<IAiSummarizationProvider, AiProviderDispatcher>();
         Splatr.RegisterLazySingleton<IFigureConverterService, FigureConverterService>();
         Splatr.RegisterLazySingleton<IGameDataManager, GameDataManager>();
         Splatr.RegisterLazySingleton<IGameStateService, GameStateService>();
@@ -226,6 +229,8 @@ public static class ViewModelLocator
         Splatr.RegisterLazySingleton<ExternalVariablesViewModel>();
 
         Splatr.RegisterLazySingleton<OfferItemsViewModel>();
+
+        Splatr.RegisterLazySingleton<ChatSummaryDialogViewModel>();
     }
 
     static void RegisterViews()

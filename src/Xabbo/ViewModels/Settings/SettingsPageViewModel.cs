@@ -20,6 +20,8 @@ public sealed class SettingsPageViewModel : PageViewModel
     private readonly IConfigProvider<AppConfig> _config;
     private readonly IChatHistoryService _chatHistory;
     private readonly IProfanityFilterService _profanityFilter;
+    private readonly IOllamaService _ollama;
+    private readonly IGeminiService _gemini;
     public AppConfig Config => _config.Value;
 
     public static IReadOnlyList<ChatBubbleOption> NormalBubbles { get; } = ChatBubbleOption.NormalBubbles;
@@ -29,18 +31,46 @@ public sealed class SettingsPageViewModel : PageViewModel
     [Reactive] public ChatBubbleOption? SelectedOtherBubble  { get; set; }
     [Reactive] public string CustomProfanityWordsText { get; set; } = string.Empty;
     [Reactive] public int HistoryEntryCount { get; set; }
+    [Reactive] public string? OllamaConnectionStatus { get; set; }
+    [Reactive] public string? GeminiConnectionStatus { get; set; }
+
+    public int ProviderIndex
+    {
+        get => Config.Ai.Provider switch
+        {
+            AiProvider.Gemini => 1,
+            _ => 0,
+        };
+        set
+        {
+            Config.Ai.Provider = value == 1 ? AiProvider.Gemini : AiProvider.Ollama;
+            this.RaisePropertyChanged();
+            this.RaisePropertyChanged(nameof(IsOllamaSelected));
+            this.RaisePropertyChanged(nameof(IsGeminiSelected));
+        }
+    }
+
+    public bool IsOllamaSelected => Config.Ai.Provider == AiProvider.Ollama;
+    public bool IsGeminiSelected => Config.Ai.Provider == AiProvider.Gemini;
 
     public ReactiveCommand<Unit, Unit> ApplyCustomWordsCmd { get; }
     public ReactiveCommand<Unit, Unit> ClearHistoryCmd { get; }
+    public ReactiveCommand<Unit, Unit> TestOllamaConnectionCmd { get; }
+    public ReactiveCommand<Unit, Unit> TestGeminiConnectionCmd { get; }
+    public ReactiveCommand<Unit, Unit> ResetPromptCmd { get; }
 
     public SettingsPageViewModel(
         IConfigProvider<AppConfig> config,
         IChatHistoryService chatHistory,
-        IProfanityFilterService profanityFilter)
+        IProfanityFilterService profanityFilter,
+        IOllamaService ollama,
+        IGeminiService gemini)
     {
         _config = config;
         _chatHistory = chatHistory;
         _profanityFilter = profanityFilter;
+        _ollama = ollama;
+        _gemini = gemini;
 
         // Initialize text from current custom words
         RefreshCustomWordsText();
@@ -72,6 +102,35 @@ public sealed class SettingsPageViewModel : PageViewModel
 
         ApplyCustomWordsCmd = ReactiveCommand.Create(ApplyCustomWords);
         ClearHistoryCmd = ReactiveCommand.Create(ClearHistory);
+        TestOllamaConnectionCmd = ReactiveCommand.CreateFromTask(TestOllamaConnectionAsync);
+        TestGeminiConnectionCmd = ReactiveCommand.CreateFromTask(TestGeminiConnectionAsync);
+        ResetPromptCmd = ReactiveCommand.Create(() => { Config.Ai.SystemPrompt = AiConfig.DefaultSystemPrompt; });
+    }
+
+    private async Task TestGeminiConnectionAsync()
+    {
+        GeminiConnectionStatus = "Testing...";
+        var status = await _gemini.CheckAvailabilityAsync();
+
+        if (!status.Reachable)
+            GeminiConnectionStatus = $"Unreachable: {status.ErrorMessage}";
+        else if (!status.ModelAvailable)
+            GeminiConnectionStatus = $"Connected, but model '{status.ConfiguredModel}' not found";
+        else
+            GeminiConnectionStatus = $"Connected (model {status.ConfiguredModel} available)";
+    }
+
+    private async Task TestOllamaConnectionAsync()
+    {
+        OllamaConnectionStatus = "Testing...";
+        var status = await _ollama.CheckAvailabilityAsync();
+
+        if (!status.Reachable)
+            OllamaConnectionStatus = $"Unreachable: {status.ErrorMessage}";
+        else if (!status.ModelAvailable)
+            OllamaConnectionStatus = $"Connected, but model '{status.ConfiguredModel}' is not available. Run: ollama pull {status.ConfiguredModel}";
+        else
+            OllamaConnectionStatus = $"Connected (model {status.ConfiguredModel} available)";
     }
 
     private void InitBubbleSelection()

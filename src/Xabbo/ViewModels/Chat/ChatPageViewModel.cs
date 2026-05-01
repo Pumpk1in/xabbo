@@ -52,6 +52,7 @@ public class ChatPageViewModel : PageViewModel
     private readonly IProfanityFilterService _profanityFilter;
     private readonly IFileExportService _fileExport;
     private readonly IChatHistoryService _chatHistory;
+    private readonly IAiSummarizationProvider _ollama;
 
     private readonly RoomManager _roomManager;
     private readonly ProfileManager _profileManager;
@@ -179,6 +180,17 @@ public class ChatPageViewModel : PageViewModel
     public ReactiveCommand<Unit, Unit> GoToHistoryMessageCmd { get; }
     public ReactiveCommand<Unit, Unit> SearchHistoryUserCmd { get; }
     public ReactiveCommand<Unit, Task> AddHistoryToProfanityFilterCmd { get; }
+    public ReactiveCommand<Unit, Unit> SummarizeChatCmd { get; }
+
+    [Reactive] public bool OllamaAvailable { get; set; }
+
+    public async Task RefreshOllamaAvailabilityAsync()
+    {
+        var available = await _ollama.IsAvailableAsync();
+        OllamaAvailable = available;
+    }
+    private readonly ObservableAsPropertyHelper<bool> _canSummarize;
+    public bool CanSummarize => _canSummarize.Value;
 
     public SelectionModel<ChatHistoryEntry> HistorySelection { get; } = new SelectionModel<ChatHistoryEntry>()
     {
@@ -212,6 +224,7 @@ public class ChatPageViewModel : PageViewModel
         IProfanityFilterService profanityFilter,
         IFileExportService fileExport,
         IChatHistoryService chatHistory,
+        IAiSummarizationProvider ollama,
         RoomManager roomManager,
         ProfileManager profileManager,
         RoomModerationController moderation,
@@ -227,6 +240,7 @@ public class ChatPageViewModel : PageViewModel
         _profanityFilter = profanityFilter;
         _fileExport = fileExport;
         _chatHistory = chatHistory;
+        _ollama = ollama;
         _roomManager = roomManager;
         _profileManager = profileManager;
         _moderation = moderation;
@@ -373,6 +387,20 @@ public class ChatPageViewModel : PageViewModel
             .Select(p => p is null ? "Advanced" : $"Advanced · {FormatPreset(p.Value)}")
             .ToProperty(this, x => x.AdvancedHeaderText);
         ExportHistoryCmd = ReactiveCommand.Create<string, Task>(ExportHistoryAsync);
+
+        _canSummarize = this
+            .WhenAnyValue(
+                x => x.HistoryResultsTotal,
+                x => x.OllamaAvailable,
+                x => x.Settings.Ai.Enabled,
+                (count, available, enabled) => enabled && available && count > 0)
+            .ToProperty(this, x => x.CanSummarize);
+        SummarizeChatCmd = ReactiveCommand.CreateFromTask(SummarizeChatAsync,
+            this.WhenAnyValue(x => x.CanSummarize));
+
+        Observable.FromAsync(_ollama.IsAvailableAsync)
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(available => OllamaAvailable = available);
         var canCopyHistoryEntries = Observable
             .FromEventPattern<EventHandler<SelectionModelSelectionChangedEventArgs<ChatHistoryEntry>>, SelectionModelSelectionChangedEventArgs<ChatHistoryEntry>>(
                 h => HistorySelection.SelectionChanged += h,
@@ -1100,6 +1128,63 @@ public class ChatPageViewModel : PageViewModel
         {
             _xabbot.ShowMessage($"History exported to {Path.GetFileName(filePath)}");
         }
+    }
+
+    private async Task SummarizeChatAsync()
+    {
+        HistoryErrorMessage = null;
+
+        if (_historyResults.Count == 0)
+        {
+            HistoryErrorMessage = "No history entries to summarize. Run a search first.";
+            return;
+        }
+
+        var maxMessages = Settings.Ai.MaxMessages;
+        var totalCount = _historyResults.Count;
+        var entries = _historyResults
+            .OrderByDescending(e => e.Timestamp)
+            .Take(maxMessages)
+            .OrderBy(e => e.Timestamp)
+            .ToList();
+
+        var dialogVm = _dialog.CreateViewModel<ChatSummaryDialogViewModel>();
+        dialogVm.MessageCount = entries.Count;
+        dialogVm.ModelName = Settings.Ai.Provider switch
+        {
+            AiProvider.Gemini => $"Gemini · {Settings.Ai.GeminiModel}",
+            _ => $"Ollama · {Settings.Ai.Model}",
+        };
+        dialogVm.WarningMessage = totalCount > entries.Count
+            ? $"Summarizing the {entries.Count} most recent messages out of {totalCount}."
+            : null;
+
+        CloseHistoryFlyoutAction?.Invoke();
+
+        var systemPrompt = string.IsNullOrWhiteSpace(Settings.Ai.SystemPrompt)
+            ? AiConfig.DefaultSystemPrompt
+            : Settings.Ai.SystemPrompt;
+
+        // Cloud providers handle large contexts in a single shot. Local providers benefit from map-reduce above ~200 messages.
+        var mapReduceThreshold = Settings.Ai.Provider switch
+        {
+            AiProvider.Gemini => int.MaxValue,
+            _ => 200,
+        };
+
+        _ = dialogVm.StartAsync(entries, systemPrompt, mapReduceThreshold);
+
+        await _dialog.ShowContentDialogAsync(
+            _dialog.CreateViewModel<MainViewModel>(),
+            new HanumanInstitute.MvvmDialogs.Avalonia.Fluent.ContentDialogSettings
+            {
+                Title = "Chat Summary",
+                Content = dialogVm,
+                CloseButtonText = "Close",
+                FullSizeDesired = true,
+            });
+
+        dialogVm.Dispose();
     }
 
     private long NextEntryId() => Interlocked.Increment(ref _currentMessageId);

@@ -268,6 +268,86 @@
         </ui:SettingsExpanderItem>
       </ui:SettingsExpander>
       <ui:SettingsExpander
+        Header="AI Summarization"
+        IconSource="{icm:SymbolIconSource Symbol=Bot}"
+      >
+        <ui:SettingsExpanderItem Content="Enable AI summarization">
+          <ui:SettingsExpanderItem.Footer>
+            <ToggleSwitch IsChecked="{Binding Config.Ai.Enabled}" />
+          </ui:SettingsExpanderItem.Footer>
+        </ui:SettingsExpanderItem>
+        <ui:SettingsExpanderItem>
+          <StackPanel Spacing="8">
+            <Grid ColumnDefinitions="120,*">
+              <TextBlock Grid.Column="0" Text="Provider:" VerticalAlignment="Center" />
+              <ComboBox Grid.Column="1" SelectedIndex="{Binding ProviderIndex}">
+                <ComboBoxItem Content="Ollama (local)" />
+                <ComboBoxItem Content="Gemini (cloud)" />
+              </ComboBox>
+            </Grid>
+            <Grid ColumnDefinitions="120,*">
+              <TextBlock Grid.Column="0" Text="Max messages:" VerticalAlignment="Center" />
+              <NumericUpDown Grid.Column="1" Value="{Binding Config.Ai.MaxMessages}" Minimum="50" Maximum="1000" Increment="50" />
+            </Grid>
+
+            <StackPanel Spacing="8" IsVisible="{Binding IsOllamaSelected}">
+              <Separator Margin="0,8" />
+              <TextBlock Text="Ollama (local)" FontWeight="SemiBold" />
+              <Grid ColumnDefinitions="120,*">
+                <TextBlock Grid.Column="0" Text="Endpoint:" VerticalAlignment="Center" />
+                <TextBox Grid.Column="1" Text="{Binding Config.Ai.OllamaEndpoint}" Watermark="http://localhost:11434" />
+              </Grid>
+              <Grid ColumnDefinitions="120,*">
+                <TextBlock Grid.Column="0" Text="Model:" VerticalAlignment="Center" />
+                <TextBox Grid.Column="1" Text="{Binding Config.Ai.Model}" Watermark="llama3.1:8b" />
+              </Grid>
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <Button Content="Test connection" Command="{Binding TestOllamaConnectionCmd}" />
+                <TextBlock Text="{Binding OllamaConnectionStatus}" VerticalAlignment="Center"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+              </StackPanel>
+            </StackPanel>
+
+            <StackPanel Spacing="8" IsVisible="{Binding IsGeminiSelected}">
+              <Separator Margin="0,8" />
+              <TextBlock Text="Gemini (cloud)" FontWeight="SemiBold" />
+              <Grid ColumnDefinitions="120,*">
+                <TextBlock Grid.Column="0" Text="API key:" VerticalAlignment="Center" />
+                <TextBox Grid.Column="1" Text="{Binding Config.Ai.GeminiApiKey}" PasswordChar="•"
+                         Watermark="Coller la clé API Google AI Studio" />
+              </Grid>
+              <Grid ColumnDefinitions="120,*">
+                <TextBlock Grid.Column="0" Text="Model:" VerticalAlignment="Center" />
+                <TextBox Grid.Column="1" Text="{Binding Config.Ai.GeminiModel}" Watermark="gemini-flash-latest" />
+              </Grid>
+              <TextBlock Text="Clé gratuite sur https://aistudio.google.com/app/apikey"
+                         FontSize="11"
+                         Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <Button Content="Test connection" Command="{Binding TestGeminiConnectionCmd}" />
+                <TextBlock Text="{Binding GeminiConnectionStatus}" VerticalAlignment="Center"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+              </StackPanel>
+            </StackPanel>
+            <StackPanel Spacing="6">
+              <DockPanel LastChildFill="False">
+                <TextBlock Text="System prompt:" VerticalAlignment="Center" DockPanel.Dock="Left" />
+                <Button Content="Reset prompt" Command="{Binding ResetPromptCmd}" DockPanel.Dock="Right" />
+              </DockPanel>
+              <TextBox Text="{Binding Config.Ai.SystemPrompt}"
+                       AcceptsReturn="True"
+                       TextWrapping="Wrap"
+                       MinHeight="200"
+                       MaxHeight="400"
+                       VerticalContentAlignment="Top"
+                       FontFamily="Cascadia Mono,Consolas,monospace"
+                       FontSize="11"
+                       ScrollViewer.VerticalScrollBarVisibility="Auto" />
+            </StackPanel>
+          </StackPanel>
+        </ui:SettingsExpanderItem>
+      </ui:SettingsExpander>
+      <ui:SettingsExpander
         Header="Debug"
         IsVisible="{DynamicResource IsDebug}"
         IconSource="{icm:SymbolIconSource Symbol=Bug}"
