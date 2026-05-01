@@ -255,11 +255,11 @@ public class ChatPageViewModel : PageViewModel
         _roomManager.AvatarUpdated += RoomManager_AvatarUpdated;
         _ext.Intercept<WhisperMsg>(msg => _lastSentWhisperRecipient = msg.Recipient);
         Observable
-            .FromEvent(
+            .FromEvent<Action<bool>, bool>(
                 h => _profanityFilter.PatternsChanged += h,
                 h => _profanityFilter.PatternsChanged -= h)
             .Throttle(TimeSpan.FromMilliseconds(150))
-            .Subscribe(_ => OnProfanityPatternsChanged());
+            .Subscribe(onlyAdditions => OnProfanityPatternsChanged(onlyAdditions));
 
         // Update HasModRights on all existing messages when mod rights change
         _moderation.WhenAnyValue(x => x.CanKick, x => x.CanMute, x => x.CanBan,
@@ -1460,12 +1460,12 @@ public class ChatPageViewModel : PageViewModel
         return (true, segments, matchedWords);
     }
 
-    private void OnProfanityPatternsChanged()
+    private void OnProfanityPatternsChanged(bool onlyAdditions = false)
     {
         // Update profanity flags in DB (background)
         _ = Task.Run(async () =>
         {
-            try { await _chatHistory.UpdateProfanityFlagsAsync(_profanityFilter); }
+            try { await _chatHistory.UpdateProfanityFlagsAsync(_profanityFilter, onlyUnflagged: onlyAdditions); }
             catch { /* DB update is best-effort */ }
         });
 

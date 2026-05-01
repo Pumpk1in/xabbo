@@ -14,7 +14,7 @@ public interface IProfanityFilterService
     /// Raised when profanity patterns are rebuilt (words added/removed).
     /// Not raised during initial construction.
     /// </summary>
-    event Action? PatternsChanged;
+    event Action<bool>? PatternsChanged;
 
     /// <summary>
     /// Checks if the message contains any profanity.

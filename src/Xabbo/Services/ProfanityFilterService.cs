@@ -23,7 +23,7 @@ public partial class ProfanityFilterService : IProfanityFilterService
     private System.Collections.ObjectModel.ObservableCollection<string>? _subscribedCollection;
     private bool _initialized;
 
-    public event Action? PatternsChanged;
+    public event Action<bool>? PatternsChanged;  // bool: onlyAdditions
 
     // Character substitutions for obfuscation detection
     private static readonly Dictionary<char, string> CharacterPatterns = new()
@@ -107,6 +107,7 @@ public partial class ProfanityFilterService : IProfanityFilterService
         EnsureSubscribed();
 
         bool changed;
+        bool onlyAdditions;
         lock (_lock)
         {
             var previousWords = _patterns.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -120,10 +121,11 @@ public partial class ProfanityFilterService : IProfanityFilterService
                 }
             }
             changed = !previousWords.SetEquals(_patterns.Keys);
+            onlyAdditions = changed && _patterns.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase).IsSupersetOf(previousWords);
         }
 
         if (_initialized && !suppressEvent && changed)
-            PatternsChanged?.Invoke();
+            PatternsChanged?.Invoke(onlyAdditions);
     }
 
     /// <summary>

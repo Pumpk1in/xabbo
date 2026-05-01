@@ -45,7 +45,7 @@ public interface IChatHistoryService
     /// <summary>
     /// Re-scans all messages and updates has_profanity flags in the database.
     /// </summary>
-    Task UpdateProfanityFlagsAsync(IProfanityFilterService profanityFilter);
+    Task UpdateProfanityFlagsAsync(IProfanityFilterService profanityFilter, bool onlyUnflagged = false);
 
     /// <summary>
     /// Returns the 0-based position of an entry by timestamp ordered DESC.

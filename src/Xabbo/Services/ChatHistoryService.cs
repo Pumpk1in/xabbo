@@ -334,18 +334,21 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
         };
     }
 
-    public Task UpdateProfanityFlagsAsync(IProfanityFilterService profanityFilter)
+    public Task UpdateProfanityFlagsAsync(IProfanityFilterService profanityFilter, bool onlyUnflagged = false)
     {
         return Task.Run(() =>
         {
             lock (_lock)
             {
-                // Read all message IDs and their current profanity state
+                // Read all message IDs and their current profanity state.
+                // Fast path: if onlyUnflagged, skip rows already flagged — they can't go 1→0 on a pure add.
                 var updates = new List<(long Id, bool NewFlag)>();
 
                 using (var cmd = _connection.CreateCommand())
                 {
-                    cmd.CommandText = "SELECT id, message, has_profanity FROM chat_history WHERE type = 'message' AND message IS NOT NULL";
+                    cmd.CommandText = onlyUnflagged
+                        ? "SELECT id, message, has_profanity FROM chat_history WHERE type = 'message' AND message IS NOT NULL AND has_profanity = 0"
+                        : "SELECT id, message, has_profanity FROM chat_history WHERE type = 'message' AND message IS NOT NULL";
                     using var reader = cmd.ExecuteReader();
                     while (reader.Read())
                     {
