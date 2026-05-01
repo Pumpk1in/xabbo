@@ -6,9 +6,7 @@ using DynamicData;
 using DynamicData.Binding;
 using DynamicData.Kernel;
 using ReactiveUI;
-using Avalonia.Controls.Selection;
 using FluentAvalonia.UI.Controls;
-using Humanizer;
 using HanumanInstitute.MvvmDialogs;
 using HanumanInstitute.MvvmDialogs.Avalonia.Fluent;
 
@@ -55,11 +53,8 @@ public sealed class FriendsPageViewModel : PageViewModel
     public ReactiveCommand<FriendViewModel, Unit> FollowFriendCmd { get; }
     public ReactiveCommand<FriendViewModel, Unit> ToggleNotifyCmd { get; }
     public ReactiveCommand<FriendViewModel, Unit> RemoveSingleFriendCmd { get; }
-    public ReactiveCommand<Unit, Unit> RemoveFriendsCmd { get; }
     public ReactiveCommand<FriendViewModel, Unit> SendPrivateMessageCmd { get; }
     public ReactiveCommand<string, Task> OpenProfileCmd { get; }
-
-    public SelectionModel<FriendViewModel> Selection { get; } = new() { SingleSelect = false };
 
     [Reactive] public FriendViewModel? ContextFriend { get; set; }
 
@@ -101,13 +96,6 @@ public sealed class FriendsPageViewModel : PageViewModel
         SendPrivateMessageCmd = ReactiveCommand.Create<FriendViewModel>(SendPrivateMessage);
         OpenProfileCmd = ReactiveCommand.Create<string, Task>(OpenProfile);
         RemoveSingleFriendCmd = ReactiveCommand.CreateFromTask<FriendViewModel>(RemoveSingleFriendAsync);
-        RemoveFriendsCmd = ReactiveCommand.CreateFromTask(
-            RemoveSelectedFriendsAsync,
-            Selection
-                .WhenPropertyChanged(x => x.SelectedItems)
-                .Select(count => count.Value?.Count > 0)
-                .ObserveOn(RxApp.MainThreadScheduler)
-        );
 
         _config.Loaded += OnConfigLoaded;
 
@@ -299,32 +287,6 @@ public sealed class FriendsPageViewModel : PageViewModel
         if (result is ContentDialogResult.Primary)
         {
             _interceptor.Send(new RemoveFriendsMsg([friend.Id]));
-        }
-    }
-
-    private async Task RemoveSelectedFriendsAsync()
-    {
-        List<FriendViewModel> friendsToRemove = Selection.SelectedItems
-            .Where(x => x is not null)
-            .Select(x => x!)
-            .ToList();
-
-        if (friendsToRemove.Count == 0)
-            return;
-
-        var result = await _dialogService.ShowContentDialogAsync(_dialogService.CreateViewModel<MainViewModel>(), new ContentDialogSettings
-        {
-            Title = $"Remove {"friend".ToQuantity(friendsToRemove.Count)}",
-            Content = $"Are you sure you wish to remove {
-                friendsToRemove.Select(x => x.Name).Humanize(5, "more friends")
-            }?",
-            PrimaryButtonText = "Yes",
-            SecondaryButtonText = "No",
-        });
-
-        if (result is ContentDialogResult.Primary)
-        {
-            _interceptor.Send(new RemoveFriendsMsg(friendsToRemove.Select(x => x.Id)));
         }
     }
 }

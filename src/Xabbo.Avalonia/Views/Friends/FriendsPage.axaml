@@ -30,140 +30,118 @@
           Text="{Binding FilterText}"
         />
       </DockPanel>
-      <ListBox
-        x:Name="FriendsList"
-        Classes="flat"
-        Grid.Row="1"
-        Padding="6"
-        ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-        ItemsSource="{Binding Friends}"
-        Selection="{Binding Selection}"
-        SelectionMode="Multiple"
-      >
-        <ListBox.KeyBindings>
-          <KeyBinding Gesture="Delete" Command="{Binding RemoveFriendsCmd}" />
-        </ListBox.KeyBindings>
-        <ListBox.ContextFlyout>
-          <ui:FAMenuFlyout>
-            <ui:MenuFlyoutItem
-              Command="{Binding RemoveFriendsCmd}"
-              IconSource="{icm:SymbolIconSource Symbol=PersonDelete}"
-              Text="Remove"
+      <ScrollViewer Grid.Row="1" Padding="6" HorizontalScrollBarVisibility="Disabled">
+        <ItemsRepeater ItemsSource="{Binding Friends}">
+          <ItemsRepeater.Layout>
+            <UniformGridLayout
+              MinItemWidth="260"
+              MinItemHeight="56"
+              MinColumnSpacing="8"
+              MinRowSpacing="8"
+              ItemsStretch="Fill"
             />
-          </ui:FAMenuFlyout>
-        </ListBox.ContextFlyout>
-        <ListBox.Styles>
-          <Style Selector="ListBoxItem">
-            <Setter Property="Padding" Value="0" />
-            <Setter Property="Margin" Value="4" />
-            <Setter Property="VerticalAlignment" Value="Top" />
-          </Style>
-        </ListBox.Styles>
-        <ListBox.ItemsPanel>
-          <ItemsPanelTemplate>
-            <UniformGrid Columns="{Binding Path=Columns, ElementName=friendsPage}" VerticalAlignment="Top" />
-          </ItemsPanelTemplate>
-        </ListBox.ItemsPanel>
-        <ListBox.ItemTemplate>
-          <DataTemplate x:DataType="vm:FriendViewModel">
-            <Panel
-              x:Name="root"
-              Classes.offline="{Binding !IsOnline}"
-            >
-              <Panel.ContextFlyout>
-                <ui:FAMenuFlyout Opened="OnFriendFlyoutOpened">
-                  <ui:MenuFlyoutItem
-                    Text="Send private message"
-                    IconSource="{icm:SymbolIconSource Symbol=ChatMultiple}"
-                    Command="{Binding #friendsPage.((vm:FriendsPageViewModel)DataContext).SendPrivateMessageCmd}"
-                    CommandParameter="{Binding}"
-                  />
-                  <ui:MenuFlyoutSubItem
-                    IconSource="{icm:SymbolIconSource Symbol=Person}"
-                    Text="Open profile..."
-                  >
-                    <ui:MenuFlyoutItem Text="In-game" Command="{Binding #friendsPage.((vm:FriendsPageViewModel)DataContext).OpenProfileCmd}" CommandParameter="game" />
-                    <ui:MenuFlyoutItem Text="On the web" Command="{Binding #friendsPage.((vm:FriendsPageViewModel)DataContext).OpenProfileCmd}" CommandParameter="web" />
-                    <ui:MenuFlyoutItem Text="On HabboWidgets" Command="{Binding #friendsPage.((vm:FriendsPageViewModel)DataContext).OpenProfileCmd}" CommandParameter="habbowidgets" />
-                  </ui:MenuFlyoutSubItem>
-                  <ui:MenuFlyoutSeparator />
-                  <ui:MenuFlyoutItem
-                    Text="{Binding NotifyMenuText}"
-                    IconSource="{icm:SymbolIconSource Symbol=Alert}"
-                    Command="{Binding #friendsPage.((vm:FriendsPageViewModel)DataContext).ToggleNotifyCmd}"
-                    CommandParameter="{Binding}"
-                  />
-                  <ui:MenuFlyoutSeparator />
-                  <ui:MenuFlyoutItem
-                    Text="Remove"
-                    IconSource="{icm:SymbolIconSource Symbol=PersonDelete}"
-                    Command="{Binding #friendsPage.((vm:FriendsPageViewModel)DataContext).RemoveSingleFriendCmd}"
-                    CommandParameter="{Binding}"
-                  />
-                </ui:FAMenuFlyout>
-              </Panel.ContextFlyout>
-              <Panel.Styles>
-                <Style Selector=":is(Control).offline">
-                  <Setter Property="Opacity" Value="0.5" />
-                </Style>
-                <Style Selector=":is(Control).follow">
-                  <Setter Property="Opacity" Value="0" />
-                </Style>
-                <Style Selector="#root:pointerover:not(.offline) :is(Control).follow">
-                  <Setter Property="Opacity" Value="1" />
-                </Style>
-              </Panel.Styles>
-              <Border
-                Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
-                BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
-                BorderThickness="1"
-                CornerRadius="4"
-              />
-              <Grid ColumnDefinitions="Auto,*" Margin="8,4,8,4">
-                <controls:AvatarImage
-                  HeadOnly="true"
-                  Margin="0,-10,8,-10"
-                  Width="54"
-                  ClipToBounds="false"
-                  FigureString="{Binding ModernFigure}"
-                  UserName="{Binding Name}"
-                />
-                <StackPanel
-                  Grid.Column="1" VerticalAlignment="Center" Orientation="Vertical"
-                >
-                  <TextBlock
-                    HorizontalAlignment="Left"
-                    Classes="privacy"
-                    FontWeight="Bold"
-                    Text="{Binding Name}"
-                    TextTrimming="CharacterEllipsis"
-                  />
-                  <TextBlock
-                    Text="{Binding Motto, Converter={StaticResource HabboStringConverter}}"
-                    IsVisible="{Binding Motto, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                    FontSize="11"
-                    FontStyle="Italic"
-                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                    TextTrimming="CharacterEllipsis"
-                    MaxLines="1"
-                  />
-                </StackPanel>
-              </Grid>
-              <Button
-                Classes="follow modern"
-                HorizontalAlignment="Right" VerticalAlignment="Top"
-                Margin="0,4,4,0"
-                Width="24" Height="24"
-                Theme="{StaticResource TransparentButton}"
-                Command="{Binding #friendsPage.((vm:FriendsPageViewModel)DataContext).FollowFriendCmd}"
-                CommandParameter="{Binding}"
+          </ItemsRepeater.Layout>
+          <ItemsRepeater.ItemTemplate>
+            <DataTemplate x:DataType="vm:FriendViewModel">
+              <Panel
+                x:Name="root"
+                Classes.offline="{Binding !IsOnline}"
               >
-                <ic:SymbolIcon Width="20" Height="20" Symbol="DoorArrowLeft" />
-              </Button>
-            </Panel>
-          </DataTemplate>
-        </ListBox.ItemTemplate>
-      </ListBox>
+                <Panel.ContextFlyout>
+                  <ui:FAMenuFlyout Opened="OnFriendFlyoutOpened">
+                    <ui:MenuFlyoutItem
+                      Text="Send private message"
+                      IconSource="{icm:SymbolIconSource Symbol=ChatMultiple}"
+                      Command="{Binding #friendsPage.((vm:FriendsPageViewModel)DataContext).SendPrivateMessageCmd}"
+                      CommandParameter="{Binding}"
+                    />
+                    <ui:MenuFlyoutSubItem
+                      IconSource="{icm:SymbolIconSource Symbol=Person}"
+                      Text="Open profile..."
+                    >
+                      <ui:MenuFlyoutItem Text="In-game" Command="{Binding #friendsPage.((vm:FriendsPageViewModel)DataContext).OpenProfileCmd}" CommandParameter="game" />
+                      <ui:MenuFlyoutItem Text="On the web" Command="{Binding #friendsPage.((vm:FriendsPageViewModel)DataContext).OpenProfileCmd}" CommandParameter="web" />
+                      <ui:MenuFlyoutItem Text="On HabboWidgets" Command="{Binding #friendsPage.((vm:FriendsPageViewModel)DataContext).OpenProfileCmd}" CommandParameter="habbowidgets" />
+                    </ui:MenuFlyoutSubItem>
+                    <ui:MenuFlyoutSeparator />
+                    <ui:MenuFlyoutItem
+                      Text="{Binding NotifyMenuText}"
+                      IconSource="{icm:SymbolIconSource Symbol=Alert}"
+                      Command="{Binding #friendsPage.((vm:FriendsPageViewModel)DataContext).ToggleNotifyCmd}"
+                      CommandParameter="{Binding}"
+                    />
+                    <ui:MenuFlyoutSeparator />
+                    <ui:MenuFlyoutItem
+                      Text="Remove"
+                      IconSource="{icm:SymbolIconSource Symbol=PersonDelete}"
+                      Command="{Binding #friendsPage.((vm:FriendsPageViewModel)DataContext).RemoveSingleFriendCmd}"
+                      CommandParameter="{Binding}"
+                    />
+                  </ui:FAMenuFlyout>
+                </Panel.ContextFlyout>
+                <Panel.Styles>
+                  <Style Selector=":is(Control).offline">
+                    <Setter Property="Opacity" Value="0.5" />
+                  </Style>
+                  <Style Selector=":is(Control).follow">
+                    <Setter Property="Opacity" Value="0" />
+                  </Style>
+                  <Style Selector="#root:pointerover:not(.offline) :is(Control).follow">
+                    <Setter Property="Opacity" Value="1" />
+                  </Style>
+                </Panel.Styles>
+                <Border
+                  Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                  BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                  BorderThickness="1"
+                  CornerRadius="4"
+                />
+                <Grid ColumnDefinitions="Auto,*" Margin="8,4,8,4">
+                  <controls:AvatarImage
+                    HeadOnly="true"
+                    Margin="0,-10,8,-10"
+                    Width="54"
+                    ClipToBounds="false"
+                    FigureString="{Binding ModernFigure}"
+                    UserName="{Binding Name}"
+                  />
+                  <StackPanel
+                    Grid.Column="1" VerticalAlignment="Center" Orientation="Vertical"
+                  >
+                    <TextBlock
+                      HorizontalAlignment="Left"
+                      Classes="privacy"
+                      FontWeight="Bold"
+                      Text="{Binding Name}"
+                      TextTrimming="CharacterEllipsis"
+                    />
+                    <TextBlock
+                      Text="{Binding Motto, Converter={StaticResource HabboStringConverter}}"
+                      IsVisible="{Binding Motto, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                      FontSize="11"
+                      FontStyle="Italic"
+                      Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                      TextTrimming="CharacterEllipsis"
+                      MaxLines="1"
+                    />
+                  </StackPanel>
+                </Grid>
+                <Button
+                  Classes="follow modern"
+                  HorizontalAlignment="Right" VerticalAlignment="Top"
+                  Margin="0,4,4,0"
+                  Width="24" Height="24"
+                  Theme="{StaticResource TransparentButton}"
+                  Command="{Binding #friendsPage.((vm:FriendsPageViewModel)DataContext).FollowFriendCmd}"
+                  CommandParameter="{Binding}"
+                >
+                  <ic:SymbolIcon Width="20" Height="20" Symbol="DoorArrowLeft" />
+                </Button>
+              </Panel>
+            </DataTemplate>
+          </ItemsRepeater.ItemTemplate>
+        </ItemsRepeater>
+      </ScrollViewer>
     </Grid>
   </controls:Loading>
 </UserControl>
