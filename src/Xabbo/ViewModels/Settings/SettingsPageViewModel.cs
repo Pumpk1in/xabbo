@@ -97,9 +97,6 @@ public sealed class SettingsPageViewModel : PageViewModel
             .WhereNotNull()
             .Subscribe(b => { SelectedNormalBubble = null; Config.Chat.BubbleStyle = b.Id; });
 
-        // Initialize history count (async to avoid blocking UI thread)
-        _ = RefreshHistoryCountAsync();
-
         ApplyCustomWordsCmd = ReactiveCommand.Create(ApplyCustomWords);
         ClearHistoryCmd = ReactiveCommand.Create(ClearHistory);
         TestOllamaConnectionCmd = ReactiveCommand.CreateFromTask(TestOllamaConnectionAsync);

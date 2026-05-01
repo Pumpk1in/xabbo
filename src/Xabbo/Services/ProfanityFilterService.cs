@@ -68,12 +68,14 @@ public partial class ProfanityFilterService : IProfanityFilterService
         RebuildPatterns();
         _initialized = true;
 
-        // Re-subscribe when config is reloaded (Value is replaced with new instance)
+        // Re-subscribe when config is reloaded (Value is replaced with new instance).
+        // Skip PatternsChanged if the word set is identical (e.g. config just loaded from disk
+        // with the same words as before) — avoids triggering an expensive DB rescan for nothing.
         _configProvider.Loaded += () =>
         {
             _subscribedCollection = null; // Force re-subscription
             EnsureSubscribed();
-            RebuildPatterns();
+            RebuildPatterns(suppressEvent: true);
         };
     }
 
@@ -99,13 +101,15 @@ public partial class ProfanityFilterService : IProfanityFilterService
         RebuildPatterns();
     }
 
-    private void RebuildPatterns()
+    private void RebuildPatterns(bool suppressEvent = false)
     {
         // Ensure we're subscribed to the current collection
         EnsureSubscribed();
 
+        bool changed;
         lock (_lock)
         {
+            var previousWords = _patterns.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
             _patterns.Clear();
             // Build patterns for all words (default + custom)
             foreach (var word in Config.AllWords)
@@ -115,9 +119,10 @@ public partial class ProfanityFilterService : IProfanityFilterService
                     _patterns[word] = BuildPattern(word);
                 }
             }
+            changed = !previousWords.SetEquals(_patterns.Keys);
         }
 
-        if (_initialized)
+        if (_initialized && !suppressEvent && changed)
             PatternsChanged?.Invoke();
     }
 

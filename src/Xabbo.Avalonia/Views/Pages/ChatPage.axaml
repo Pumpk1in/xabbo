@@ -241,6 +241,11 @@
                   </DataTemplate>
                 </ListBox.ItemTemplate>
               </ListBox>
+              <ProgressBar Grid.Row="5"
+                           IsIndeterminate="True"
+                           Height="2"
+                           VerticalAlignment="Top"
+                           IsVisible="{Binding IsSearchingHistory}" />
               <!-- Error message displayed inline -->
               <Border
                 Grid.Row="6"

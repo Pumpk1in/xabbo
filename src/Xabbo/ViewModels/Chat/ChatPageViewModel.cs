@@ -159,6 +159,7 @@ public class ChatPageViewModel : PageViewModel
     [Reactive] public int HistoryResultsTotal { get; set; }
     [Reactive] public string? HistoryErrorMessage { get; set; }
     [Reactive] public string HistoryResultsText { get; set; } = "Results: 0";
+    [Reactive] public bool IsSearchingHistory { get; set; }
 
     // Current search parameters (for export)
     private string? _lastSearchUser;
@@ -925,6 +926,9 @@ public class ChatPageViewModel : PageViewModel
 
     private async Task SearchHistoryAsync()
     {
+        IsSearchingHistory = true;
+        try
+        {
         HistoryErrorMessage = null;
         _historyResults.Clear();
 
@@ -994,6 +998,11 @@ public class ChatPageViewModel : PageViewModel
         if (_historyResults.Count == 0)
         {
             HistoryErrorMessage = "No results found for the specified criteria.";
+        }
+        }
+        finally
+        {
+            IsSearchingHistory = false;
         }
     }
 
