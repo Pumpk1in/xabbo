@@ -58,6 +58,11 @@
     <Style Selector=":is(Control).overlayContent">
       <Setter Property="Opacity" Value="1" />
     </Style>
+    <Style Selector=".isConnecting">
+      <Style Selector="^ ui|ProgressRing#OverlayProgressRing">
+        <Setter Property="IsVisible" Value="true" />
+      </Style>
+    </Style>
     <Style Selector=".ready">
       <Style Selector="^ Grid#Overlay">
         <Setter Property="IsHitTestVisible" Value="false" />
@@ -68,9 +73,6 @@
       </Style>
       <Style Selector="^ :is(Control).overlayContent">
         <Setter Property="Opacity" Value="0" />
-      </Style>
-      <Style Selector="^ ui|ProgressRing#OverlayProgressRing">
-        <Setter Property="IsVisible" Value="false" />
       </Style>
     </Style>
     <Style Selector="Grid#OverlayContent">
@@ -97,9 +99,6 @@
       </Style>
       <Style Selector="^ Grid#ErrorDetails">
         <Setter Property="IsVisible" Value="true" />
-      </Style>
-      <Style Selector="^ ui|ProgressRing#OverlayProgressRing">
-        <Setter Property="IsVisible" Value="false" />
       </Style>
     </Style>
   </wnd:AppWindow.Styles>
@@ -138,6 +137,7 @@
             <ui:ProgressRing
               x:Name="OverlayProgressRing"
               Classes="overlayContent"
+              IsVisible="False"
               Margin="-20"
               Width="200" Height="200"
             />
