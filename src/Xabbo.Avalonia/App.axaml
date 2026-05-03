@@ -42,6 +42,7 @@
       <!-- Session -->
       <x:Boolean x:Key="IsConnecting">True</x:Boolean>
       <x:Boolean x:Key="IsConnected">False</x:Boolean>
+      <x:Boolean x:Key="IsReady">False</x:Boolean>
       <x:Boolean x:Key="IsOrigins">False</x:Boolean>
       <x:Boolean x:Key="IsModern">False</x:Boolean>
       <x:Boolean x:Key="IsError">False</x:Boolean>
