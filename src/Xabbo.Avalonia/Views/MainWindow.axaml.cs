@@ -22,10 +22,6 @@ public partial class MainWindow : AppWindow
 #endif
         TitleBar.ExtendsContentIntoTitleBar = true;
         TitleBar.TitleBarHitTestType = TitleBarHitTestType.Complex;
-
-        if (Application.Current is { } app)
-            app.ResourcesChanged += OnApplicationResourcesChanged;
-        SyncProgressRingVisibility();
     }
 
     protected override void OnLoaded(RoutedEventArgs e)
@@ -33,15 +29,5 @@ public partial class MainWindow : AppWindow
         base.OnLoaded(e);
 
         TitleBarHost.ColumnDefinitions[3].Width = new GridLength(TitleBar.RightInset, GridUnitType.Pixel);
-    }
-
-    private void OnApplicationResourcesChanged(object? sender, global::Avalonia.Controls.ResourcesChangedEventArgs e)
-        => SyncProgressRingVisibility();
-
-    private void SyncProgressRingVisibility()
-    {
-        if (Application.Current is not { } app) return;
-        bool isReady = app.Resources.TryGetResource("IsReady", null, out var v) && v is true;
-        OverlayProgressRing.IsVisible = !isReady;
     }
 }
