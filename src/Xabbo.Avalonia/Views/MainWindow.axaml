@@ -58,14 +58,6 @@
     <Style Selector=":is(Control).overlayContent">
       <Setter Property="Opacity" Value="1" />
     </Style>
-    <Style Selector="ui|ProgressRing#OverlayProgressRing">
-      <Setter Property="IsVisible" Value="false" />
-    </Style>
-    <Style Selector=".isConnecting">
-      <Style Selector="^ ui|ProgressRing#OverlayProgressRing">
-        <Setter Property="IsVisible" Value="true" />
-      </Style>
-    </Style>
     <Style Selector=".ready">
       <Style Selector="^ Grid#Overlay">
         <Setter Property="IsHitTestVisible" Value="false" />
