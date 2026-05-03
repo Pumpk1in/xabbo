@@ -58,6 +58,9 @@
     <Style Selector=":is(Control).overlayContent">
       <Setter Property="Opacity" Value="1" />
     </Style>
+    <Style Selector="ui|ProgressRing#OverlayProgressRing">
+      <Setter Property="IsVisible" Value="false" />
+    </Style>
     <Style Selector=".isConnecting">
       <Style Selector="^ ui|ProgressRing#OverlayProgressRing">
         <Setter Property="IsVisible" Value="true" />
@@ -137,7 +140,6 @@
             <ui:ProgressRing
               x:Name="OverlayProgressRing"
               Classes="overlayContent"
-              IsVisible="False"
               Margin="-20"
               Width="200" Height="200"
             />
