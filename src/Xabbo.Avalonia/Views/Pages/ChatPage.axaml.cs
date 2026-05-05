@@ -5,6 +5,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Avalonia.Xaml.Interactivity;
@@ -119,8 +120,23 @@ public partial class ChatPage : UserControl
         }, DispatcherPriority.Background);
     }
 
+    private void SuspendChatAutoScroll()
+    {
+        var autoScroll = Interaction.GetBehaviors(ListBoxMessages)
+            .OfType<AutoScrollBehavior>()
+            .FirstOrDefault();
+        autoScroll?.SuspendAutoScroll();
+    }
+
+    private void OnModerationButtonClick(object? sender, RoutedEventArgs e)
+    {
+        SuspendChatAutoScroll();
+    }
+
     private void OnContextRequested(object? sender, ContextRequestedEventArgs e)
     {
+        SuspendChatAutoScroll();
+
         if (DataContext is not ChatPageViewModel chatViewModel)
             return;
 

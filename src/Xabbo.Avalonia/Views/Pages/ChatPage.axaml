@@ -530,7 +530,8 @@
                   Padding="2">
                 <StackPanel Orientation="Horizontal">
                   <Button x:Name="KickBtn" Padding="5" Margin="2,0,0,0" ToolTip.Tip="Kick user"
-                    Classes.flyout-open="{Binding #KickBtn.Flyout.IsOpen}">
+                    Classes.flyout-open="{Binding #KickBtn.Flyout.IsOpen}"
+                    Click="OnModerationButtonClick">
                     <Button.Flyout>
                       <ui:FAMenuFlyout>
                         <ui:MenuFlyoutItem Text="Kick" Command="{Binding #ChatPageRoot.((vm:ChatPageViewModel)DataContext).KickUserByNameCmd}" CommandParameter="{Binding Name}" />
@@ -539,7 +540,8 @@
                     <ic:SymbolIcon Symbol="SignOut" FontSize="14" />
                   </Button>
                   <Button x:Name="MuteBtn" Padding="5" Margin="2,0,0,0" ToolTip.Tip="Mute user"
-                    Classes.flyout-open="{Binding #MuteBtn.Flyout.IsOpen}">
+                    Classes.flyout-open="{Binding #MuteBtn.Flyout.IsOpen}"
+                    Click="OnModerationButtonClick">
                     <Button.Flyout>
                       <ui:FAMenuFlyout>
                         <ui:MenuFlyoutItem Text="1 min" Command="{Binding #ChatPageRoot.((vm:ChatPageViewModel)DataContext).MuteUserByNameCmd}" CommandParameter="{Binding MuteParam1}" />
@@ -558,7 +560,8 @@
                     <ic:SymbolIcon Symbol="ChatOff" FontSize="14" />
                   </Button>
                   <Button x:Name="BanBtn" Padding="5" Margin="2,0,0,0" ToolTip.Tip="Ban user"
-                    Classes.flyout-open="{Binding #BanBtn.Flyout.IsOpen}">
+                    Classes.flyout-open="{Binding #BanBtn.Flyout.IsOpen}"
+                    Click="OnModerationButtonClick">
                     <Button.Flyout>
                       <ui:FAMenuFlyout>
                         <ui:MenuFlyoutItem Text="For an hour" Command="{Binding #ChatPageRoot.((vm:ChatPageViewModel)DataContext).BanUserByNameCmd}" CommandParameter="{Binding BanParamHour}" />

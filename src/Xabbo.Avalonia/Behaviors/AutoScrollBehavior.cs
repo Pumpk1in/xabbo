@@ -36,6 +36,17 @@ public class AutoScrollBehavior : Behavior<ListBox>
         AssociatedObject?.ScrollIntoView(item);
         _isProgrammaticScroll = false;
     }
+
+    /// <summary>
+    /// Suspends autoscroll without changing the scroll position.
+    /// Resumes automatically when the user scrolls back to the bottom
+    /// (or clicks the "scroll to bottom" button).
+    /// </summary>
+    public void SuspendAutoScroll()
+    {
+        _shouldStayAtBottom = false;
+        _scrollPending = false;
+    }
     private bool _isProgrammaticScroll;
     private bool _scrollPending;
     private DateTime _lastAddTime;
