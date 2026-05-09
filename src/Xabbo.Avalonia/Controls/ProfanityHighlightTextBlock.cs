@@ -78,21 +78,6 @@ public class ProfanityHighlightTextBlock : TextBlock
     private static readonly IBrush WhisperBrush = new SolidColorBrush(Color.Parse("#a495ff"));
     private static readonly IBrush UsernameBrush = new SolidColorBrush(Color.Parse("#9995ff"));
 
-    // Layout loop detection: counts MeasureOverride calls per second.
-    // 3 consecutive seconds with >250 calls = layout loop → trigger purge.
-    private static int _globalMeasureCount;
-    private static DateTime _lastResetTime = DateTime.UtcNow;
-    private static DateTime _lastBurstEndTime = DateTime.UtcNow;
-    private static bool _pruneScheduled;
-    private static int _consecutiveBurstCount;
-    private static int _purgeCount;
-
-    /// <summary>
-    /// Assigned by ChatPage to trigger a KeepLastMessages() purge when a layout loop is detected.
-    /// </summary>
-    public static Action? PruneAction { get; set; }
-    public static Action? PurgeTotalAction { get; set; }
-
     static ProfanityHighlightTextBlock()
     {
         SegmentsProperty.Changed.AddClassHandler<ProfanityHighlightTextBlock>((x, _) => x.ScheduleUpdateInlines());
@@ -148,6 +133,10 @@ public class ProfanityHighlightTextBlock : TextBlock
 
         var runs = new List<Inline>();
 
+        // Whisper messages use WhisperBrush color but NOT FontStyle.Italic — italic forces Skia to
+        // generate per-instance native TextLayouts that retain ~50-70 MB of native memory per whisper
+        // and never get released. Color-only is sufficient to distinguish whispers visually.
+
         // Add username prefix if provided
         if (!string.IsNullOrEmpty(username))
         {
@@ -161,12 +150,11 @@ public class ProfanityHighlightTextBlock : TextBlock
             };
             runs.Add(usernameRun);
 
-            // For outgoing whispers, show "Name -> Recipient: msg" (all italic/purple, no bold)
+            // For outgoing whispers, show "Name -> Recipient: msg" (purple, no bold)
             if (!string.IsNullOrEmpty(WhisperRecipient))
             {
                 runs.Add(new Run($" -> {InjectWordBreaks(WhisperRecipient)}")
                 {
-                    FontStyle = FontStyle.Italic,
                     Foreground = WhisperBrush,
                     FontSize = 13
                 });
@@ -177,10 +165,6 @@ public class ProfanityHighlightTextBlock : TextBlock
                 FontSize = 13,
                 Foreground = IsWhisper ? WhisperBrush : UsernameBrush
             };
-            if (IsWhisper)
-            {
-                separatorRun.FontStyle = FontStyle.Italic;
-            }
             runs.Add(separatorRun);
         }
 
@@ -188,10 +172,7 @@ public class ProfanityHighlightTextBlock : TextBlock
         {
             var fallbackRun = new Run(InjectWordBreaks(fallback ?? string.Empty));
             if (IsWhisper)
-            {
-                fallbackRun.FontStyle = FontStyle.Italic;
                 fallbackRun.Foreground = WhisperBrush;
-            }
             runs.Add(fallbackRun);
         }
         else
@@ -208,7 +189,6 @@ public class ProfanityHighlightTextBlock : TextBlock
                 }
                 else if (IsWhisper)
                 {
-                    run.FontStyle = FontStyle.Italic;
                     run.Foreground = WhisperBrush;
                 }
 
@@ -229,42 +209,6 @@ public class ProfanityHighlightTextBlock : TextBlock
 
     protected override Size MeasureOverride(Size availableSize)
     {
-        var now = DateTime.UtcNow;
-        if ((now - _lastResetTime).TotalSeconds > 1.0)
-        {
-            if (_globalMeasureCount > 250)
-            {
-                _consecutiveBurstCount++;
-
-                // 3+ consecutive bursts = layout loop not converging → trigger purge
-                if (_consecutiveBurstCount >= 3 && !_pruneScheduled)
-                {
-                    _pruneScheduled = true;
-                    _purgeCount++;
-                    try
-                    {
-                        if (_purgeCount >= 2 && PurgeTotalAction != null)
-                            PurgeTotalAction.Invoke();
-                        else
-                            PruneAction?.Invoke();
-                    }
-                    catch { }
-                    _pruneScheduled = false;
-                    _consecutiveBurstCount = 0;
-                }
-
-                _lastBurstEndTime = _lastResetTime;
-            }
-            else
-            {
-                _consecutiveBurstCount = 0;
-                _purgeCount = 0;
-            }
-            _globalMeasureCount = 0;
-            _lastResetTime = now;
-        }
-        _globalMeasureCount++;
-
         if (!_measureDirty && Math.Abs(availableSize.Width - _lastMeasureWidth) < 3.0)
             return _lastMeasureResult;
 

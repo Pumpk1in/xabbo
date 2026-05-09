@@ -292,6 +292,9 @@
           <ui:FAMenuFlyout>
             <ui:MenuFlyoutItem Text="Clear all" Command="{Binding ClearAllMessagesCmd}" IconSource="{icm:SymbolIconSource Symbol=Delete}" />
             <ui:MenuFlyoutItem Text="Keep last 150 messages" Command="{Binding KeepLast60MinCmd}" IconSource="{icm:SymbolIconSource Symbol=Clock}" />
+            <ui:MenuFlyoutItem Text="Keep last hour" Command="{Binding KeepLastHourCmd}" IconSource="{icm:SymbolIconSource Symbol=Clock}" />
+            <ui:MenuFlyoutItem Text="Keep last 3 hours" Command="{Binding KeepLast3HoursCmd}" IconSource="{icm:SymbolIconSource Symbol=Clock}" />
+            <ui:MenuFlyoutItem Text="Keep last 6 hours" Command="{Binding KeepLast6HoursCmd}" IconSource="{icm:SymbolIconSource Symbol=Clock}" />
           </ui:FAMenuFlyout>
         </Button.Flyout>
         <ic:SymbolIcon Symbol="Delete" FontSize="16" />

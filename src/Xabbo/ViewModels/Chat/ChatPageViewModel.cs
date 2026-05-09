@@ -212,6 +212,9 @@ public class ChatPageViewModel : PageViewModel
     // Clear chat commands
     public ReactiveCommand<Unit, Unit> ClearAllMessagesCmd { get; }
     public ReactiveCommand<Unit, Unit> KeepLast60MinCmd { get; }
+    public ReactiveCommand<Unit, Unit> KeepLastHourCmd { get; }
+    public ReactiveCommand<Unit, Unit> KeepLast3HoursCmd { get; }
+    public ReactiveCommand<Unit, Unit> KeepLast6HoursCmd { get; }
 
     [DependencyInjectionConstructor]
     public ChatPageViewModel(
@@ -457,6 +460,9 @@ public class ChatPageViewModel : PageViewModel
         // Clear chat commands
         ClearAllMessagesCmd = ReactiveCommand.Create(ClearAllMessages);
         KeepLast60MinCmd = ReactiveCommand.Create(() => KeepLastMessages());
+        KeepLastHourCmd = ReactiveCommand.Create(() => KeepLastDuration(TimeSpan.FromHours(1)));
+        KeepLast3HoursCmd = ReactiveCommand.Create(() => KeepLastDuration(TimeSpan.FromHours(3)));
+        KeepLast6HoursCmd = ReactiveCommand.Create(() => KeepLastDuration(TimeSpan.FromHours(6)));
 
         // Scroll to bottom when unchecking a filter
         this.WhenAnyValue(x => x.WhispersOnly)
@@ -913,15 +919,30 @@ public class ChatPageViewModel : PageViewModel
 
     public void ClearAllMessages()
     {
+        var items = _cache.Items.ToList();
         _cache.Clear();
+        foreach (var vm in items)
+            vm.Dispose();
     }
 
     public void KeepLastMessages(int keepCount = 150)
     {
-        var allIds = _cache.Items.OrderByDescending(m => m.EntryId).Select(m => m.EntryId).ToList();
-        if (allIds.Count <= keepCount) return;
-        var toRemove = allIds.Skip(keepCount).ToList();
-        _cache.RemoveKeys(toRemove);
+        var ordered = _cache.Items.OrderByDescending(m => m.EntryId).ToList();
+        if (ordered.Count <= keepCount) return;
+        var toRemove = ordered.Skip(keepCount).ToList();
+        _cache.RemoveKeys(toRemove.Select(m => m.EntryId));
+        foreach (var vm in toRemove)
+            vm.Dispose();
+    }
+
+    public void KeepLastDuration(TimeSpan duration)
+    {
+        var cutoff = DateTime.Now - duration;
+        var toRemove = _cache.Items.Where(m => m.Timestamp < cutoff).ToList();
+        if (toRemove.Count == 0) return;
+        _cache.RemoveKeys(toRemove.Select(m => m.EntryId));
+        foreach (var vm in toRemove)
+            vm.Dispose();
     }
 
     private async Task SearchHistoryAsync()
@@ -1371,7 +1392,7 @@ public class ChatPageViewModel : PageViewModel
             }
         }
 
-        var renderedMessage = H.RenderText(e.Message);
+        var renderedMessage = H.RenderText(e.Message ?? string.Empty);
         var (hasProfanity, segments, matchedWords) = AnalyzeProfanity(renderedMessage);
 
         var isWhisper = e.ChatType == ChatType.Whisper && e.BubbleStyle != 34;

@@ -139,10 +139,13 @@ public class HighlightedTextBlock : TextBlock
                 }
             }
 
+            // Whisper messages use WhisperBrush color but NOT FontStyle.Italic — italic forces Skia
+            // to generate per-instance native TextLayouts that retain large amounts of native memory
+            // and never get released. Color-only is sufficient to distinguish whispers visually.
             if (escapedWords.Count == 0)
             {
                 var run = new Run(InjectWordBreaks(text));
-                if (isWhisper) { run.FontStyle = FontStyle.Italic; run.Foreground = WhisperBrush; }
+                if (isWhisper) run.Foreground = WhisperBrush;
                 runs.Add(run);
             }
             else
@@ -156,7 +159,7 @@ public class HighlightedTextBlock : TextBlock
                     if (match.Index > currentIndex)
                     {
                         var run = new Run(InjectWordBreaks(text.Substring(currentIndex, match.Index - currentIndex)));
-                        if (isWhisper) { run.FontStyle = FontStyle.Italic; run.Foreground = WhisperBrush; }
+                        if (isWhisper) run.Foreground = WhisperBrush;
                         runs.Add(run);
                     }
 
@@ -172,7 +175,7 @@ public class HighlightedTextBlock : TextBlock
                 if (currentIndex < text.Length)
                 {
                     var run = new Run(InjectWordBreaks(text.Substring(currentIndex)));
-                    if (isWhisper) { run.FontStyle = FontStyle.Italic; run.Foreground = WhisperBrush; }
+                    if (isWhisper) run.Foreground = WhisperBrush;
                     runs.Add(run);
                 }
             }

@@ -57,6 +57,7 @@ public class ChatMessageViewModel : ChatLogEntryViewModel
         _showModerationButtons = this.WhenAnyValue(x => x.HasProfanity, x => x.HasModRights,
                 (hp, mr) => hp && !IsOwnMessage && mr)
             .ToProperty(this, x => x.ShowModerationButtons);
+        Disposables.Add(_showModerationButtons);
     }
 
     // Quick action parameters (Name, Duration/BanType)
