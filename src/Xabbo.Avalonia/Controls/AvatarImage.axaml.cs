@@ -1,7 +1,5 @@
 using Avalonia;
 using Avalonia.Controls.Primitives;
-using Avalonia.Media;
-using Xabbo.Avalonia.Services;
 using Xabbo.Utility;
 
 namespace Xabbo.Avalonia.Controls;
@@ -27,10 +25,6 @@ public class AvatarImage : TemplatedControl
     public static readonly DirectProperty<AvatarImage, string?> AvatarImageUrlProperty =
         AvaloniaProperty.RegisterDirect<AvatarImage, string?>(nameof(AvatarImageUrl),
             x => x.AvatarImageUrl);
-
-    public static readonly DirectProperty<AvatarImage, IImage?> DirectBitmapProperty =
-        AvaloniaProperty.RegisterDirect<AvatarImage, IImage?>(nameof(DirectBitmap),
-            x => x.DirectBitmap);
 
     public string? FigureString
     {
@@ -70,60 +64,29 @@ public class AvatarImage : TemplatedControl
         private set => SetAndRaise(AvatarImageUrlProperty, ref _avatarImageUrl, value);
     }
 
-    private IImage? _directBitmap;
-    public IImage? DirectBitmap
-    {
-        get => _directBitmap;
-        private set => SetAndRaise(DirectBitmapProperty, ref _directBitmap, value);
-    }
-
-    private void UpdateImage()
-    {
-        Placeholder = $"avares://Xabbo.Avalonia/Assets/Images/Avatar/{(HeadOnly ? "head" : "body")}-{Direction}.png";
-
-        if (string.IsNullOrWhiteSpace(FigureString) &&
-            string.IsNullOrWhiteSpace(UserName))
-        {
-            DirectBitmap = null;
-            AvatarImageUrl = null;
-        }
-        else
-        {
-            var url = UrlHelper.AvatarImageUrl(
-                figure: FigureString,
-                direction: Direction,
-                headOnly: HeadOnly,
-                name: UserName,
-                webHost: XabboImageLoader.Instance.WebHost
-            );
-
-            if (url is not null && XabboImageLoader.Instance.TryGetBitmap(url, out var cached))
-            {
-                DirectBitmap = cached;
-                AvatarImageUrl = null;
-            }
-            else
-            {
-                DirectBitmap = null;
-                AvatarImageUrl = url;
-            }
-        }
-    }
-
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
-        if (change.Property == DataContextProperty)
-        {
-            // DataContext reassigned (ListBox item recycling): force re-check even if
-            // FigureString value is identical to what it was before recycling.
-            UpdateImage();
-        }
-        else if (change.Property == FigureStringProperty ||
+        if (change.Property == FigureStringProperty ||
             change.Property == DirectionProperty ||
             change.Property == HeadOnlyProperty ||
             change.Property == UserNameProperty)
         {
-            UpdateImage();
+            Placeholder = $"avares://Xabbo.Avalonia/Assets/Images/Avatar/{(HeadOnly ? "head" : "body")}-{Direction}.png";
+
+            if (string.IsNullOrWhiteSpace(FigureString) &&
+                string.IsNullOrWhiteSpace(UserName))
+            {
+                AvatarImageUrl = null;
+            }
+            else
+            {
+                AvatarImageUrl = UrlHelper.AvatarImageUrl(
+                    figure: FigureString,
+                    direction: Direction,
+                    headOnly: HeadOnly,
+                    name: UserName
+                );
+            }
         }
 
         base.OnPropertyChanged(change);
