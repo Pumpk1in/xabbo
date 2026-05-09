@@ -47,6 +47,15 @@ public class AutoScrollBehavior : Behavior<ListBox>
         _shouldStayAtBottom = false;
         _scrollPending = false;
     }
+
+    /// <summary>
+    /// Resumes autoscroll and scrolls to the bottom immediately.
+    /// </summary>
+    public void ResumeAutoScroll()
+    {
+        _shouldStayAtBottom = true;
+        ScrollToBottom();
+    }
     private bool _isProgrammaticScroll;
     private bool _scrollPending;
     private DateTime _lastAddTime;

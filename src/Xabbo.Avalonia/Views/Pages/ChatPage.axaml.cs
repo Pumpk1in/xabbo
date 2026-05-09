@@ -30,6 +30,13 @@ public partial class ChatPage : UserControl
                 vm.CloseHistoryFlyoutAction = () => HistoryButton?.Flyout?.Hide();
                 vm.ScrollToMessageAction = ScrollToMessage;
                 vm.FocusChatInputAction = () => ChatInputTextBox.Focus();
+                vm.ScrollChatToBottomAction = () =>
+                {
+                    var autoScroll = Interaction.GetBehaviors(ListBoxMessages)
+                        .OfType<AutoScrollBehavior>()
+                        .FirstOrDefault();
+                    autoScroll?.ResumeAutoScroll();
+                };
                 vm.ScrollToHistoryEntryAction = entry =>
                     Dispatcher.UIThread.Post(
                         () => HistoryResultsListBox?.ScrollIntoView(entry),

@@ -205,6 +205,7 @@ public class ChatPageViewModel : PageViewModel
     public Action? OpenHistoryFlyoutAction { get; set; }
     public Action? CloseHistoryFlyoutAction { get; set; }
     public Action? FocusChatInputAction { get; set; }
+    public Action? ScrollChatToBottomAction { get; set; }
     public Action<ChatHistoryEntry>? ScrollToHistoryEntryAction { get; set; }
 
     public ReactiveCommand<Unit, Unit> SearchUserInHistoryCmd { get; }
@@ -629,6 +630,7 @@ public class ChatPageViewModel : PageViewModel
         {
             ChatInputMode = ChatType.Whisper;
             WhisperRecipient = name;
+            ScrollChatToBottomAction?.Invoke();
             FocusChatInputAction?.Invoke();
         }
     }
