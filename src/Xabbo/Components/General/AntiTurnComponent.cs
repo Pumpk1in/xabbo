@@ -26,9 +26,14 @@ public partial class AntiTurnComponent : Component
     private int _ownLocationY = int.MinValue;
     private bool _ownDirectionInitialized;
     private bool _allowNextOwnTurn;
-    private bool _forceBlockNextOwnTurn;
+    private System.DateTime _forceBlockNextOwnTurnUntil = System.DateTime.MinValue;
+    private System.DateTime _allowHandItemTurnUntil = System.DateTime.MinValue;
 
-    public void ForceBlockNextOwnTurn() => _forceBlockNextOwnTurn = true;
+    public void ForceBlockNextOwnTurn() =>
+        _forceBlockNextOwnTurnUntil = System.DateTime.Now.AddMilliseconds(500);
+
+    public void AllowNextHandItemTurn() =>
+        _allowHandItemTurnUntil = System.DateTime.Now.AddMilliseconds(500);
 
     public void InjectReturnLookToOwnDirection()
     {
@@ -64,7 +69,8 @@ public partial class AntiTurnComponent : Component
         _ownLocationX = int.MinValue;
         _ownLocationY = int.MinValue;
         _allowNextOwnTurn = false;
-        _forceBlockNextOwnTurn = false;
+        _forceBlockNextOwnTurnUntil = System.DateTime.MinValue;
+        _allowHandItemTurnUntil = System.DateTime.MinValue;
     }
 
     private bool TryGetOwnIndex(out int index)
@@ -174,12 +180,18 @@ public partial class AntiTurnComponent : Component
 
             bool directionChanged = update.Direction != _ownBodyDirection || update.HeadDirection != _ownHeadDirection;
 
-            if (!isMoving && _forceBlockNextOwnTurn && directionChanged)
+            if (!isMoving && System.DateTime.Now < _forceBlockNextOwnTurnUntil && directionChanged)
             {
-                _forceBlockNextOwnTurn = false;
+                _forceBlockNextOwnTurnUntil = System.DateTime.MinValue;
                 update.Direction = _ownBodyDirection;
                 update.HeadDirection = _ownHeadDirection;
                 modified = true;
+            }
+            else if (!isMoving && directionChanged && System.DateTime.Now < _allowHandItemTurnUntil)
+            {
+                _allowHandItemTurnUntil = System.DateTime.MinValue;
+                _ownBodyDirection = update.Direction;
+                _ownHeadDirection = update.HeadDirection;
             }
             else if (Enabled && !isMoving)
             {

@@ -44,5 +44,9 @@ public partial class AntiHandItemComponent(
             _antiTurnComponent.ForceBlockNextOwnTurn();
             _antiTurnComponent.InjectReturnLookToOwnDirection();
         }
+        else
+        {
+            _antiTurnComponent.AllowNextHandItemTurn();
+        }
     }
 }
