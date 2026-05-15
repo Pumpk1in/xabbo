@@ -11,7 +11,6 @@ namespace Xabbo.Components;
 [Intercept]
 public partial class AntiTurnComponent : Component
 {
-    private long _lastSelectedUser = -1;
     private int _lastLookAtX, _lastLookAtY;
     private System.DateTime _lastSelection = System.DateTime.MinValue;
 
@@ -25,6 +24,9 @@ public partial class AntiTurnComponent : Component
     private int _ownLocationY = int.MinValue;
     private bool _ownDirectionInitialized;
     private bool _allowNextOwnTurn;
+    private bool _forceBlockNextOwnTurn;
+
+    public void ForceBlockNextOwnTurn() => _forceBlockNextOwnTurn = true;
 
     private AppConfig Config => _config.Value;
 
@@ -54,6 +56,7 @@ public partial class AntiTurnComponent : Component
         _ownLocationX = int.MinValue;
         _ownLocationY = int.MinValue;
         _allowNextOwnTurn = false;
+        _forceBlockNextOwnTurn = false;
     }
 
     private bool TryGetOwnIndex(out int index)
@@ -74,37 +77,20 @@ public partial class AntiTurnComponent : Component
 
         bool block = true;
 
-        if (Client is ClientType.Shockwave)
+        if (TurnOnReselect
+            && (System.DateTime.Now - _lastSelection).TotalSeconds < ReselectThreshold
+            && _lastLookAtX == look.X && _lastLookAtY == look.Y)
         {
-            if (Enabled && TurnOnReselect && (System.DateTime.Now - _lastSelection).TotalSeconds < ReselectThreshold)
-            {
-                if (_lastLookAtX == look.X && _lastLookAtY == look.Y)
-                    block = false;
-            }
-
-            _lastSelection = System.DateTime.Now;
+            block = false;
+            _allowNextOwnTurn = true;
         }
+
+        _lastSelection = System.DateTime.Now;
 
         if (block) e.Block();
 
         _lastLookAtX = look.X;
         _lastLookAtY = look.Y;
-    }
-
-    [Intercept(~ClientType.Shockwave)]
-    [InterceptOut(nameof(Out.GetSelectedBadges))]
-    private void OnRequestWearingBadges(Intercept e)
-    {
-        Id userId = e.Packet.Read<Id>();
-
-        if (Enabled && TurnOnReselect && (System.DateTime.Now - _lastSelection).TotalSeconds < ReselectThreshold)
-        {
-            if (userId == _lastSelectedUser)
-                _allowNextOwnTurn = true;
-        }
-
-        _lastSelection = System.DateTime.Now;
-        _lastSelectedUser = userId;
     }
 
     [InterceptIn(nameof(In.UserUpdate))]
@@ -134,10 +120,17 @@ public partial class AntiTurnComponent : Component
                 || update.Location.X != _ownLocationX
                 || update.Location.Y != _ownLocationY;
 
-            if (Enabled && !isMoving)
-            {
-                bool directionChanged = update.Direction != _ownBodyDirection || update.HeadDirection != _ownHeadDirection;
+            bool directionChanged = update.Direction != _ownBodyDirection || update.HeadDirection != _ownHeadDirection;
 
+            if (!isMoving && _forceBlockNextOwnTurn && directionChanged)
+            {
+                _forceBlockNextOwnTurn = false;
+                update.Direction = _ownBodyDirection;
+                update.HeadDirection = _ownHeadDirection;
+                modified = true;
+            }
+            else if (Enabled && !isMoving)
+            {
                 if (directionChanged && _allowNextOwnTurn)
                 {
                     _allowNextOwnTurn = false;
