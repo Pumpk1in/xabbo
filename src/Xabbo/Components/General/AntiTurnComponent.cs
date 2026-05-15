@@ -30,6 +30,12 @@ public partial class AntiTurnComponent : Component
 
     public void ForceBlockNextOwnTurn() => _forceBlockNextOwnTurn = true;
 
+    public void InjectReturnLookToOwnDirection()
+    {
+        if (!_ownDirectionInitialized) return;
+        _ = InjectReturnLookToAsync(_ownBodyDirection);
+    }
+
     private AppConfig Config => _config.Value;
 
     private bool Enabled => Config.Movement.NoTurn;

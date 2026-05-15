@@ -40,6 +40,9 @@ public partial class AntiHandItemComponent(
         }
 
         if (ShouldMaintainDirection)
+        {
             _antiTurnComponent.ForceBlockNextOwnTurn();
+            _antiTurnComponent.InjectReturnLookToOwnDirection();
+        }
     }
 }
