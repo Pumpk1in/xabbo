@@ -12,7 +12,9 @@ namespace Xabbo.Components;
 public partial class AntiTurnComponent : Component
 {
     private int _lastLookAtX, _lastLookAtY;
+    private long _lastSelectedUser = -1;
     private System.DateTime _lastSelection = System.DateTime.MinValue;
+    private System.DateTime _allowNextOwnTurnSetAt = System.DateTime.MinValue;
 
     private readonly IConfigProvider<AppConfig> _config;
     private readonly ProfileManager _profileManager;
@@ -83,6 +85,7 @@ public partial class AntiTurnComponent : Component
         {
             block = false;
             _allowNextOwnTurn = true;
+            _allowNextOwnTurnSetAt = System.DateTime.Now;
         }
 
         _lastSelection = System.DateTime.Now;
@@ -91,6 +94,49 @@ public partial class AntiTurnComponent : Component
 
         _lastLookAtX = look.X;
         _lastLookAtY = look.Y;
+    }
+
+    [Intercept(~ClientType.Shockwave)]
+    [InterceptOut(nameof(Out.WiredClickUser))]
+    private void OnWiredClickUser(Intercept e)
+    {
+        if (!Enabled || !_ownDirectionInitialized) return;
+        if (_allowNextOwnTurn) return; // re-select : laisser tourner naturellement
+
+        _ = InjectReturnLookToAsync(_ownBodyDirection);
+    }
+
+    // Server ignores 45° rotations from a single LookTo. Send the opposite
+    // direction first, then the target — same trick as TurnCommand.
+    private async System.Threading.Tasks.Task InjectReturnLookToAsync(int dir)
+    {
+        var (ix, iy) = H.GetMagicVector((dir + 4) % 8);
+        Ext.Send(new LookToMsg(ix, iy));
+
+        await System.Threading.Tasks.Task.Delay(100);
+
+        var (x, y) = H.GetMagicVector(dir);
+        Ext.Send(new LookToMsg(x, y));
+    }
+
+    [Intercept(~ClientType.Shockwave)]
+    [InterceptOut(nameof(Out.GetSelectedBadges))]
+    private void OnRequestWearingBadges(Intercept e)
+    {
+        if (!Enabled) return;
+
+        Id userId = e.Packet.Read<Id>();
+
+        if (TurnOnReselect
+            && (System.DateTime.Now - _lastSelection).TotalSeconds < ReselectThreshold
+            && userId == _lastSelectedUser)
+        {
+            _allowNextOwnTurn = true;
+            _allowNextOwnTurnSetAt = System.DateTime.Now;
+        }
+
+        _lastSelection = System.DateTime.Now;
+        _lastSelectedUser = userId;
     }
 
     [InterceptIn(nameof(In.UserUpdate))]
@@ -131,7 +177,10 @@ public partial class AntiTurnComponent : Component
             }
             else if (Enabled && !isMoving)
             {
-                if (directionChanged && _allowNextOwnTurn)
+                bool reselectActive = _allowNextOwnTurn
+                    && (System.DateTime.Now - _allowNextOwnTurnSetAt).TotalSeconds < ReselectThreshold;
+
+                if (directionChanged && reselectActive)
                 {
                     _allowNextOwnTurn = false;
                     _ownBodyDirection = update.Direction;
@@ -139,6 +188,7 @@ public partial class AntiTurnComponent : Component
                 }
                 else if (directionChanged)
                 {
+                    _allowNextOwnTurn = false;
                     update.Direction = _ownBodyDirection;
                     update.HeadDirection = _ownHeadDirection;
                     modified = true;
