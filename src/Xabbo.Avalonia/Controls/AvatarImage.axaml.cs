@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls.Primitives;
+using Xabbo.Avalonia.Services;
 using Xabbo.Utility;
 
 namespace Xabbo.Avalonia.Controls;
@@ -84,7 +85,8 @@ public class AvatarImage : TemplatedControl
                     figure: FigureString,
                     direction: Direction,
                     headOnly: HeadOnly,
-                    name: UserName
+                    name: UserName,
+                    webHost: XabboImageLoader.Instance.WebHost
                 );
             }
         }
