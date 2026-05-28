@@ -44,6 +44,7 @@
       <x:Boolean x:Key="IsConnected">False</x:Boolean>
       <x:Boolean x:Key="IsOrigins">False</x:Boolean>
       <x:Boolean x:Key="IsModern">False</x:Boolean>
+      <x:Boolean x:Key="IsFlash">False</x:Boolean>
       <x:Boolean x:Key="IsError">False</x:Boolean>
       <x:Boolean x:Key="IsDebug">False</x:Boolean>
       <x:String x:Key="AppStatus">Waiting for connection...</x:String>
@@ -112,6 +113,11 @@
 
     <!-- Hide origins components on modern sessions -->
     <Style Selector=".ismodern :is(Control).origins">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+
+    <!-- Hide flash-obsolete components on flash sessions (fields no longer sent since WIN63-202605181326) -->
+    <Style Selector=".isflash :is(Control).flashhide">
       <Setter Property="IsVisible" Value="False" />
     </Style>
 

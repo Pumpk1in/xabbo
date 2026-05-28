@@ -307,6 +307,7 @@ public sealed class XabboAppManager : IApplicationManager
             _application.Resources["IsConnected"] = true;
             _application.Resources["IsOrigins"] = e.Session.Is(ClientType.Origins);
             _application.Resources["IsModern"] = !e.Session.Is(ClientType.Origins);
+            _application.Resources["IsFlash"] = e.Session.Is(ClientType.Flash);
         });
 
         CancellationToken ct = _extension.DisconnectToken;

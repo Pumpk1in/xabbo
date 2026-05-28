@@ -21,6 +21,7 @@
   FontSize="16"
   Classes.isorigins="{DynamicResource IsOrigins}"
   Classes.ismodern="{DynamicResource IsModern}"
+  Classes.isflash="{DynamicResource IsFlash}"
   Classes.ready="{DynamicResource IsReady}"
   Classes.isError="{DynamicResource IsError}"
   Classes.isConnecting="{DynamicResource IsConnecting}"
