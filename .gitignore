@@ -346,3 +346,5 @@ healthchecksdb
 
 # Claude code
 .claude/
+# Local tooling (decompilers, downloaded SWFs, etc.) — not versioned
+.tools/
