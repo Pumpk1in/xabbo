@@ -176,6 +176,16 @@
                   Ban then unban - "kicks" the user with no kick alert
                 </ToolTip.Tip>
               </RadioButton>
+              <RadioButton
+                Classes="modern"
+                GroupName="ClickTo"
+                Content="Move"
+                IsChecked="{Binding ClickTo.Move}"
+              >
+                <ToolTip.Tip>
+                  Click a user then a tile to teleport them
+                </ToolTip.Tip>
+              </RadioButton>
               <StackPanel Orientation="Horizontal">
                 <TextBlock
                   Margin="0,0,10,0"

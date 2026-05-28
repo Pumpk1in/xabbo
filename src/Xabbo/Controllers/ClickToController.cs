@@ -4,6 +4,7 @@ using Xabbo.Core;
 using Xabbo.Core.Game;
 using Xabbo.Core.Messages.Outgoing;
 using Xabbo.Core.Messages.Incoming;
+using Xabbo.Core.Events;
 using Xabbo.Services.Abstractions;
 using Xabbo.Configuration;
 using Xabbo.Controllers;
@@ -46,6 +47,18 @@ public partial class ClickToController(
     [Reactive] public bool BanPerm { get; set; }
 
     [Reactive] public bool Bounce { get; set; }
+
+    [Reactive] public bool Move { get; set; }
+
+    // Variable names used by the game's debug object-variable function to set an avatar's position.
+    // Confirmed by packet capture: -230 = position.x, -231 = position.y, type 1 = User.
+    private const string VarPosX = "-230";
+    private const string VarPosY = "-231";
+    private const int VarTypeUser = 1;
+
+    // Index of the avatar to move on the next tile click. Null = none.
+    // Always cleared immediately after a move (never remembers the selected user).
+    private int? _pendingMoveTarget;
 
     [Intercept(~ClientType.Shockwave)]
     [InterceptOut(nameof(Out.GetSelectedBadges))]
@@ -179,7 +192,60 @@ public partial class ClickToController(
                 Send(Out.UnbanUserFromRoom, user.Id, room.Id);
             });
         }
+        else if (Move)
+        {
+            _pendingMoveTarget = user.Index;
+            SendInfoMessage("(click-move: click a tile)", user.Index);
+        }
 
+    }
+
+    [Intercept(~ClientType.Shockwave)]
+    [InterceptOut(nameof(Out.MoveAvatar))]
+    void OnWalk(Intercept e)
+    {
+        if (!Enabled || !Move || _pendingMoveTarget is not int index)
+            return;
+
+        var walk = e.Packet.Read<WalkMsg>();
+        e.Block(); // Don't walk our own avatar.
+
+        _pendingMoveTarget = null; // Safety: forget the selected user immediately.
+        _ = MoveAvatarToAsync(index, walk.X, walk.Y);
+    }
+
+    // Each WiredSetObjectVariableValue sets a single variable and triggers one slide.
+    // Sending X and Y back-to-back makes the server ignore Y (received mid-slide), so only
+    // one axis moves. Send X, wait for the server to confirm the slide and finish animating,
+    // then send Y.
+    private async Task MoveAvatarToAsync(int index, int x, int y)
+    {
+        var tcs = new TaskCompletionSource<int>(); // resolves with AnimationTime
+        void OnMove(AvatarWiredMovementEventArgs ev)
+        {
+            if (ev.Avatar.Index == index)
+                tcs.TrySetResult(ev.Movement.AnimationTime);
+        }
+
+        _roomManager.AvatarWiredMovement += OnMove;
+        try
+        {
+            Send(Out.WiredSetObjectVariableValue, VarTypeUser, index, VarPosX, x, 0);
+
+            // Wait for the slide to start; time out if X already matches the current position.
+            var completed = await Task.WhenAny(tcs.Task, Task.Delay(1500));
+            int animTime = completed == tcs.Task ? tcs.Task.Result : 0;
+
+            if (animTime > 0)
+                await Task.Delay(animTime + 100); // let the X slide finish before sending Y
+        }
+        finally
+        {
+            _roomManager.AvatarWiredMovement -= OnMove;
+        }
+
+        Send(Out.WiredSetObjectVariableValue, VarTypeUser, index, VarPosY, y, 0);
+        SendInfoMessage($"(moved to {x},{y})", index);
     }
 
     private void SendInfoMessage(string message, int avatarIndex = -1) => Send(new AvatarWhisperMsg(message, avatarIndex));
