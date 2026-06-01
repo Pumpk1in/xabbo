@@ -4,7 +4,6 @@ using Xabbo.Core;
 using Xabbo.Core.Game;
 using Xabbo.Core.Messages.Outgoing;
 using Xabbo.Core.Messages.Incoming;
-using Xabbo.Core.Events;
 using Xabbo.Services.Abstractions;
 using Xabbo.Configuration;
 using Xabbo.Controllers;
@@ -214,38 +213,29 @@ public partial class ClickToController(
         _ = MoveAvatarToAsync(index, walk.X, walk.Y);
     }
 
-    // Each WiredSetObjectVariableValue sets a single variable and triggers one slide.
-    // Sending X and Y back-to-back makes the server ignore Y (received mid-slide), so only
-    // one axis moves. Send X, wait for the server to confirm the slide and finish animating,
-    // then send Y.
+    // Each WiredSetObjectVariableValue sets a single variable and triggers one slide. Sending
+    // X and Y back-to-back makes the server ignore Y mid-slide, and an avatar on a furni
+    // (/flatctrl/) ignores position changes entirely until it walks off. So we place each axis
+    // with retries, verifying the real position (tracked by RoomManager) after each attempt.
     private async Task MoveAvatarToAsync(int index, int x, int y)
     {
-        var tcs = new TaskCompletionSource<int>(); // resolves with AnimationTime
-        void OnMove(AvatarWiredMovementEventArgs ev)
+        if (!await TrySetAxisAsync(index, VarPosX, x, t => t.X)) return; // X failed -> stop
+        await TrySetAxisAsync(index, VarPosY, y, t => t.Y);
+    }
+
+    private async Task<bool> TrySetAxisAsync(int index, string varName, int target, System.Func<Tile, int> axis)
+    {
+        for (int attempt = 0; attempt < 3; attempt++)
         {
-            if (ev.Avatar.Index == index)
-                tcs.TrySetResult(ev.Movement.AnimationTime);
+            Send(Out.WiredSetObjectVariableValue, VarTypeUser, index, varName, target, 0);
+            await Task.Delay(200);
+
+            if (_roomManager.Room?.GetAvatar<IAvatar>(index) is { } avatar &&
+                axis(avatar.Location) == target)
+                return true;
         }
 
-        _roomManager.AvatarWiredMovement += OnMove;
-        try
-        {
-            Send(Out.WiredSetObjectVariableValue, VarTypeUser, index, VarPosX, x, 0);
-
-            // Wait for the slide to start; time out if X already matches the current position.
-            var completed = await Task.WhenAny(tcs.Task, Task.Delay(1500));
-            int animTime = completed == tcs.Task ? tcs.Task.Result : 0;
-
-            if (animTime > 0)
-                await Task.Delay(animTime + 100); // let the X slide finish before sending Y
-        }
-        finally
-        {
-            _roomManager.AvatarWiredMovement -= OnMove;
-        }
-
-        Send(Out.WiredSetObjectVariableValue, VarTypeUser, index, VarPosY, y, 0);
-        SendInfoMessage($"(moved to {x},{y})", index);
+        return false; // give up silently (avatar likely sitting on a furni)
     }
 
     private void SendInfoMessage(string message, int avatarIndex = -1) => Send(new AvatarWhisperMsg(message, avatarIndex));
