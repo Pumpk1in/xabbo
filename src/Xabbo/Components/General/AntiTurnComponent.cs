@@ -178,9 +178,14 @@ public partial class AntiTurnComponent : Component
                 || update.Location.X != _ownLocationX
                 || update.Location.Y != _ownLocationY;
 
+            // When sitting/lying (e.g. on a chair), the server legitimately
+            // rotates us if the furniture turns. Don't fight that — only block
+            // standing rotations (the click-on-user / hand-item cases).
+            bool isSeated = update.Stance != AvatarStance.Stand;
+
             bool directionChanged = update.Direction != _ownBodyDirection || update.HeadDirection != _ownHeadDirection;
 
-            if (!isMoving && System.DateTime.Now < _forceBlockNextOwnTurnUntil && directionChanged)
+            if (!isMoving && !isSeated && System.DateTime.Now < _forceBlockNextOwnTurnUntil && directionChanged)
             {
                 _forceBlockNextOwnTurnUntil = System.DateTime.MinValue;
                 update.Direction = _ownBodyDirection;
@@ -193,7 +198,7 @@ public partial class AntiTurnComponent : Component
                 _ownBodyDirection = update.Direction;
                 _ownHeadDirection = update.HeadDirection;
             }
-            else if (Enabled && !isMoving)
+            else if (Enabled && !isMoving && !isSeated)
             {
                 bool reselectActive = _allowNextOwnTurn
                     && (System.DateTime.Now - _allowNextOwnTurnSetAt).TotalSeconds < ReselectThreshold;
