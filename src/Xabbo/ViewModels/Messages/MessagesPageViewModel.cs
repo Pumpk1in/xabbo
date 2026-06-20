@@ -1,9 +1,9 @@
+using System.Collections;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Reactive;
 using System.Reactive.Linq;
 using System.Web;
-using Avalonia.Controls.Selection;
 using DynamicData;
 using DynamicData.Binding;
 using ReactiveUI;
@@ -52,14 +52,9 @@ public sealed class MessagesPageViewModel : PageViewModel
     [Reactive] public int TotalUnread { get; private set; }
     [Reactive] public bool IsActive { get; set; }
 
-    public SelectionModel<PrivateMessageViewModel> MessageSelection { get; } = new SelectionModel<PrivateMessageViewModel>()
-    {
-        SingleSelect = false
-    };
-
     private bool _isSendingFromHere;
 
-    public ReactiveCommand<Unit, Unit> CopySelectedMessagesCmd { get; }
+    public ReactiveCommand<IList?, Unit> CopySelectedMessagesCmd { get; }
     public ReactiveCommand<Unit, Unit> SendReplyCmd { get; }
     public ReactiveCommand<Unit, Unit> FollowFriendCmd { get; }
     public ReactiveCommand<ConversationViewModel, Unit> HideConversationCmd { get; }
@@ -100,7 +95,7 @@ public sealed class MessagesPageViewModel : PageViewModel
             (conv, text) => conv is not null && !string.IsNullOrWhiteSpace(text));
 
         SendReplyCmd = ReactiveCommand.Create(SendReply, canSend);
-        CopySelectedMessagesCmd = ReactiveCommand.Create(CopySelectedMessages);
+        CopySelectedMessagesCmd = ReactiveCommand.Create<IList?>(CopySelectedMessages);
 
         var canFollow = this.WhenAnyValue(x => x.SelectedConversation)
             .Select(conv => conv is not null);
@@ -517,11 +512,12 @@ public sealed class MessagesPageViewModel : PageViewModel
         ReplyText = "";
     }
 
-    private void CopySelectedMessages()
+    private void CopySelectedMessages(IList? selected)
     {
-        var items = MessageSelection.SelectedItems
+        if (selected is null) return;
+        var items = selected
+            .Cast<PrivateMessageViewModel?>()
             .Where(x => x is not null)
-            .Cast<PrivateMessageViewModel>()
             .ToList();
         if (items.Count == 0) return;
         _clipboard.SetText(string.Join("\n", items));

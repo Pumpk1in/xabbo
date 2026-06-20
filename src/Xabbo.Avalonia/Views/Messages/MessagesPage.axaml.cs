@@ -20,7 +20,7 @@ public partial class MessagesPage : UserControl
                 vm.WhenAnyValue(x => x.SelectedConversation)
                     .Subscribe(_ =>
                     {
-                        vm.MessageSelection.Clear();
+                        MessagesList.SelectedItems?.Clear();
                         ScrollMessagesToBottom();
                     });
             }

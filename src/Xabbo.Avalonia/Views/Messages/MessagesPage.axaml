@@ -140,11 +140,10 @@
         IsVisible="{Binding SelectedConversation, Converter={x:Static ObjectConverters.IsNotNull}}"
         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
         SelectionMode="Multiple"
-        Selection="{Binding MessageSelection}"
         Name="MessagesList"
       >
         <ListBox.KeyBindings>
-          <KeyBinding Gesture="Ctrl+C" Command="{Binding CopySelectedMessagesCmd}" />
+          <KeyBinding Gesture="Ctrl+C" Command="{Binding CopySelectedMessagesCmd}" CommandParameter="{Binding #MessagesList.SelectedItems}" />
         </ListBox.KeyBindings>
         <ListBox.ItemsPanel>
           <ItemsPanelTemplate>
