@@ -16,6 +16,7 @@ using Symbol = FluentIcons.Common.Symbol;
 using Xabbo.Core;
 using Xabbo.Core.Game;
 using Xabbo.Core.Events;
+using Xabbo.Core.Messages.Incoming;
 using Xabbo.Core.Messages.Outgoing;
 using Xabbo.Interceptor;
 using Xabbo.Messages;
@@ -138,6 +139,7 @@ public sealed class MessagesPageViewModel : PageViewModel
         _friendManager.MessageReceived += OnMessageReceived;
         _friendManager.RoomInviteReceived += OnRoomInviteReceived;
         _interceptor.Intercept<SendConsoleMessageMsg>(OnSentConsoleMessage);
+        _interceptor.Intercept<ConsoleMessageMsg>(OnConsoleMessageEcho);
 
         _ = InitAsync();
     }
@@ -401,6 +403,47 @@ public sealed class MessagesPageViewModel : PageViewModel
             TotalUnread -= conv.UnreadCount;
             if (TotalUnread < 0) TotalUnread = 0;
             conv.UnreadCount = 0;
+        });
+    }
+
+    // Habbicons envoyés par soi-même reviennent en écho NewConsole (SenderId == mon id)
+    // au lieu de passer par un SendMsg outgoing. On les affiche ici comme IsFromMe.
+    // Le texte garde son chemin via OnSentConsoleMessage, donc on ignore MessageType == 0.
+    private void OnConsoleMessageEcho(ConsoleMessageMsg msg)
+    {
+        var m = msg.Message;
+
+        var myId = _profileManager.UserData?.Id ?? default;
+        if (m.SenderId != myId) return;
+        if (m.MessageType == 0) return;
+
+        // ChatId = l'autre participant (ici le destinataire). On ne peut MP qu'un ami.
+        var friend = _friendManager.GetFriend(m.ChatId);
+        if (friend is null) return;
+
+        var myName = _profileManager.UserData?.Name ?? "Me";
+        var timestamp = DateTimeOffset.Now;
+
+        _uiContext.Invoke(() =>
+        {
+            var conv = GetOrCreateConversation(friend);
+            var pm = new PrivateMessageViewModel
+            {
+                SenderName = myName,
+                Content = m.Content,
+                Timestamp = timestamp,
+                IsFromMe = true,
+            };
+            if (conv.IsLoadingHistory)
+            {
+                conv.PendingMessages.Add(pm);
+            }
+            else
+            {
+                _history.Enqueue(friend.Id, friend.Name, myName, m.Content, timestamp, isFromMe: true);
+                conv.AddMessage(pm);
+            }
+            UpdateLastMessageTime(conv, timestamp);
         });
     }
 
