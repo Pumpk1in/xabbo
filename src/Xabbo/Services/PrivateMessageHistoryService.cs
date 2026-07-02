@@ -182,6 +182,18 @@ public sealed class PrivateMessageHistoryService : IPrivateMessageHistoryService
         });
     }
 
+    public void UpdateFriendName(Id friendId, string friendName)
+    {
+        lock (_lock)
+        {
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = "UPDATE private_messages SET friend_name = @friendName WHERE friend_id = @friendId";
+            cmd.Parameters.AddWithValue("@friendName", friendName);
+            cmd.Parameters.AddWithValue("@friendId", (long)friendId);
+            cmd.ExecuteNonQuery();
+        }
+    }
+
     public void HideConversation(Id friendId)
     {
         lock (_lock)

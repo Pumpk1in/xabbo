@@ -60,7 +60,7 @@ public sealed class MessagesPageViewModel : PageViewModel
     public ReactiveCommand<Unit, Unit> FollowFriendCmd { get; }
     public ReactiveCommand<ConversationViewModel, Unit> HideConversationCmd { get; }
     public ReactiveCommand<ConversationViewModel, Unit> DeleteConversationCmd { get; }
-    public ReactiveCommand<string, Task> OpenProfileCmd { get; }
+    public ReactiveCommand<string, Unit> OpenProfileCmd { get; }
 
     public MessagesPageViewModel(
         IUiContext uiContext,
@@ -104,7 +104,7 @@ public sealed class MessagesPageViewModel : PageViewModel
 
         HideConversationCmd = ReactiveCommand.Create<ConversationViewModel>(HideConversation);
         DeleteConversationCmd = ReactiveCommand.CreateFromTask<ConversationViewModel>(DeleteConversationAsync);
-        OpenProfileCmd = ReactiveCommand.Create<string, Task>(OpenProfile);
+        OpenProfileCmd = ReactiveCommand.CreateFromTask<string>(OpenProfile);
 
         this.WhenAnyValue(x => x.TotalUnread)
             .Subscribe(_ =>
@@ -162,6 +162,12 @@ public sealed class MessagesPageViewModel : PageViewModel
 
             if (e.Previous.Figure != e.Friend.Figure && !string.IsNullOrEmpty(e.Friend.Figure))
                 conv.FriendFigure = e.Friend.Figure;
+
+            if (!string.IsNullOrEmpty(e.Friend.Name) && e.Friend.Name != conv.FriendName)
+            {
+                conv.FriendName = e.Friend.Name;
+                _history.UpdateFriendName(conv.FriendId, e.Friend.Name);
+            }
         });
     }
 
@@ -179,8 +185,55 @@ public sealed class MessagesPageViewModel : PageViewModel
 
                 if (string.IsNullOrEmpty(conv.FriendFigure) && !string.IsNullOrEmpty(friend.Figure))
                     conv.FriendFigure = friend.Figure;
+
+                if (!string.IsNullOrEmpty(friend.Name) && friend.Name != conv.FriendName)
+                {
+                    conv.FriendName = friend.Name;
+                    _history.UpdateFriendName(conv.FriendId, friend.Name);
+                }
             }
         });
+
+        // Les conversations dont l'ami n'est plus dans la liste (renommé/supprimé) ne peuvent
+        // pas être rafraîchies via FriendManager : on interroge le profil par ID.
+        _ = RefreshStaleConversationsAsync();
+    }
+
+    private async Task RefreshStaleConversationsAsync()
+    {
+        if (!_interceptor.Session.Is(ClientType.Modern))
+            return;
+
+        var stale = _cache.Items
+            .Where(conv => _friendManager.GetFriend(conv.FriendId) is null)
+            .ToList();
+
+        foreach (var conv in stale)
+        {
+            try
+            {
+                var profile = await _interceptor.RequestAsync(new GetProfileMsg(conv.FriendId), block: false);
+                if (profile is null) continue;
+
+                _uiContext.Invoke(() =>
+                {
+                    if (!_cache.Lookup(conv.FriendId).HasValue) return;
+
+                    if (!string.IsNullOrEmpty(profile.Figure))
+                        conv.FriendFigure = profile.Figure;
+
+                    if (!string.IsNullOrEmpty(profile.Name) && profile.Name != conv.FriendName)
+                    {
+                        conv.FriendName = profile.Name;
+                        _history.UpdateFriendName(conv.FriendId, profile.Name);
+                    }
+                });
+            }
+            catch
+            {
+                // Profil indisponible / timeout : on garde les valeurs historiques.
+            }
+        }
     }
 
     private async Task LoadHistoryAsync()
@@ -499,7 +552,7 @@ public sealed class MessagesPageViewModel : PageViewModel
         switch (type)
         {
             case "game":
-                var profile = await _interceptor.RequestAsync(new GetProfileByNameMsg(conv.FriendName), block: false);
+                var profile = await _interceptor.RequestAsync(new GetProfileMsg(conv.FriendId, Open: true), block: false);
                 if (!profile.DisplayInClient)
                 {
                     await _dialogService.ShowContentDialogAsync(

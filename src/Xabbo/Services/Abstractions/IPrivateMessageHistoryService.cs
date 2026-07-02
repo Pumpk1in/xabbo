@@ -25,6 +25,12 @@ public interface IPrivateMessageHistoryService
     Task DeleteConversationAsync(Id friendId);
 
     /// <summary>
+    /// Updates the stored friend name for all messages of a given friend
+    /// (e.g. after the friend renamed their account).
+    /// </summary>
+    void UpdateFriendName(Id friendId, string friendName);
+
+    /// <summary>
     /// Marks a conversation as hidden. It will reappear when a new message arrives.
     /// </summary>
     void HideConversation(Id friendId);
