@@ -373,7 +373,7 @@
           Classes.Critical="{Binding HasUnseenVotedSanctions}"
           Classes.Informational="{Binding !HasUnseenVotedSanctions}"
           Value="{Binding VotedSanctionCount}"
-          IsVisible="{Binding HasVotedSanctions}"
+          IsVisible="{Binding HasActiveVotedSanctions}"
           HorizontalAlignment="Right" VerticalAlignment="Top"
           Margin="0,-2,-2,0"
           TextElement.FontSize="10" />

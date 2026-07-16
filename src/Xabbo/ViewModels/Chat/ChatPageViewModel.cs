@@ -86,6 +86,9 @@ public class ChatPageViewModel : PageViewModel
     private readonly ObservableAsPropertyHelper<int> _votedSanctionCount;
     public int VotedSanctionCount => _votedSanctionCount.Value;
 
+    private readonly ObservableAsPropertyHelper<bool> _hasActiveVotedSanctions;
+    public bool HasActiveVotedSanctions => _hasActiveVotedSanctions.Value;
+
     private readonly ObservableAsPropertyHelper<bool> _hasVotedSanctions;
     public bool HasVotedSanctions => _hasVotedSanctions.Value;
 
@@ -518,14 +521,17 @@ public class ChatPageViewModel : PageViewModel
             .SortAndBind(out _messages, SortExpressionComparer<ChatLogEntryViewModel>.Ascending(x => x.EntryId))
             .Subscribe();
 
-        _votedSanctionsCache
+        // Active sanctions (top of the flyout); the badge count reflects these only.
+        _votedSanctionCount = _votedSanctionsCache
             .Connect()
             .AutoRefresh(x => x.IsExpired)
             .Filter(x => !x.IsExpired)
             .ObserveOn(RxApp.MainThreadScheduler)
             .SortAndBind(out _activeVotedSanctions, SortExpressionComparer<VotedSanctionViewModel>.Descending(x => x.Timestamp))
-            .Subscribe();
+            .Count()
+            .ToProperty(this, x => x.VotedSanctionCount);
 
+        // Expired sanctions (below the separator, no undo).
         _votedSanctionsCache
             .Connect()
             .AutoRefresh(x => x.IsExpired)
@@ -538,10 +544,12 @@ public class ChatPageViewModel : PageViewModel
         Observable.Interval(TimeSpan.FromSeconds(30), RxApp.MainThreadScheduler)
             .Subscribe(_ => RefreshVotedSanctionExpiry());
 
-        _votedSanctionCount = _votedSanctionsCache.CountChanged
-            .ObserveOn(RxApp.MainThreadScheduler)
-            .ToProperty(this, x => x.VotedSanctionCount);
+        _hasActiveVotedSanctions = this
+            .WhenAnyValue(x => x.VotedSanctionCount)
+            .Select(c => c > 0)
+            .ToProperty(this, x => x.HasActiveVotedSanctions);
 
+        // Any sanction at all (active or expired) — controls the flyout's list vs "none yet" text.
         _hasVotedSanctions = _votedSanctionsCache.CountChanged
             .Select(c => c > 0)
             .ObserveOn(RxApp.MainThreadScheduler)
