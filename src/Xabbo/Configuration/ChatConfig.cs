@@ -24,6 +24,7 @@ public sealed class ChatConfig : ReactiveObject
 
     [Reactive] public bool VoteModeration { get; set; } = false;
     [Reactive] public bool VoteWhisperFeedback { get; set; } = true;
+    [Reactive] public bool VoteAnnounceSanction { get; set; } = false;
     [Reactive] public int VoteMinMessages { get; set; } = 2;
     [Reactive] public int VoteNetThreshold { get; set; } = 4;
     [Reactive] public int VoteQuorum { get; set; } = 3;
@@ -49,4 +50,10 @@ public sealed class ChatConfig : ReactiveObject
         "Tu ne peux pas voter contre toi-même.";
     [Reactive] public string VoteNotAllowedText { get; set; } =
         "{name} ne peut pas être ciblé.";
+
+    // Public room announcements when a vote passes (sent from your own avatar, not a whisper).
+    [Reactive] public string VoteAnnounceBanText { get; set; } =
+        "{name} a été banni 1h suite au vote de la communauté ({for} pour / {against} contre).";
+    [Reactive] public string VoteAnnounceMuteText { get; set; } =
+        "{name} a été muté 10 min suite au vote de la communauté ({for} pour / {against} contre).";
 }

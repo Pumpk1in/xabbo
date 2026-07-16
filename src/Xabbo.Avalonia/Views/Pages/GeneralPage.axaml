@@ -353,6 +353,11 @@
                   Classes="modern"
                   IsChecked="{Binding Config.Chat.VoteWhisperFeedback}"
                 />
+                <CheckBox
+                  Content="Announce sanctions in room chat (public, from your avatar)"
+                  Classes="modern"
+                  IsChecked="{Binding Config.Chat.VoteAnnounceSanction}"
+                />
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <TextBlock VerticalAlignment="Center" Text="Apply when net votes reach" />
                   <NumericUpDown Minimum="1" Maximum="50" Width="110" Value="{Binding Config.Chat.VoteNetThreshold}" />

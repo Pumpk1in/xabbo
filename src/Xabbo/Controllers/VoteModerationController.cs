@@ -270,7 +270,20 @@ public partial class VoteModerationController : ControllerBase
         else
             await _moderation.MuteUsersAsync([target], MuteMinutes);
 
+        Announce(target, type, forCount, againstCount);
         NotifyResult(target, type, forCount, againstCount);
+    }
+
+    private void Announce(IUser target, VoteType type, int forCount, int againstCount)
+    {
+        if (!Settings.Chat.VoteAnnounceSanction) return;
+
+        var template = type == VoteType.Ban
+            ? Settings.Chat.VoteAnnounceBanText
+            : Settings.Chat.VoteAnnounceMuteText;
+        var text = Format(template, target.Name, forCount, againstCount);
+        if (!string.IsNullOrWhiteSpace(text))
+            Ext.Send(new ChatMsg(ChatType.Talk, text, Settings.Chat.BubbleStyle));
     }
 
     private void OnAvatarsAdded(AvatarsEventArgs e)
