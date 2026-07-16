@@ -74,8 +74,14 @@ public class ChatPageViewModel : PageViewModel
 
     // Vote-ban / vote-mute results (community moderation).
     private readonly SourceCache<VotedSanctionViewModel, long> _votedSanctionsCache = new(x => x.Id);
-    private readonly ReadOnlyObservableCollection<VotedSanctionViewModel> _votedSanctions;
-    public ReadOnlyObservableCollection<VotedSanctionViewModel> VotedSanctions => _votedSanctions;
+    private readonly ReadOnlyObservableCollection<VotedSanctionViewModel> _activeVotedSanctions;
+    public ReadOnlyObservableCollection<VotedSanctionViewModel> ActiveVotedSanctions => _activeVotedSanctions;
+
+    private readonly ReadOnlyObservableCollection<VotedSanctionViewModel> _expiredVotedSanctions;
+    public ReadOnlyObservableCollection<VotedSanctionViewModel> ExpiredVotedSanctions => _expiredVotedSanctions;
+
+    /// <summary>True when at least one voted sanction in the list has expired (shows the separator).</summary>
+    [Reactive] public bool HasExpiredVotedSanctions { get; set; }
 
     private readonly ObservableAsPropertyHelper<int> _votedSanctionCount;
     public int VotedSanctionCount => _votedSanctionCount.Value;
@@ -514,9 +520,23 @@ public class ChatPageViewModel : PageViewModel
 
         _votedSanctionsCache
             .Connect()
+            .AutoRefresh(x => x.IsExpired)
+            .Filter(x => !x.IsExpired)
             .ObserveOn(RxApp.MainThreadScheduler)
-            .SortAndBind(out _votedSanctions, SortExpressionComparer<VotedSanctionViewModel>.Descending(x => x.Timestamp))
+            .SortAndBind(out _activeVotedSanctions, SortExpressionComparer<VotedSanctionViewModel>.Descending(x => x.Timestamp))
             .Subscribe();
+
+        _votedSanctionsCache
+            .Connect()
+            .AutoRefresh(x => x.IsExpired)
+            .Filter(x => x.IsExpired)
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .SortAndBind(out _expiredVotedSanctions, SortExpressionComparer<VotedSanctionViewModel>.Descending(x => x.ExpiresAt))
+            .Subscribe();
+
+        // Flip IsExpired on sanctions whose duration has elapsed (moves them below the separator).
+        Observable.Interval(TimeSpan.FromSeconds(30), RxApp.MainThreadScheduler)
+            .Subscribe(_ => RefreshVotedSanctionExpiry());
 
         _votedSanctionCount = _votedSanctionsCache.CountChanged
             .ObserveOn(RxApp.MainThreadScheduler)
@@ -1296,7 +1316,25 @@ public class ChatPageViewModel : PageViewModel
         RxApp.MainThreadScheduler.Schedule(() => HasUnseenVotedSanctions = true);
     }
 
-    public void ClearVotedSanctionsUnseen() => HasUnseenVotedSanctions = false;
+    public void ClearVotedSanctionsUnseen()
+    {
+        HasUnseenVotedSanctions = false;
+        RefreshVotedSanctionExpiry();
+    }
+
+    private void RefreshVotedSanctionExpiry()
+    {
+        var now = DateTime.Now;
+        bool anyExpired = false;
+        foreach (var vm in _votedSanctionsCache.Items)
+        {
+            bool expired = now >= vm.ExpiresAt;
+            if (vm.IsExpired != expired)
+                vm.IsExpired = expired;
+            anyExpired |= expired;
+        }
+        HasExpiredVotedSanctions = anyExpired;
+    }
 
     private async Task UndoVotedSanctionAsync(VotedSanctionViewModel row)
     {

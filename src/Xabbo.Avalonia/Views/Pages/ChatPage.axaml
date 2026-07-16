@@ -308,33 +308,62 @@
                 <TextBlock Grid.Row="1" Text="No voted sanctions yet."
                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                            Margin="4" IsVisible="{Binding !HasVotedSanctions}" />
-                <ListBox Grid.Row="1" ItemsSource="{Binding VotedSanctions}"
-                         IsVisible="{Binding HasVotedSanctions}"
-                         Background="Transparent" Padding="0">
-                  <ListBox.ItemTemplate>
-                    <DataTemplate x:DataType="vm:VotedSanctionViewModel">
-                      <Grid ColumnDefinitions="*,Auto" Margin="0,2">
-                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                          <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
-                          <StackPanel Orientation="Horizontal" Spacing="10">
-                            <TextBlock Text="{Binding SanctionText}" FontSize="11"
-                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                            <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                       Text="{Binding ForCount, StringFormat='👍 {0}'}" />
-                            <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                       Text="{Binding AgainstCount, StringFormat='👎 {0}'}" />
-                            <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                       ToolTip.Tip="Sanction expires at this time"
-                                       Text="{Binding ExpiresAt, StringFormat='exp. {0:HH:mm}'}" />
-                          </StackPanel>
-                        </StackPanel>
-                        <Button Grid.Column="1" VerticalAlignment="Center" Content="{Binding UndoText}"
-                                Command="{Binding #ChatPageRoot.((vm:ChatPageViewModel)DataContext).UndoVotedSanctionCmd}"
-                                CommandParameter="{Binding}" />
-                      </Grid>
-                    </DataTemplate>
-                  </ListBox.ItemTemplate>
-                </ListBox>
+                <ScrollViewer Grid.Row="1" IsVisible="{Binding HasVotedSanctions}"
+                              VerticalScrollBarVisibility="Auto">
+                  <StackPanel Spacing="2">
+                    <!-- Active sanctions (with undo) -->
+                    <ItemsControl ItemsSource="{Binding ActiveVotedSanctions}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:VotedSanctionViewModel">
+                          <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                              <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                              <StackPanel Orientation="Horizontal" Spacing="10">
+                                <TextBlock Text="{Binding SanctionText}" FontSize="11"
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                           Text="{Binding ForCount, StringFormat='👍 {0}'}" />
+                                <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                           Text="{Binding AgainstCount, StringFormat='👎 {0}'}" />
+                                <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                           ToolTip.Tip="Sanction expires at this time"
+                                           Text="{Binding ExpiresAt, StringFormat='exp. {0:HH:mm}'}" />
+                              </StackPanel>
+                            </StackPanel>
+                            <Button Grid.Column="1" VerticalAlignment="Center" Content="{Binding UndoText}"
+                                    Command="{Binding #ChatPageRoot.((vm:ChatPageViewModel)DataContext).UndoVotedSanctionCmd}"
+                                    CommandParameter="{Binding}" />
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <!-- Expired sanctions (greyed, no undo) -->
+                    <StackPanel Spacing="2" Margin="0,6,0,0" IsVisible="{Binding HasExpiredVotedSanctions}">
+                      <Separator />
+                      <TextBlock Text="Expired" FontSize="11" FontWeight="SemiBold"
+                                 Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                      <ItemsControl ItemsSource="{Binding ExpiredVotedSanctions}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:VotedSanctionViewModel">
+                            <StackPanel Margin="0,2" Opacity="0.5">
+                              <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextDecorations="Strikethrough" />
+                              <StackPanel Orientation="Horizontal" Spacing="10">
+                                <TextBlock Text="{Binding SanctionText}" FontSize="11"
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                           Text="{Binding ForCount, StringFormat='👍 {0}'}" />
+                                <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                           Text="{Binding AgainstCount, StringFormat='👎 {0}'}" />
+                                <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                           Text="{Binding ExpiresAt, StringFormat='expired {0:HH:mm}'}" />
+                              </StackPanel>
+                            </StackPanel>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                  </StackPanel>
+                </ScrollViewer>
               </Grid>
             </Flyout>
           </Button.Flyout>

@@ -1,3 +1,4 @@
+using ReactiveUI;
 using Xabbo.Controllers;
 
 namespace Xabbo.ViewModels;
@@ -11,6 +12,9 @@ public class VotedSanctionViewModel(long id, string name, VoteType type, int for
     public int ForCount { get; } = forCount;
     public int AgainstCount { get; } = againstCount;
     public DateTime Timestamp { get; } = DateTime.Now;
+
+    /// <summary>Set by a periodic sweep once <see cref="ExpiresAt"/> has passed.</summary>
+    [Reactive] public bool IsExpired { get; set; }
 
     public bool IsBan => Type == VoteType.Ban;
     public string SanctionText => IsBan ? "banned 1h" : "muted 10min";
