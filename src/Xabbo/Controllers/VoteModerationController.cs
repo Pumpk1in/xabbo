@@ -179,7 +179,8 @@ public partial class VoteModerationController : ControllerBase
             {
                 rejectWhisper = Format(Settings.Chat.VoteImmuneText, display, 0, 0);
             }
-            else if (target is not null && !_moderation.CanModerate(ToModerationType(type), target))
+            else if (target is not null &&
+                     (IsVoteProtected(target) || !_moderation.CanModerate(ToModerationType(type), target)))
             {
                 rejectWhisper = Format(Settings.Chat.VoteNotAllowedText, display, 0, 0);
             }
@@ -296,6 +297,7 @@ public partial class VoteModerationController : ControllerBase
                     _pendingSanctions.Remove(key);
 
                     if (IsWhitelisted(user, user.Name)) continue;
+                    if (IsVoteProtected(user)) continue;
                     var immunity = type == VoteType.Ban ? _immuneBanUntil : _immuneMuteUntil;
                     if (immunity.TryGetValue(user.Id, out var im) && im > now) continue;
                     if (!_moderation.CanModerate(ToModerationType(type), user)) continue;
@@ -321,6 +323,10 @@ public partial class VoteModerationController : ControllerBase
         type == VoteType.Ban
             ? RoomModerationController.ModerationType.Ban
             : RoomModerationController.ModerationType.Mute;
+
+    // Room owners and group admins are never a valid vote target, regardless of the
+    // moderator's own rank (so the community can't brigade a trusted admin).
+    private static bool IsVoteProtected(IUser user) => user.RightsLevel >= RightsLevel.GroupAdmin;
 
     private bool IsWhitelisted(IUser? target, string name)
     {
