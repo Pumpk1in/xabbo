@@ -391,6 +391,16 @@ public partial class VoteModerationController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Debug helper (used by the <c>/votetest</c> command): simulates a passed vote to
+    /// exercise the full sanction + UI path solo, since a moderator can't cast real votes.
+    /// </summary>
+    public void TriggerTestSanction(IUser target, VoteType type)
+    {
+        int forCount = Math.Max(Settings.Chat.VoteNetThreshold, Settings.Chat.VoteQuorum);
+        _ = ApplySanctionAsync(target, type, forCount, 0);
+    }
+
     public void AddToWhitelist(Id id, string name)
     {
         lock (_lock)

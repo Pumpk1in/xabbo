@@ -195,6 +195,7 @@ public static class ViewModelLocator
         Splatr.RegisterLazySingleton<CommandModule, MoodCommands>();
         Splatr.RegisterLazySingleton<CommandModule, RoomCommands>();
         Splatr.RegisterLazySingleton<CommandModule, TurnCommand>();
+        Splatr.RegisterLazySingleton<CommandModule, VoteTestCommand>();
         Splatr.RegisterLazySingleton<CommandModule, UserProfileCommands>();
         Splatr.RegisterLazySingleton<CommandModule, ClickThroughCommand>();
         #pragma warning restore SPLATDI006
