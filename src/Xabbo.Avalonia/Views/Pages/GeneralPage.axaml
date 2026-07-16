@@ -334,7 +334,7 @@
             <StackPanel Spacing="4">
               <CheckBox
                 x:Name="VoteModerationEnabled"
-                Content="Let players vote-ban (1h) / vote-mute (5min)"
+                Content="Let players vote-ban (1h) / vote-mute (10min)"
                 Classes="modern"
                 IsChecked="{Binding Config.Chat.VoteModeration}"
               />

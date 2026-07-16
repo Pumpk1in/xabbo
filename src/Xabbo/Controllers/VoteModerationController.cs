@@ -20,7 +20,7 @@ public enum VoteType { Ban, Mute }
 /// <summary>
 /// Community vote-ban / vote-mute engine. Players type <c>/voteban</c>, <c>/votenoban</c>,
 /// <c>/votemute</c> or <c>/votenomute</c> in room chat; when a net threshold + quorum is reached
-/// the target is banned 1h or muted 5min. Runs entirely off incoming chat
+/// the target is banned 1h or muted 10min. Runs entirely off incoming chat
 /// (<see cref="RoomManager.AvatarChat"/>) — the moderator is alerted only through the UI.
 /// </summary>
 [Intercept]
@@ -28,7 +28,8 @@ public partial class VoteModerationController : ControllerBase
 {
     private enum VoteDirection { For, Against }
 
-    private const int MuteMinutes = 5;
+    private const int MuteMinutes = 10; // 10min = the max mute a moderator can set from the game client,
+                                        // so a vote-mute can never shorten an existing manual mute.
     private static readonly TimeSpan ImmunityDuration = TimeSpan.FromHours(1);
     private static readonly TimeSpan DeferredSanctionWindow = TimeSpan.FromMinutes(15);
 
@@ -311,7 +312,7 @@ public partial class VoteModerationController : ControllerBase
     private void NotifyResult(IUser target, VoteType type, int forCount, int againstCount)
     {
         _chatPage ??= Locator.Current.GetService<ChatPageViewModel>();
-        var label = type == VoteType.Ban ? "vote-banned 1h" : "vote-muted 5min";
+        var label = type == VoteType.Ban ? "vote-banned 1h" : "vote-muted 10min";
         _chatPage?.AppendModerationNotification(target.Name, $"{label} ({forCount}/{againstCount})");
         _chatPage?.AddVotedSanction(new VotedSanctionViewModel(target.Id, target.Name, type, forCount, againstCount));
     }
