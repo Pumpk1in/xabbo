@@ -93,9 +93,9 @@ public partial class VoteModerationController : ControllerBase
         switch (verb)
         {
             case "voteban": type = VoteType.Ban; direction = VoteDirection.For; return true;
-            case "votekeep": type = VoteType.Ban; direction = VoteDirection.Against; return true;
+            case "votenoban": type = VoteType.Ban; direction = VoteDirection.Against; return true;
             case "votemute": type = VoteType.Mute; direction = VoteDirection.For; return true;
-            case "voteunmute": type = VoteType.Mute; direction = VoteDirection.Against; return true;
+            case "votenomute": type = VoteType.Mute; direction = VoteDirection.Against; return true;
             default: type = default; direction = default; return false;
         }
     }

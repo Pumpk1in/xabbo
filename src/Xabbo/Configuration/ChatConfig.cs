@@ -32,7 +32,7 @@ public sealed class ChatConfig : ReactiveObject
 
     // Whisper templates sent to voters. Placeholders: {name}, {for}, {against}.
     [Reactive] public string VoteHelpText { get; set; } =
-        "Modération par vote : /voteban <pseudo> (bannir), /votemute <pseudo> (muter). Pour défendre : /votekeep <pseudo>, /voteunmute <pseudo>.";
+        "Modération par vote : /voteban <pseudo> (bannir), /votemute <pseudo> (muter). Contre le vote : /votenoban <pseudo>, /votenomute <pseudo>.";
     [Reactive] public string VoteCountedText { get; set; } =
         "Ton vote concernant {name} est pris en compte ({for} pour / {against} contre).";
     [Reactive] public string VoteChangedText { get; set; } =
