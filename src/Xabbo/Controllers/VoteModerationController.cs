@@ -18,8 +18,8 @@ namespace Xabbo.Controllers;
 public enum VoteType { Ban, Mute }
 
 /// <summary>
-/// Community vote-ban / vote-mute engine. Players type <c>/voteban</c>, <c>/votekeep</c>,
-/// <c>/votemute</c> or <c>/voteunmute</c> in room chat; when a net threshold + quorum is reached
+/// Community vote-ban / vote-mute engine. Players type <c>/voteban</c>, <c>/votenoban</c>,
+/// <c>/votemute</c> or <c>/votenomute</c> in room chat; when a net threshold + quorum is reached
 /// the target is banned 1h or muted 5min. Runs entirely off incoming chat
 /// (<see cref="RoomManager.AvatarChat"/>) — the moderator is alerted only through the UI.
 /// </summary>
