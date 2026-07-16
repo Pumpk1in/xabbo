@@ -46,6 +46,7 @@ public class GeneralPageViewModel : PageViewModel
     [Reactive] public bool IsChatExpanded { get; set; } = true;
     [Reactive] public bool IsMuteExpanded { get; set; } = true;
     [Reactive] public bool IsAntiSpamExpanded { get; set; } = true;
+    [Reactive] public bool IsVoteModerationExpanded { get; set; } = true;
     [Reactive] public bool IsFurniExpanded { get; set; } = true;
     [Reactive] public bool IsHandItemExpanded { get; set; } = true;
     [Reactive] public bool IsAlertsExpanded { get; set; } = true;

@@ -320,6 +320,66 @@
               </StackPanel>
             </StackPanel>
           </Expander>
+          <Expander
+            Margin="0,5,0,5"
+            Classes="modern"
+            IsExpanded="{Binding IsVoteModerationExpanded}"
+          >
+            <Expander.Header>
+              <StackPanel Orientation="Horizontal" Spacing="5">
+                <ic:SymbolIcon Symbol="PeopleTeam" />
+                <TextBlock Text="Community vote moderation" />
+              </StackPanel>
+            </Expander.Header>
+            <StackPanel Spacing="4">
+              <CheckBox
+                x:Name="VoteModerationEnabled"
+                Content="Let players vote-ban (1h) / vote-mute (5min)"
+                Classes="modern"
+                IsChecked="{Binding Config.Chat.VoteModeration}"
+              />
+              <TextBlock
+                FontSize="11"
+                TextWrapping="Wrap"
+                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                Text="Commands: /voteban, /votekeep (against), /votemute, /voteunmute (against)."
+              />
+              <StackPanel
+                Spacing="4"
+                IsEnabled="{Binding #VoteModerationEnabled.IsChecked}"
+              >
+                <CheckBox
+                  Content="Notify voters by whisper (vote counted, blocked, etc.)"
+                  Classes="modern"
+                  IsChecked="{Binding Config.Chat.VoteWhisperFeedback}"
+                />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBlock VerticalAlignment="Center" Text="Apply when net votes reach" />
+                  <NumericUpDown Minimum="1" Maximum="50" Width="110" Value="{Binding Config.Chat.VoteNetThreshold}" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBlock VerticalAlignment="Center" Text="...and at least" />
+                  <NumericUpDown Minimum="1" Maximum="50" Width="110" Value="{Binding Config.Chat.VoteQuorum}" />
+                  <TextBlock VerticalAlignment="Center" Text="voters are in favor" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBlock VerticalAlignment="Center" Text="A voter must have sent" />
+                  <NumericUpDown Minimum="0" Maximum="20" Width="110" Value="{Binding Config.Chat.VoteMinMessages}" />
+                  <TextBlock VerticalAlignment="Center" Text="messages" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBlock VerticalAlignment="Center" Text="Vote expires after" />
+                  <NumericUpDown Minimum="1" Maximum="60" Width="110" Value="{Binding Config.Chat.VoteSessionTtlMinutes}" />
+                  <TextBlock VerticalAlignment="Center" Text="minutes of inactivity" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBlock VerticalAlignment="Center" Text="Cooldown after a sanction:" />
+                  <NumericUpDown Minimum="0" Maximum="120" Width="110" Value="{Binding Config.Chat.VoteCooldownMinutes}" />
+                  <TextBlock VerticalAlignment="Center" Text="minutes" />
+                </StackPanel>
+              </StackPanel>
+            </StackPanel>
+          </Expander>
         </StackPanel>
       </Expander>
 

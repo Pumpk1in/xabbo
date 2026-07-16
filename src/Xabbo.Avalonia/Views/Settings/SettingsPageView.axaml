@@ -142,6 +142,53 @@
           </StackPanel>
         </ui:SettingsExpanderItem>
       </ui:SettingsExpander>
+      <!-- Vote moderation messages -->
+      <ui:SettingsExpander
+        Header="Vote moderation messages"
+        Description="{}Whispers sent to voters. Placeholders: {name}, {for}, {against}. Max 165 characters."
+        IconSource="{icm:SymbolIconSource Symbol=Chat}"
+      >
+        <ui:SettingsExpanderItem>
+          <StackPanel Spacing="8">
+            <StackPanel Spacing="2">
+              <TextBlock Text="Help (shown on bare /voteban or /votemute)" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+              <TextBox Text="{Binding Config.Chat.VoteHelpText}" MaxLength="165" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60" />
+            </StackPanel>
+            <StackPanel Spacing="2">
+              <TextBlock Text="Vote counted" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+              <TextBox Text="{Binding Config.Chat.VoteCountedText}" MaxLength="165" />
+            </StackPanel>
+            <StackPanel Spacing="2">
+              <TextBlock Text="Vote changed" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+              <TextBox Text="{Binding Config.Chat.VoteChangedText}" MaxLength="165" />
+            </StackPanel>
+            <StackPanel Spacing="2">
+              <TextBlock Text="Already voted" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+              <TextBox Text="{Binding Config.Chat.VoteAlreadyText}" MaxLength="165" />
+            </StackPanel>
+            <StackPanel Spacing="2">
+              <TextBlock Text="Target whitelisted" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+              <TextBox Text="{Binding Config.Chat.VoteWhitelistedText}" MaxLength="165" />
+            </StackPanel>
+            <StackPanel Spacing="2">
+              <TextBlock Text="Target on cooldown" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+              <TextBox Text="{Binding Config.Chat.VoteCooldownText}" MaxLength="165" />
+            </StackPanel>
+            <StackPanel Spacing="2">
+              <TextBlock Text="Target temporarily immune" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+              <TextBox Text="{Binding Config.Chat.VoteImmuneText}" MaxLength="165" />
+            </StackPanel>
+            <StackPanel Spacing="2">
+              <TextBlock Text="Self-vote" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+              <TextBox Text="{Binding Config.Chat.VoteSelfText}" MaxLength="165" />
+            </StackPanel>
+            <StackPanel Spacing="2">
+              <TextBlock Text="Target not allowed (staff / rights)" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+              <TextBox Text="{Binding Config.Chat.VoteNotAllowedText}" MaxLength="165" />
+            </StackPanel>
+          </StackPanel>
+        </ui:SettingsExpanderItem>
+      </ui:SettingsExpander>
       <!-- Timing (modern) -->
       <ui:SettingsExpander
         Classes="modern"

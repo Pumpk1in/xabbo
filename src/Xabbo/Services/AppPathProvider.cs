@@ -19,6 +19,7 @@ public sealed class AppPathService : IAppPathProvider
         AppPathKind.ChatHistoryDb => GetAppDataFilePath("chat_history.db"),
         AppPathKind.PrivateMessagesDb => GetAppDataFilePath("private_messages.db"),
         AppPathKind.DeferredBans => GetAppDataFilePath("deferred_bans.json"),
+        AppPathKind.VoteWhitelist => GetAppDataFilePath("vote_whitelist.json"),
         _ => throw new Exception($"Unsupported app path kind: '{kind}'."),
     };
 }

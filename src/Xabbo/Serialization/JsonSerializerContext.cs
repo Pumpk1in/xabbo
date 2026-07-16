@@ -18,4 +18,5 @@ namespace Xabbo.Serialization;
 [JsonSerializable(typeof(Dictionary<long, string>))]
 [JsonSerializable(typeof(HashSet<long>))]
 [JsonSerializable(typeof(DeferredModerationData))]
+[JsonSerializable(typeof(VoteWhitelistData))]
 public partial class JsonSourceGenerationContext : JsonSerializerContext;

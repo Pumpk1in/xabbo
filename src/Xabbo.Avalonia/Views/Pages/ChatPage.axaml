@@ -20,7 +20,7 @@
     <vm:ChatPageViewModel />
   </Design.DataContext>
   <Grid RowDefinitions="Auto,*,Auto">
-    <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto" Margin="10,10,10,0">
+    <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto" Margin="10,10,10,0">
       <TextBox
         Grid.Column="0"
         Classes="clearButton"
@@ -191,6 +191,11 @@
                       IsEnabled="{Binding AddHistoryToProfanityFilterCmd.CanExecute^}"
                       Command="{Binding AddHistoryToProfanityFilterCmd}"
                     />
+                    <ui:MenuFlyoutItem
+                      Text="Add to vote whitelist"
+                      IconSource="{icm:SymbolIconSource Symbol=Shield}"
+                      Command="{Binding AddHistoryToWhitelistCmd}"
+                    />
                     <ui:MenuFlyoutSubItem
                       Text="Ban"
                       IconSource="{icm:SymbolIconSource Symbol=PersonProhibited}"
@@ -287,7 +292,63 @@
         </Button.Flyout>
         <ic:SymbolIcon Symbol="History" FontSize="16" />
       </Button>
-      <Button Grid.Column="5" Margin="10,0,0,0" VerticalAlignment="Center" Padding="8" ToolTip.Tip="Clear chat">
+      <Panel Grid.Column="5" Margin="10,0,0,0" VerticalAlignment="Center">
+        <Button x:Name="VotedSanctionsButton" VerticalAlignment="Center" Padding="8" ToolTip.Tip="Voted sanctions">
+          <Button.Flyout>
+            <Flyout Placement="BottomEdgeAlignedRight">
+              <Flyout.FlyoutPresenterTheme>
+                <ControlTheme TargetType="FlyoutPresenter" BasedOn="{StaticResource {x:Type FlyoutPresenter}}">
+                  <Setter Property="MaxHeight" Value="Infinity" />
+                </ControlTheme>
+              </Flyout.FlyoutPresenterTheme>
+              <Grid x:Name="VotedSanctionsFlyoutPanel" Width="360" MaxHeight="420"
+                    RowDefinitions="Auto,*"
+                    x:DataType="vm:ChatPageViewModel" DataContext="{Binding #ChatPageRoot.DataContext}">
+                <TextBlock Grid.Row="0" Text="Voted sanctions" FontWeight="SemiBold" Margin="4,4,4,8" />
+                <TextBlock Grid.Row="1" Text="No voted sanctions yet."
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                           Margin="4" IsVisible="{Binding !HasVotedSanctions}" />
+                <ListBox Grid.Row="1" ItemsSource="{Binding VotedSanctions}"
+                         IsVisible="{Binding HasVotedSanctions}"
+                         Background="Transparent" Padding="0">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:VotedSanctionViewModel">
+                      <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                          <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                          <StackPanel Orientation="Horizontal" Spacing="10">
+                            <TextBlock Text="{Binding SanctionText}" FontSize="11"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                            <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="{Binding ForCount, StringFormat='👍 {0}'}" />
+                            <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="{Binding AgainstCount, StringFormat='👎 {0}'}" />
+                            <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="{Binding Timestamp, StringFormat='HH:mm'}" />
+                          </StackPanel>
+                        </StackPanel>
+                        <Button Grid.Column="1" VerticalAlignment="Center" Content="{Binding UndoText}"
+                                Command="{Binding #ChatPageRoot.((vm:ChatPageViewModel)DataContext).UndoVotedSanctionCmd}"
+                                CommandParameter="{Binding}" />
+                      </Grid>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+              </Grid>
+            </Flyout>
+          </Button.Flyout>
+          <ic:SymbolIcon Symbol="Gavel" FontSize="16" />
+        </Button>
+        <ui:InfoBadge
+          Classes.Critical="{Binding HasUnseenVotedSanctions}"
+          Classes.Informational="{Binding !HasUnseenVotedSanctions}"
+          Value="{Binding VotedSanctionCount}"
+          IsVisible="{Binding HasVotedSanctions}"
+          HorizontalAlignment="Right" VerticalAlignment="Top"
+          Margin="0,-2,-2,0"
+          TextElement.FontSize="10" />
+      </Panel>
+      <Button Grid.Column="6" Margin="10,0,0,0" VerticalAlignment="Center" Padding="8" ToolTip.Tip="Clear chat">
         <Button.Flyout>
           <ui:FAMenuFlyout>
             <ui:MenuFlyoutItem Text="Clear all" Command="{Binding ClearAllMessagesCmd}" IconSource="{icm:SymbolIconSource Symbol=Delete}" />
@@ -350,6 +411,11 @@
             IconSource="{icm:SymbolIconSource Symbol=History}"
             Text="Search in history"
             Command="{Binding SearchUserInHistoryCmd}"
+          />
+          <ui:MenuFlyoutItem
+            IconSource="{icm:SymbolIconSource Symbol=Shield}"
+            Text="Add to vote whitelist"
+            Command="{Binding AddToWhitelistCmd}"
           />
           <ui:MenuFlyoutItem
             IconSource="{icm:SymbolIconSource Symbol=TextBulletListSquareWarning}"

@@ -8,4 +8,5 @@ public enum AppPathKind
     ChatHistoryDb,
     PrivateMessagesDb,
     DeferredBans,
+    VoteWhitelist,
 }

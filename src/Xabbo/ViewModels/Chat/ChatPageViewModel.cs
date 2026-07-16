@@ -1,5 +1,6 @@
 ﻿using System.Collections.ObjectModel;
 using System.Reactive;
+using System.Reactive.Concurrency;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using System.Text;
@@ -58,6 +59,7 @@ public class ChatPageViewModel : PageViewModel
     private readonly ProfileManager _profileManager;
     private readonly RoomModerationController _moderation;
     private readonly XabbotComponent _xabbot;
+    private readonly VoteModerationController _voteController;
     private ModerationCommands? _moderationCommands;
 
     public ChatLogConfig Config => Settings.Chat.Log;
@@ -69,6 +71,24 @@ public class ChatPageViewModel : PageViewModel
 
     private readonly ReadOnlyObservableCollection<ChatLogEntryViewModel> _messages;
     public ReadOnlyObservableCollection<ChatLogEntryViewModel> Messages => _messages;
+
+    // Vote-ban / vote-mute results (community moderation).
+    private readonly SourceCache<VotedSanctionViewModel, long> _votedSanctionsCache = new(x => x.Id);
+    private readonly ReadOnlyObservableCollection<VotedSanctionViewModel> _votedSanctions;
+    public ReadOnlyObservableCollection<VotedSanctionViewModel> VotedSanctions => _votedSanctions;
+
+    private readonly ObservableAsPropertyHelper<int> _votedSanctionCount;
+    public int VotedSanctionCount => _votedSanctionCount.Value;
+
+    private readonly ObservableAsPropertyHelper<bool> _hasVotedSanctions;
+    public bool HasVotedSanctions => _hasVotedSanctions.Value;
+
+    /// <summary>True when a new voted sanction landed and the flyout hasn't been opened since.</summary>
+    [Reactive] public bool HasUnseenVotedSanctions { get; set; }
+
+    public ReactiveCommand<VotedSanctionViewModel, Unit> UndoVotedSanctionCmd { get; }
+    public ReactiveCommand<Unit, Unit> AddToWhitelistCmd { get; }
+    public ReactiveCommand<Unit, Unit> AddHistoryToWhitelistCmd { get; }
 
     [Reactive] public IList<ChatMessageViewModel>? ContextSelection { get; set; }
 
@@ -233,7 +253,8 @@ public class ChatPageViewModel : PageViewModel
         RoomManager roomManager,
         ProfileManager profileManager,
         RoomModerationController moderation,
-        XabbotComponent xabbot)
+        XabbotComponent xabbot,
+        VoteModerationController voteController)
     {
         _ext = ext;
         _settingsProvider = settingsProvider;
@@ -250,6 +271,7 @@ public class ChatPageViewModel : PageViewModel
         _profileManager = profileManager;
         _moderation = moderation;
         _xabbot = xabbot;
+        _voteController = voteController;
 
         _roomManager.Entered += OnEnteredRoom;
         _roomManager.Left += () => IsInRoom = false;
@@ -489,6 +511,26 @@ public class ChatPageViewModel : PageViewModel
             .ObserveOn(RxApp.MainThreadScheduler)
             .SortAndBind(out _messages, SortExpressionComparer<ChatLogEntryViewModel>.Ascending(x => x.EntryId))
             .Subscribe();
+
+        _votedSanctionsCache
+            .Connect()
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .SortAndBind(out _votedSanctions, SortExpressionComparer<VotedSanctionViewModel>.Descending(x => x.Timestamp))
+            .Subscribe();
+
+        _votedSanctionCount = _votedSanctionsCache.CountChanged
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .ToProperty(this, x => x.VotedSanctionCount);
+
+        _hasVotedSanctions = _votedSanctionsCache.CountChanged
+            .Select(c => c > 0)
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .ToProperty(this, x => x.HasVotedSanctions);
+
+        UndoVotedSanctionCmd = ReactiveCommand.CreateFromTask<VotedSanctionViewModel>(
+            row => TryModerate(() => UndoVotedSanctionAsync(row)));
+        AddToWhitelistCmd = ReactiveCommand.Create(AddSelectedToWhitelist);
+        AddHistoryToWhitelistCmd = ReactiveCommand.Create(AddSelectedHistoryToWhitelist);
 
         CopySelectedEntriesCmd = ReactiveCommand.Create(CopySelectedEntries);
 
@@ -1245,6 +1287,65 @@ public class ChatPageViewModel : PageViewModel
             RoomId = (long?)_roomManager.Room?.Id,
             RoomName = _roomManager.Room?.Data?.Name,
         });
+    }
+
+    /// <summary>Called by <see cref="VoteModerationController"/> when a vote-sanction is applied.</summary>
+    public void AddVotedSanction(VotedSanctionViewModel vm)
+    {
+        _votedSanctionsCache.AddOrUpdate(vm);
+        RxApp.MainThreadScheduler.Schedule(() => HasUnseenVotedSanctions = true);
+    }
+
+    public void ClearVotedSanctionsUnseen() => HasUnseenVotedSanctions = false;
+
+    private async Task UndoVotedSanctionAsync(VotedSanctionViewModel row)
+    {
+        if (row.Type == VoteType.Ban)
+        {
+            await _moderation.UnbanUsersAsync([new IdName(row.Id, row.Name)]);
+        }
+        else if (_roomManager.Room is { } room)
+        {
+            IUser? user = room.TryGetUserById(row.Id, out var byId) ? byId
+                : room.TryGetUserByName(row.Name, out var byName) ? byName : null;
+            if (user is not null)
+                await _moderation.UnmuteUsersAsync([user]);
+        }
+
+        _votedSanctionsCache.RemoveKey(row.Id);
+        AppendModerationNotification(row.Name, $"{row.UndoText.ToLowerInvariant()} (vote undone)");
+    }
+
+    private void AddSelectedToWhitelist()
+    {
+        if (ContextSelection is null)
+            return;
+
+        foreach (var message in ContextSelection)
+        {
+            if (_roomManager.Room is not null &&
+                _roomManager.Room.TryGetUserByName(message.Name, out IUser? user))
+                _voteController.AddToWhitelist(user.Id, user.Name);
+            else
+                _voteController.AddToWhitelistByName(message.Name);
+
+            AppendModerationNotification(message.Name, "added to vote whitelist");
+        }
+    }
+
+    private void AddSelectedHistoryToWhitelist()
+    {
+        var names = HistorySelection.SelectedItems
+            .OfType<ChatHistoryEntry>()
+            .Select(e => e.Name)
+            .Where(n => !string.IsNullOrEmpty(n))
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var name in names)
+        {
+            _voteController.AddToWhitelistByName(name!);
+            AppendModerationNotification(name!, "added to vote whitelist");
+        }
     }
 
     private void OnAvatarAdded(AvatarEventArgs e)

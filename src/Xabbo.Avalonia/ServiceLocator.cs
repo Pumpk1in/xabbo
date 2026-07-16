@@ -171,6 +171,7 @@ public static class ViewModelLocator
         Splatr.RegisterLazySingleton<RoomAvatarsController>();
         Splatr.RegisterLazySingleton<RoomRightsController>();
         Splatr.RegisterLazySingleton<RoomModerationController>();
+        Splatr.RegisterLazySingleton<VoteModerationController>();
         Splatr.RegisterLazySingleton<RoomFurniController>();
         Splatr.RegisterLazySingleton<FurniPlacementController>();
         Splatr.RegisterLazySingleton<PrivacyController>();

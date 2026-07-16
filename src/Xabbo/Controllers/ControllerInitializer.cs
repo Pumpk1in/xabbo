@@ -10,6 +10,7 @@ public sealed class ControllerInitializer(
     PrivacyController privacy,
     RoomFurniController roomFurni,
     RoomModerationController moderaion,
+    VoteModerationController voteModeration,
     RoomRightsController rights
 );
 #pragma warning restore CS9113 // Parameter is unread.
