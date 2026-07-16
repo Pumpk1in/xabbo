@@ -343,8 +343,21 @@ public partial class VoteModerationController : ControllerBase
     }
 
     [Intercept]
+    private void OnBanSent(Intercept<BanUserMsg> e)
+    {
+        // Any ban (manual or vote-driven) pre-empts an in-progress ban vote on that user.
+        var name = e.Msg.Name;
+        if (string.IsNullOrEmpty(name) && e.Msg.Id is { } id &&
+            _roomManager.Room is { } room && room.TryGetUserById(id, out var u))
+            name = u.Name;
+        if (!string.IsNullOrEmpty(name))
+            CancelVote(name, VoteType.Ban);
+    }
+
+    [Intercept]
     private void OnUnbanSent(Intercept<UnbanUserMsg> e)
     {
+        // Manual unban → 1h vote-ban immunity.
         lock (_lock)
             _immuneBanUntil[e.Msg.Id] = DateTimeOffset.UtcNow + ImmunityDuration;
     }
@@ -352,9 +365,30 @@ public partial class VoteModerationController : ControllerBase
     [Intercept]
     private void OnMuteSent(Intercept<MuteUserMsg> e)
     {
-        if (e.Msg.Minutes != 0) return; // 0 minutes == unmute
+        if (e.Msg.Minutes == 0)
+        {
+            // Manual unmute → 1h vote-mute immunity.
+            lock (_lock)
+                _immuneMuteUntil[e.Msg.Id] = DateTimeOffset.UtcNow + ImmunityDuration;
+            return;
+        }
+
+        // Any mute (manual or vote-driven) pre-empts an in-progress mute vote on that user,
+        // and the cooldown prevents a later vote from re-applying (and shortening) it.
+        if (_roomManager.Room is { } room && room.TryGetUserById(e.Msg.Id, out var u))
+            CancelVote(u.Name, VoteType.Mute);
+    }
+
+    /// <summary>Drops any in-progress or pending vote for the target and starts the cooldown.</summary>
+    private void CancelVote(string name, VoteType type)
+    {
+        var key = (name.ToLowerInvariant(), type);
         lock (_lock)
-            _immuneMuteUntil[e.Msg.Id] = DateTimeOffset.UtcNow + ImmunityDuration;
+        {
+            _sessions.Remove(key);
+            _pendingSanctions.Remove(key);
+            _cooldownUntil[key] = DateTimeOffset.UtcNow + TimeSpan.FromMinutes(Settings.Chat.VoteCooldownMinutes);
+        }
     }
 
     public void AddToWhitelist(Id id, string name)
