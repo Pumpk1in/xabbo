@@ -18,8 +18,8 @@ namespace Xabbo.Controllers;
 public enum VoteType { Ban, Mute }
 
 /// <summary>
-/// Community vote-ban / vote-mute engine. Players type <c>/voteban</c>, <c>/votenoban</c>,
-/// <c>/votemute</c> or <c>/votenomute</c> in room chat; when a net threshold + quorum is reached
+/// Community vote-ban / vote-mute engine. Players type <c>:voteban</c>, <c>:votenoban</c>,
+/// <c>:votemute</c> or <c>:votenomute</c> in room chat; when a net threshold + quorum is reached
 /// the target is banned 1h or muted 10min. Runs entirely off incoming chat
 /// (<see cref="RoomManager.AvatarChat"/>) — the moderator is alerted only through the UI.
 /// </summary>
@@ -126,9 +126,11 @@ public partial class VoteModerationController : ControllerBase
         var parts = message.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
         var first = parts[0];
 
-        // A vote command must be the whole message, typed as "/verb <pseudo>": it must start
-        // with the slash-prefixed verb, so it never fires from inside a sentence.
-        if (!first.StartsWith('/') ||
+        // A vote command must be the whole message, typed as ":verb <pseudo>": it must start
+        // with the colon-prefixed verb, so it never fires from inside a sentence. The colon
+        // (not the slash) lets the moderator vote too — Xabbo's CommandManager blocks outgoing
+        // "/"-prefixed chat, but ":"-prefixed chat passes through to the server as normal chat.
+        if (!first.StartsWith(':') ||
             !TryParseVerb(first[1..].ToLowerInvariant(), out var type, out var direction))
         {
             // Only genuine (non-command) public chat counts toward voter eligibility.
@@ -185,9 +187,12 @@ public partial class VoteModerationController : ControllerBase
             {
                 rejectWhisper = Format(Settings.Chat.VoteWhitelistedText, display, 0, 0);
             }
-            else if (_messageCounts.GetValueOrDefault(voter.Id) < Settings.Chat.VoteMinMessages)
+            else if (voter.RightsLevel < RightsLevel.Standard &&
+                     _messageCounts.GetValueOrDefault(voter.Id) < Settings.Chat.VoteMinMessages)
             {
                 // Eligibility rule is intentionally never revealed — stay completely silent.
+                // Players with room rights (Standard rights, group admins, owners) are trusted
+                // and exempt from the min-messages gate, so they can vote right away.
                 return;
             }
             else if (_cooldownUntil.TryGetValue((nameLower, type), out var cd) && cd > now)

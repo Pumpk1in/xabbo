@@ -151,7 +151,7 @@
         <ui:SettingsExpanderItem>
           <StackPanel Spacing="8">
             <StackPanel Spacing="2">
-              <TextBlock Text="Help (shown on bare /voteban or /votemute)" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+              <TextBlock Text="Help (shown on bare :voteban or :votemute)" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
               <TextBox Text="{Binding Config.Chat.VoteHelpText}" MaxLength="165" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60" />
             </StackPanel>
             <StackPanel Spacing="2">

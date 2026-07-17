@@ -5,9 +5,9 @@ using Xabbo.Core.Game;
 namespace Xabbo.Command.Modules;
 
 /// <summary>
-/// Debug command to test the vote-moderation feature solo. Since a moderator's own
-/// <c>/voteban</c> chat is blocked outgoing (and never comes back as incoming chat that the
-/// vote engine listens to), this command lets the moderator trigger a passed vote directly.
+/// Debug command to test the vote-moderation feature solo. A moderator can cast a real vote
+/// with <c>:voteban</c> (colon-prefixed chat isn't blocked outgoing, unlike <c>/</c>), but can
+/// never reach the quorum alone, so this command triggers a passed vote directly.
 /// </summary>
 [CommandModule]
 public sealed class VoteTestCommand(RoomManager roomManager, VoteModerationController voteModeration) : CommandModule

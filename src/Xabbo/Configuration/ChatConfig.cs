@@ -45,7 +45,7 @@ public sealed class ChatConfig : ReactiveObject
 
     // Whisper templates sent to voters. Placeholders: {name}, {for}, {against}.
     [Reactive] public string VoteHelpText { get; set; } =
-        "Modération par vote : /voteban <pseudo> (bannir), /votemute <pseudo> (muter). Contre le vote : /votenoban <pseudo>, /votenomute <pseudo>.";
+        "Modération par vote : :voteban <pseudo> (bannir), :votemute <pseudo> (muter). Contre le vote : :votenoban <pseudo>, :votenomute <pseudo>.";
     [Reactive] public string VoteCountedText { get; set; } =
         "Ton vote concernant {name} est pris en compte ({for} pour / {against} contre).";
     [Reactive] public string VoteChangedText { get; set; } =
@@ -73,7 +73,7 @@ public sealed class ChatConfig : ReactiveObject
 
     // Public room announcement when a vote starts (first vote on a target), explaining how to join in.
     [Reactive] public string VoteStartBanText { get; set; } =
-        "Un vote pour bannir {name} vient de démarrer ! Tape /voteban {name} pour voter, /votenoban {name} contre.";
+        "Un vote pour bannir {name} vient de démarrer ! Tape :voteban {name} pour voter, :votenoban {name} contre.";
     [Reactive] public string VoteStartMuteText { get; set; } =
-        "Un vote pour muter {name} vient de démarrer ! Tape /votemute {name} pour voter, /votenomute {name} contre.";
+        "Un vote pour muter {name} vient de démarrer ! Tape :votemute {name} pour voter, :votenomute {name} contre.";
 }
