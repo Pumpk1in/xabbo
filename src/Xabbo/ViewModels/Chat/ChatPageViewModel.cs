@@ -83,8 +83,7 @@ public class ChatPageViewModel : PageViewModel
     /// <summary>True when at least one voted sanction in the list has expired (shows the separator).</summary>
     [Reactive] public bool HasExpiredVotedSanctions { get; set; }
 
-    private readonly ObservableAsPropertyHelper<int> _votedSanctionCount;
-    public int VotedSanctionCount => _votedSanctionCount.Value;
+    [Reactive] public int VotedSanctionCount { get; set; }
 
     private readonly ObservableAsPropertyHelper<bool> _hasActiveVotedSanctions;
     public bool HasActiveVotedSanctions => _hasActiveVotedSanctions.Value;
@@ -521,15 +520,15 @@ public class ChatPageViewModel : PageViewModel
             .SortAndBind(out _messages, SortExpressionComparer<ChatLogEntryViewModel>.Ascending(x => x.EntryId))
             .Subscribe();
 
-        // Active sanctions (top of the flyout); the badge count reflects these only.
-        _votedSanctionCount = _votedSanctionsCache
+        // Active sanctions (top of the flyout); VotedSanctionCount is recomputed at each
+        // mutation point (see RecomputeActiveVotedSanctionCount) rather than off this stream.
+        _votedSanctionsCache
             .Connect()
             .AutoRefresh(x => x.IsExpired)
             .Filter(x => !x.IsExpired)
             .ObserveOn(RxApp.MainThreadScheduler)
             .SortAndBind(out _activeVotedSanctions, SortExpressionComparer<VotedSanctionViewModel>.Descending(x => x.Timestamp))
-            .Count()
-            .ToProperty(this, x => x.VotedSanctionCount);
+            .Subscribe();
 
         // Expired sanctions (below the separator, no undo).
         _votedSanctionsCache
@@ -1322,8 +1321,15 @@ public class ChatPageViewModel : PageViewModel
     public void AddVotedSanction(VotedSanctionViewModel vm)
     {
         _votedSanctionsCache.AddOrUpdate(vm);
-        RxApp.MainThreadScheduler.Schedule(() => HasUnseenVotedSanctions = true);
+        RxApp.MainThreadScheduler.Schedule(() =>
+        {
+            HasUnseenVotedSanctions = true;
+            RecomputeActiveVotedSanctionCount();
+        });
     }
+
+    private void RecomputeActiveVotedSanctionCount()
+        => VotedSanctionCount = _votedSanctionsCache.Items.Count(x => !x.IsExpired);
 
     public void ClearVotedSanctionsUnseen()
     {
@@ -1343,6 +1349,7 @@ public class ChatPageViewModel : PageViewModel
             anyExpired |= expired;
         }
         HasExpiredVotedSanctions = anyExpired;
+        RecomputeActiveVotedSanctionCount();
     }
 
     private async Task UndoVotedSanctionAsync(VotedSanctionViewModel row)
@@ -1360,6 +1367,7 @@ public class ChatPageViewModel : PageViewModel
         }
 
         _votedSanctionsCache.RemoveKey(row.Id);
+        RecomputeActiveVotedSanctionCount();
         AppendModerationNotification(row.Name, $"{row.UndoText.ToLowerInvariant()} (vote undone)");
     }
 
