@@ -34,7 +34,7 @@ public sealed class ChatConfig : ReactiveObject
     [Reactive] public bool VoteAnnounceSanction { get; set; } = false;
     // Announce in room chat when a vote starts (the first vote on a target), explaining how to vote.
     [Reactive] public bool VoteAnnounceStart { get; set; } = false;
-    [Reactive] public int VoteMinMessages { get; set; } = 2;
+    [Reactive] public int VoteMinPresenceMinutes { get; set; } = 3;
     // Minimum "for" votes required, per sanction type (a ban demands more people than a mute).
     [Reactive] public int VoteBanQuorum { get; set; } = 4;
     [Reactive] public int VoteMuteQuorum { get; set; } = 2;
@@ -69,8 +69,8 @@ public sealed class ChatConfig : ReactiveObject
         "Un vote est déjà en cours, attends qu'il se termine avant d'en lancer un autre.";
     [Reactive] public string VoteNoActiveText { get; set; } =
         "Aucun vote n'est en cours. Lance-en un avec :voteban <pseudo> ou :votemute <pseudo>.";
-    [Reactive] public string VoteNotEnoughMessagesText { get; set; } =
-        "Tu n'as pas assez participé aux discussions de la room pour voter (chuchoter ne compte pas).";
+    [Reactive] public string VoteNotPresentLongEnoughText { get; set; } =
+        "Tu viens d'arriver, reste un peu dans la pièce avant de pouvoir voter.";
 
     // Public room announcements when a vote passes (sent from your own avatar, not a whisper).
     [Reactive] public string VoteAnnounceBanText { get; set; } =

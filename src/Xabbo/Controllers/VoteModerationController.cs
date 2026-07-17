@@ -67,7 +67,10 @@ public partial class VoteModerationController : ControllerBase
 
     private readonly object _lock = new();
     private readonly Dictionary<(string Name, VoteType Type), VoteSession> _sessions = [];
-    private readonly Dictionary<Id, int> _messageCounts = [];
+    // When we first saw each user in the room. MinValue = already present when we entered (treated
+    // as long-established, eligible immediately); a real timestamp = they arrived after us and must
+    // accrue VoteMinPresenceMinutes before they can vote.
+    private readonly Dictionary<Id, DateTimeOffset> _enteredAt = [];
     private readonly Dictionary<(string Name, VoteType Type), PendingSanction> _pendingSanctions = [];
     private readonly Dictionary<(string Name, VoteType Type), DateTimeOffset> _cooldownUntil = [];
     // Grace timer: while a vote sits above threshold we hold it for VoteGraceSeconds of silence
@@ -164,10 +167,6 @@ public partial class VoteModerationController : ControllerBase
                 return;
             }
         }
-
-        // Only genuine (non-command) public chat counts toward voter eligibility.
-        lock (_lock)
-            _messageCounts[voter.Id] = _messageCounts.GetValueOrDefault(voter.Id) + 1;
     }
 
     /// <summary>
@@ -262,12 +261,13 @@ public partial class VoteModerationController : ControllerBase
                 rejectWhisper = Format(Settings.Chat.VoteWhitelistedText, display, 0, 0);
             }
             else if (voter.RightsLevel < RightsLevel.Standard &&
-                     _messageCounts.GetValueOrDefault(voter.Id) < Settings.Chat.VoteMinMessages)
+                     (!_enteredAt.TryGetValue(voter.Id, out var since) ||
+                      (now - since).TotalMinutes < Settings.Chat.VoteMinPresenceMinutes))
             {
-                // Not enough genuine participation yet — tell them (whisper is throttled).
+                // Not in the room long enough yet — tell them (whisper is throttled).
                 // Players with room rights (Standard rights, group admins, owners) are trusted
-                // and exempt from the min-messages gate, so they can vote right away.
-                rejectWhisper = Format(Settings.Chat.VoteNotEnoughMessagesText, display, 0, 0);
+                // and exempt from the presence gate, so they can vote right away.
+                rejectWhisper = Format(Settings.Chat.VoteNotPresentLongEnoughText, display, 0, 0);
             }
             else if (_cooldownUntil.TryGetValue((nameLower, type), out var cd) && cd > now)
             {
@@ -426,7 +426,7 @@ public partial class VoteModerationController : ControllerBase
             : Settings.Chat.VoteStartMuteText;
         var text = Format(template, targetName, 0, 0);
         if (!string.IsNullOrWhiteSpace(text))
-            Ext.Send(new ChatMsg(ChatType.Talk, text, Settings.Chat.VoteBubbleStyle));
+            Ext.Send(new ChatMsg(ChatType.Shout, text, Settings.Chat.VoteBubbleStyle));
     }
 
     /// <summary>
@@ -496,13 +496,17 @@ public partial class VoteModerationController : ControllerBase
             : Settings.Chat.VoteAnnounceMuteText;
         var text = Format(template, target.Name, forCount, againstCount);
         if (!string.IsNullOrWhiteSpace(text))
-            Ext.Send(new ChatMsg(ChatType.Talk, text, Settings.Chat.VoteBubbleStyle));
+            Ext.Send(new ChatMsg(ChatType.Shout, text, Settings.Chat.VoteBubbleStyle));
     }
 
     private void OnAvatarsAdded(AvatarsEventArgs e)
     {
         var now = DateTimeOffset.UtcNow;
         List<(IUser User, VoteType Type, PendingSanction Pending)> toApply = [];
+
+        // Users in the initial load (present before we entered) count as long-established;
+        // anyone arriving afterwards starts their presence clock now.
+        var entryStamp = _roomManager.IsLoadingRoom ? DateTimeOffset.MinValue : now;
 
         lock (_lock)
         {
@@ -514,6 +518,9 @@ public partial class VoteModerationController : ControllerBase
             {
                 if (avatar is not IUser user) continue;
                 var nameLower = user.Name.ToLowerInvariant();
+
+                // First sighting wins (a re-add never resets an existing presence clock).
+                _enteredAt.TryAdd(user.Id, entryStamp);
 
                 foreach (var type in new[] { VoteType.Ban, VoteType.Mute })
                 {
@@ -574,7 +581,7 @@ public partial class VoteModerationController : ControllerBase
         {
             _sessions.Clear();
             _graceGen.Clear();
-            _messageCounts.Clear();
+            _enteredAt.Clear();
             _cooldownUntil.Clear();
             _immuneBanUntil.Clear();
             _immuneMuteUntil.Clear();
