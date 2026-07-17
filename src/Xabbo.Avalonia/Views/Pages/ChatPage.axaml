@@ -238,6 +238,7 @@
                         TextWrapping="Wrap"
                         FontSize="12"
                         Text="{Binding MessageText}"
+                        ToolTip.Tip="{Binding VoteVoters}"
                         HighlightWords="{Binding MatchedWords}"
                         HighlightForeground="#FF6B6B"
                         IsWhisper="{Binding IsWhisper}"
@@ -322,8 +323,10 @@
                                 <TextBlock Text="{Binding SanctionText}" FontSize="11"
                                            Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                                 <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                           ToolTip.Tip="{Binding ForVotersText}"
                                            Text="{Binding ForCount, StringFormat='👍 {0}'}" />
                                 <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                           ToolTip.Tip="{Binding AgainstVotersText}"
                                            Text="{Binding AgainstCount, StringFormat='👎 {0}'}" />
                                 <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                            ToolTip.Tip="Sanction expires at this time"
@@ -351,8 +354,10 @@
                                 <TextBlock Text="{Binding SanctionText}" FontSize="11"
                                            Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                                 <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                           ToolTip.Tip="{Binding ForVotersText}"
                                            Text="{Binding ForCount, StringFormat='👍 {0}'}" />
                                 <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                           ToolTip.Tip="{Binding AgainstVotersText}"
                                            Text="{Binding AgainstCount, StringFormat='👎 {0}'}" />
                                 <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                            Text="{Binding ExpiresAt, StringFormat='expired {0:HH:mm}'}" />

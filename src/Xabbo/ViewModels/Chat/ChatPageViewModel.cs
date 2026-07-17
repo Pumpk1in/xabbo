@@ -1297,7 +1297,7 @@ public class ChatPageViewModel : PageViewModel
         _cache.AddOrUpdate(vm);
     }
 
-    public void AppendModerationNotification(string userName, string action)
+    public void AppendModerationNotification(string userName, string action, string? voteVoters = null)
     {
         var vm = new ChatLogAvatarActionViewModel
         {
@@ -1312,6 +1312,7 @@ public class ChatPageViewModel : PageViewModel
             Type = "action",
             UserName = userName,
             Action = action,
+            VoteVoters = voteVoters,
             RoomId = (long?)_roomManager.Room?.Id,
             RoomName = _roomManager.Room?.Data?.Name,
         });

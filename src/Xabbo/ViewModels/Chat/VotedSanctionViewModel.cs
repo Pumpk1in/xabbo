@@ -3,14 +3,23 @@ using Xabbo.Controllers;
 
 namespace Xabbo.ViewModels;
 
-public class VotedSanctionViewModel(long id, string name, VoteType type, int forCount, int againstCount)
+public class VotedSanctionViewModel(
+    long id, string name, VoteType type,
+    IReadOnlyList<string> forVoters, IReadOnlyList<string> againstVoters)
     : ViewModelBase
 {
     public long Id { get; } = id;
     public string Name { get; } = name;
     public VoteType Type { get; } = type;
-    public int ForCount { get; } = forCount;
-    public int AgainstCount { get; } = againstCount;
+    public IReadOnlyList<string> ForVoters { get; } = forVoters;
+    public IReadOnlyList<string> AgainstVoters { get; } = againstVoters;
+    public int ForCount => ForVoters.Count;
+    public int AgainstCount => AgainstVoters.Count;
+
+    /// <summary>Comma-joined voter names shown in the 👍 / 👎 tooltips.</summary>
+    public string ForVotersText => ForVoters.Count > 0 ? string.Join(", ", ForVoters) : "—";
+    public string AgainstVotersText => AgainstVoters.Count > 0 ? string.Join(", ", AgainstVoters) : "—";
+
     public DateTime Timestamp { get; } = DateTime.Now;
 
     /// <summary>Set by a periodic sweep once <see cref="ExpiresAt"/> has passed.</summary>

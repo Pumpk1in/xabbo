@@ -115,6 +115,15 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
         }
         catch (SqliteException) { /* Column already exists */ }
 
+        // Add vote_voters column if it doesn't exist (migration)
+        try
+        {
+            using var alterCmd = _connection.CreateCommand();
+            alterCmd.CommandText = "ALTER TABLE chat_history ADD COLUMN vote_voters TEXT";
+            alterCmd.ExecuteNonQuery();
+        }
+        catch (SqliteException) { /* Column already exists */ }
+
     }
 
     public void AddEntry(ChatHistoryEntry entry)
@@ -161,8 +170,8 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
     {
         using var cmd = _connection.CreateCommand();
         cmd.CommandText = """
-            INSERT INTO chat_history (timestamp, type, name, message, chat_type, is_whisper, whisper_recipient, has_profanity, matched_words, user_name, action, room_name, room_owner, room_id)
-            VALUES (@timestamp, @type, @name, @message, @chatType, @isWhisper, @whisperRecipient, @hasProfanity, @matchedWords, @userName, @action, @roomName, @roomOwner, @roomId)
+            INSERT INTO chat_history (timestamp, type, name, message, chat_type, is_whisper, whisper_recipient, has_profanity, matched_words, user_name, action, room_name, room_owner, room_id, vote_voters)
+            VALUES (@timestamp, @type, @name, @message, @chatType, @isWhisper, @whisperRecipient, @hasProfanity, @matchedWords, @userName, @action, @roomName, @roomOwner, @roomId, @voteVoters)
             """;
 
         cmd.Parameters.AddWithValue("@timestamp", new DateTimeOffset(entry.Timestamp).ToUnixTimeSeconds());
@@ -179,6 +188,7 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
         cmd.Parameters.AddWithValue("@roomName", (object?)entry.RoomName ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@roomOwner", (object?)entry.RoomOwner ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@roomId", entry.RoomId.HasValue ? (object)entry.RoomId.Value : DBNull.Value);
+        cmd.Parameters.AddWithValue("@voteVoters", (object?)entry.VoteVoters ?? DBNull.Value);
 
         cmd.ExecuteNonQuery();
     }
@@ -328,6 +338,7 @@ public sealed class ChatHistoryService : IChatHistoryService, IDisposable
             MatchedWords = matchedWords,
             UserName = reader["user_name"] as string,
             Action = reader["action"] as string,
+            VoteVoters = reader["vote_voters"] as string,
             RoomId = reader["room_id"] is long roomId ? roomId : null,
             RoomName = reader["room_name"] as string,
             RoomOwner = reader["room_owner"] as string,

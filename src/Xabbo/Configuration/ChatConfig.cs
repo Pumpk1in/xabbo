@@ -23,11 +23,23 @@ public sealed class ChatConfig : ReactiveObject
     [Reactive] public BanDuration AntiSpamBanDuration { get; set; } = BanDuration.Hour;
 
     [Reactive] public bool VoteModeration { get; set; } = false;
+    // Enable each sanction type independently (both on by default).
+    [Reactive] public bool VoteBanEnabled { get; set; } = true;
+    [Reactive] public bool VoteMuteEnabled { get; set; } = true;
+    // Only one vote can be in progress at a time (anti-spam); a new one can start once it's applied or expires.
+    [Reactive] public bool VoteSingleActive { get; set; } = true;
+    // Bubble style forced on all automated vote messages (whispers + announcements), independent of the global chat bubble.
+    [Reactive] public int VoteBubbleStyle { get; set; } = 25;
     [Reactive] public bool VoteWhisperFeedback { get; set; } = true;
     [Reactive] public bool VoteAnnounceSanction { get; set; } = false;
+    // Announce in room chat when a vote starts (the first vote on a target), explaining how to vote.
+    [Reactive] public bool VoteAnnounceStart { get; set; } = false;
     [Reactive] public int VoteMinMessages { get; set; } = 2;
-    [Reactive] public int VoteNetThreshold { get; set; } = 4;
-    [Reactive] public int VoteQuorum { get; set; } = 3;
+    // Minimum "for" votes required, per sanction type (a ban demands more people than a mute).
+    [Reactive] public int VoteBanQuorum { get; set; } = 4;
+    [Reactive] public int VoteMuteQuorum { get; set; } = 2;
+    // Shared consensus bar: for / (for + against) must reach this percentage.
+    [Reactive] public int VoteApprovalPercent { get; set; } = 66;
     [Reactive] public int VoteSessionTtlMinutes { get; set; } = 5;
     [Reactive] public int VoteCooldownMinutes { get; set; } = 15;
 
@@ -50,10 +62,18 @@ public sealed class ChatConfig : ReactiveObject
         "Tu ne peux pas voter contre toi-même.";
     [Reactive] public string VoteNotAllowedText { get; set; } =
         "{name} ne peut pas être ciblé.";
+    [Reactive] public string VoteInProgressText { get; set; } =
+        "Un vote est déjà en cours, attends qu'il se termine avant d'en lancer un autre.";
 
     // Public room announcements when a vote passes (sent from your own avatar, not a whisper).
     [Reactive] public string VoteAnnounceBanText { get; set; } =
         "{name} a été banni 1h suite au vote de la communauté ({for} pour / {against} contre).";
     [Reactive] public string VoteAnnounceMuteText { get; set; } =
         "{name} a été muté 10 min suite au vote de la communauté ({for} pour / {against} contre).";
+
+    // Public room announcement when a vote starts (first vote on a target), explaining how to join in.
+    [Reactive] public string VoteStartBanText { get; set; } =
+        "Un vote pour bannir {name} vient de démarrer ! Tape /voteban {name} pour voter, /votenoban {name} contre.";
+    [Reactive] public string VoteStartMuteText { get; set; } =
+        "Un vote pour muter {name} vient de démarrer ! Tape /votemute {name} pour voter, /votenomute {name} contre.";
 }

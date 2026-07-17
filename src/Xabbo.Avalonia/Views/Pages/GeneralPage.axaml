@@ -349,6 +349,21 @@
                 IsEnabled="{Binding #VoteModerationEnabled.IsChecked}"
               >
                 <CheckBox
+                  Content="Allow vote-ban (1h)"
+                  Classes="modern"
+                  IsChecked="{Binding Config.Chat.VoteBanEnabled}"
+                />
+                <CheckBox
+                  Content="Allow vote-mute (10min)"
+                  Classes="modern"
+                  IsChecked="{Binding Config.Chat.VoteMuteEnabled}"
+                />
+                <CheckBox
+                  Content="Only one vote at a time (anti-spam)"
+                  Classes="modern"
+                  IsChecked="{Binding Config.Chat.VoteSingleActive}"
+                />
+                <CheckBox
                   Content="Notify voters by whisper (vote counted, blocked, etc.)"
                   Classes="modern"
                   IsChecked="{Binding Config.Chat.VoteWhisperFeedback}"
@@ -358,14 +373,25 @@
                   Classes="modern"
                   IsChecked="{Binding Config.Chat.VoteAnnounceSanction}"
                 />
+                <CheckBox
+                  Content="Announce when a vote starts (explains how to vote, from your avatar)"
+                  Classes="modern"
+                  IsChecked="{Binding Config.Chat.VoteAnnounceStart}"
+                />
                 <StackPanel Orientation="Horizontal" Spacing="8">
-                  <TextBlock VerticalAlignment="Center" Text="Apply when net votes reach" />
-                  <NumericUpDown Minimum="1" Maximum="50" Width="110" Value="{Binding Config.Chat.VoteNetThreshold}" />
+                  <TextBlock VerticalAlignment="Center" Text="Ban when at least" />
+                  <NumericUpDown Minimum="1" Maximum="50" Width="110" Value="{Binding Config.Chat.VoteBanQuorum}" />
+                  <TextBlock VerticalAlignment="Center" Text="voters are in favor" />
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Spacing="8">
-                  <TextBlock VerticalAlignment="Center" Text="...and at least" />
-                  <NumericUpDown Minimum="1" Maximum="50" Width="110" Value="{Binding Config.Chat.VoteQuorum}" />
+                  <TextBlock VerticalAlignment="Center" Text="Mute when at least" />
+                  <NumericUpDown Minimum="1" Maximum="50" Width="110" Value="{Binding Config.Chat.VoteMuteQuorum}" />
                   <TextBlock VerticalAlignment="Center" Text="voters are in favor" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBlock VerticalAlignment="Center" Text="...and approval reaches" />
+                  <NumericUpDown Minimum="1" Maximum="100" Width="110" Value="{Binding Config.Chat.VoteApprovalPercent}" />
+                  <TextBlock VerticalAlignment="Center" Text="% of votes cast" />
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <TextBlock VerticalAlignment="Center" Text="A voter must have sent" />
@@ -381,6 +407,10 @@
                   <TextBlock VerticalAlignment="Center" Text="Cooldown after a sanction:" />
                   <NumericUpDown Minimum="0" Maximum="120" Width="110" Value="{Binding Config.Chat.VoteCooldownMinutes}" />
                   <TextBlock VerticalAlignment="Center" Text="minutes" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBlock VerticalAlignment="Center" Text="Bubble style for automated messages:" />
+                  <NumericUpDown Minimum="0" Maximum="39" Width="110" Value="{Binding Config.Chat.VoteBubbleStyle}" />
                 </StackPanel>
               </StackPanel>
             </StackPanel>

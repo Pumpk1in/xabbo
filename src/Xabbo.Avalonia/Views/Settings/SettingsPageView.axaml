@@ -187,12 +187,24 @@
               <TextBox Text="{Binding Config.Chat.VoteNotAllowedText}" MaxLength="165" />
             </StackPanel>
             <StackPanel Spacing="2">
+              <TextBlock Text="Another vote already in progress (anti-spam)" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+              <TextBox Text="{Binding Config.Chat.VoteInProgressText}" MaxLength="165" />
+            </StackPanel>
+            <StackPanel Spacing="2">
               <TextBlock Text="Public announcement — ban (if enabled)" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
               <TextBox Text="{Binding Config.Chat.VoteAnnounceBanText}" MaxLength="165" />
             </StackPanel>
             <StackPanel Spacing="2">
               <TextBlock Text="Public announcement — mute (if enabled)" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
               <TextBox Text="{Binding Config.Chat.VoteAnnounceMuteText}" MaxLength="165" />
+            </StackPanel>
+            <StackPanel Spacing="2">
+              <TextBlock Text="Vote started — ban (if enabled)" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+              <TextBox Text="{Binding Config.Chat.VoteStartBanText}" MaxLength="165" />
+            </StackPanel>
+            <StackPanel Spacing="2">
+              <TextBlock Text="Vote started — mute (if enabled)" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+              <TextBox Text="{Binding Config.Chat.VoteStartMuteText}" MaxLength="165" />
             </StackPanel>
           </StackPanel>
         </ui:SettingsExpanderItem>

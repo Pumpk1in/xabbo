@@ -23,6 +23,9 @@ public sealed class ChatHistoryEntry
     public string? UserName { get; init; }
     public string? Action { get; init; }
 
+    /// <summary>For vote-sanction actions: the for/against voter breakdown (multi-line), shown on hover.</summary>
+    public string? VoteVoters { get; init; }
+
     // Room context (set on all entry types)
     public long? RoomId { get; init; }
     public string? RoomName { get; init; }

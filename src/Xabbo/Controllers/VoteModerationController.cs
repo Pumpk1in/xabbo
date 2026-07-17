@@ -37,15 +37,28 @@ public partial class VoteModerationController : ControllerBase
     {
         public required VoteType Type { get; init; }
         public Dictionary<Id, VoteDirection> Votes { get; } = [];
+        public Dictionary<Id, string> VoterNames { get; } = [];
         public HashSet<Id> WarnedDuplicate { get; } = [];
         public DateTimeOffset LastVoteTime { get; set; }
 
         public int For => Votes.Values.Count(v => v == VoteDirection.For);
         public int Against => Votes.Values.Count(v => v == VoteDirection.Against);
-        public int Net => For - Against;
+
+        /// <summary>Resolves the current voters into (for, against) name lists.</summary>
+        public (List<string> For, List<string> Against) VoterLists()
+        {
+            List<string> forList = [], againstList = [];
+            foreach (var (id, direction) in Votes)
+            {
+                var name = VoterNames.GetValueOrDefault(id) ?? id.ToString();
+                (direction == VoteDirection.For ? forList : againstList).Add(name);
+            }
+            return (forList, againstList);
+        }
     }
 
-    private readonly record struct PendingSanction(DateTimeOffset Expiry, int For, int Against);
+    private readonly record struct PendingSanction(
+        DateTimeOffset Expiry, List<string> ForVoters, List<string> AgainstVoters);
 
     private readonly IConfigProvider<AppConfig> _config;
     private readonly RoomManager _roomManager;
@@ -111,7 +124,8 @@ public partial class VoteModerationController : ControllerBase
         if (string.IsNullOrEmpty(message)) return;
 
         var parts = message.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
-        var verb = parts[0].ToLowerInvariant();
+        // Players type the command with a leading slash (e.g. "/votemute"); accept it with or without.
+        var verb = parts[0].TrimStart('/').ToLowerInvariant();
 
         if (!TryParseVerb(verb, out var type, out var direction))
         {
@@ -120,6 +134,10 @@ public partial class VoteModerationController : ControllerBase
                 _messageCounts[voter.Id] = _messageCounts.GetValueOrDefault(voter.Id) + 1;
             return;
         }
+
+        // Each sanction type can be enabled independently.
+        if (type == VoteType.Ban ? !Settings.Chat.VoteBanEnabled : !Settings.Chat.VoteMuteEnabled)
+            return;
 
         if (parts.Length < 2)
         {
@@ -156,7 +174,8 @@ public partial class VoteModerationController : ControllerBase
 
         string? infoWhisper = null;
         string? rejectWhisper = null;
-        (IUser Target, VoteType Type, int For, int Against)? toApply = null;
+        bool announceStart = false;
+        (IUser Target, VoteType Type, List<string> ForVoters, List<string> AgainstVoters)? toApply = null;
 
         lock (_lock)
         {
@@ -187,47 +206,60 @@ public partial class VoteModerationController : ControllerBase
             else
             {
                 var key = (nameLower, type);
-                if (!_sessions.TryGetValue(key, out var session) ||
-                    (now - session.LastVoteTime).TotalMinutes > Settings.Chat.VoteSessionTtlMinutes)
-                {
-                    session = new VoteSession { Type = type };
-                    _sessions[key] = session;
-                }
+                bool sessionActive = _sessions.TryGetValue(key, out var session) &&
+                    (now - session.LastVoteTime).TotalMinutes <= Settings.Chat.VoteSessionTtlMinutes;
 
-                bool alreadyVoted = session.Votes.TryGetValue(voter.Id, out var existing);
-                if (alreadyVoted && existing == direction)
+                if (!sessionActive && Settings.Chat.VoteSingleActive && HasOtherActiveVote(key, now))
                 {
-                    // Duplicate vote — warn once, then stay silent so we don't spam back.
-                    if (session.WarnedDuplicate.Add(voter.Id))
-                        rejectWhisper = Format(Settings.Chat.VoteAlreadyText, display, session.For, session.Against);
+                    // Anti-spam: only one vote may run at a time until it's applied or expires.
+                    rejectWhisper = Format(Settings.Chat.VoteInProgressText, display, 0, 0);
                 }
                 else
                 {
-                    session.Votes[voter.Id] = direction;
-                    session.WarnedDuplicate.Remove(voter.Id);
-                    session.LastVoteTime = now;
-
-                    infoWhisper = Format(
-                        alreadyVoted ? Settings.Chat.VoteChangedText : Settings.Chat.VoteCountedText,
-                        display, session.For, session.Against);
-
-                    if (session.Net >= Settings.Chat.VoteNetThreshold && session.For >= Settings.Chat.VoteQuorum)
+                    if (!sessionActive)
                     {
-                        var cooldown = now + TimeSpan.FromMinutes(Settings.Chat.VoteCooldownMinutes);
-                        int f = session.For, a = session.Against;
+                        session = new VoteSession { Type = type };
+                        _sessions[key] = session;
+                    }
 
-                        if (target is not null && (type == VoteType.Ban ? _moderation.CanBan : _moderation.CanMute))
+                    bool alreadyVoted = session!.Votes.TryGetValue(voter.Id, out var existing);
+                    if (alreadyVoted && existing == direction)
+                    {
+                        // Duplicate vote — warn once, then stay silent so we don't spam back.
+                        if (session.WarnedDuplicate.Add(voter.Id))
+                            rejectWhisper = Format(Settings.Chat.VoteAlreadyText, display, session.For, session.Against);
+                    }
+                    else
+                    {
+                        // The very first vote in a fresh session "starts" the vote → optional public announce.
+                        announceStart = session.Votes.Count == 0;
+                        session.Votes[voter.Id] = direction;
+                        session.VoterNames[voter.Id] = voter.Name;
+                        session.WarnedDuplicate.Remove(voter.Id);
+                        session.LastVoteTime = now;
+
+                        infoWhisper = Format(
+                            alreadyVoted ? Settings.Chat.VoteChangedText : Settings.Chat.VoteCountedText,
+                            display, session.For, session.Against);
+
+                        if (VotePassed(type, session.For, session.Against))
                         {
-                            _sessions.Remove(key);
-                            _cooldownUntil[key] = cooldown;
-                            toApply = (target, type, f, a);
-                        }
-                        else if (target is null)
-                        {
-                            // Target isn't in the room (fled or stepped out) — apply on return, within the window.
-                            _sessions.Remove(key);
-                            _cooldownUntil[key] = cooldown;
-                            _pendingSanctions[key] = new PendingSanction(now + DeferredSanctionWindow, f, a);
+                            var cooldown = now + TimeSpan.FromMinutes(Settings.Chat.VoteCooldownMinutes);
+                            var (forVoters, againstVoters) = session.VoterLists();
+
+                            if (target is not null && (type == VoteType.Ban ? _moderation.CanBan : _moderation.CanMute))
+                            {
+                                _sessions.Remove(key);
+                                _cooldownUntil[key] = cooldown;
+                                toApply = (target, type, forVoters, againstVoters);
+                            }
+                            else if (target is null)
+                            {
+                                // Target isn't in the room (fled or stepped out) — apply on return, within the window.
+                                _sessions.Remove(key);
+                                _cooldownUntil[key] = cooldown;
+                                _pendingSanctions[key] = new PendingSanction(now + DeferredSanctionWindow, forVoters, againstVoters);
+                            }
                         }
                     }
                 }
@@ -237,14 +269,52 @@ public partial class VoteModerationController : ControllerBase
         if (rejectWhisper is not null) WhisperReject(voter, rejectWhisper);
         else if (infoWhisper is not null) Whisper(voter, infoWhisper);
 
+        if (announceStart) AnnounceStart(display, type);
+
         if (toApply is { } app)
-            _ = ApplySanctionAsync(app.Target, app.Type, app.For, app.Against);
+            _ = ApplySanctionAsync(app.Target, app.Type, app.ForVoters, app.AgainstVoters);
+    }
+
+    private void AnnounceStart(string targetName, VoteType type)
+    {
+        if (!Settings.Chat.VoteAnnounceStart) return;
+
+        var template = type == VoteType.Ban
+            ? Settings.Chat.VoteStartBanText
+            : Settings.Chat.VoteStartMuteText;
+        var text = Format(template, targetName, 0, 0);
+        if (!string.IsNullOrWhiteSpace(text))
+            Ext.Send(new ChatMsg(ChatType.Talk, text, Settings.Chat.VoteBubbleStyle));
+    }
+
+    /// <summary>
+    /// A vote passes when the "for" count reaches the per-type quorum AND the approval
+    /// ratio (for / total votes) reaches the shared percentage. The ratio replaces the old
+    /// absolute net margin so passing reflects genuine consensus, not just a raw lead.
+    /// </summary>
+    private bool VotePassed(VoteType type, int forCount, int againstCount)
+    {
+        int quorum = type == VoteType.Ban ? Settings.Chat.VoteBanQuorum : Settings.Chat.VoteMuteQuorum;
+        int total = forCount + againstCount;
+        return forCount >= quorum && forCount * 100 >= total * Settings.Chat.VoteApprovalPercent;
+    }
+
+    /// <summary>True if any vote other than <paramref name="exceptKey"/> is still within its TTL (anti-spam).</summary>
+    private bool HasOtherActiveVote((string Name, VoteType Type) exceptKey, DateTimeOffset now)
+    {
+        double ttl = Settings.Chat.VoteSessionTtlMinutes;
+        foreach (var (k, session) in _sessions)
+        {
+            if (k == exceptKey) continue;
+            if ((now - session.LastVoteTime).TotalMinutes <= ttl) return true;
+        }
+        return false;
     }
 
     private void Whisper(IUser voter, string message)
     {
         if (!Settings.Chat.VoteWhisperFeedback) return;
-        Ext.Send(new WhisperMsg(voter.Name, message, Settings.Chat.BubbleStyle));
+        Ext.Send(new WhisperMsg(voter.Name, message, Settings.Chat.VoteBubbleStyle));
     }
 
     private void WhisperReject(IUser voter, string message)
@@ -260,18 +330,19 @@ public partial class VoteModerationController : ControllerBase
             _lastRejectWhisper[voter.Id] = now;
         }
 
-        Ext.Send(new WhisperMsg(voter.Name, message, Settings.Chat.BubbleStyle));
+        Ext.Send(new WhisperMsg(voter.Name, message, Settings.Chat.VoteBubbleStyle));
     }
 
-    private async Task ApplySanctionAsync(IUser target, VoteType type, int forCount, int againstCount)
+    private async Task ApplySanctionAsync(
+        IUser target, VoteType type, IReadOnlyList<string> forVoters, IReadOnlyList<string> againstVoters)
     {
         if (type == VoteType.Ban)
             await _moderation.BanUsersAsync([target], BanDuration.Hour);
         else
             await _moderation.MuteUsersAsync([target], MuteMinutes);
 
-        Announce(target, type, forCount, againstCount);
-        NotifyResult(target, type, forCount, againstCount);
+        Announce(target, type, forVoters.Count, againstVoters.Count);
+        NotifyResult(target, type, forVoters, againstVoters);
     }
 
     private void Announce(IUser target, VoteType type, int forCount, int againstCount)
@@ -283,7 +354,7 @@ public partial class VoteModerationController : ControllerBase
             : Settings.Chat.VoteAnnounceMuteText;
         var text = Format(template, target.Name, forCount, againstCount);
         if (!string.IsNullOrWhiteSpace(text))
-            Ext.Send(new ChatMsg(ChatType.Talk, text, Settings.Chat.BubbleStyle));
+            Ext.Send(new ChatMsg(ChatType.Talk, text, Settings.Chat.VoteBubbleStyle));
     }
 
     private void OnAvatarsAdded(AvatarsEventArgs e)
@@ -321,16 +392,23 @@ public partial class VoteModerationController : ControllerBase
         }
 
         foreach (var (user, type, pending) in toApply)
-            _ = ApplySanctionAsync(user, type, pending.For, pending.Against);
+            _ = ApplySanctionAsync(user, type, pending.ForVoters, pending.AgainstVoters);
     }
 
-    private void NotifyResult(IUser target, VoteType type, int forCount, int againstCount)
+    private void NotifyResult(
+        IUser target, VoteType type, IReadOnlyList<string> forVoters, IReadOnlyList<string> againstVoters)
     {
         _chatPage ??= Locator.Current.GetService<ChatPageViewModel>();
         var label = type == VoteType.Ban ? "vote-banned 1h" : "vote-muted 10min";
-        _chatPage?.AppendModerationNotification(target.Name, $"{label} ({forCount}/{againstCount})");
-        _chatPage?.AddVotedSanction(new VotedSanctionViewModel(target.Id, target.Name, type, forCount, againstCount));
+        var voters = FormatVoters("Pour", forVoters) + "\n" + FormatVoters("Contre", againstVoters);
+        _chatPage?.AppendModerationNotification(
+            target.Name, $"{label} ({forVoters.Count}/{againstVoters.Count})", voters);
+        _chatPage?.AddVotedSanction(
+            new VotedSanctionViewModel(target.Id, target.Name, type, forVoters, againstVoters));
     }
+
+    private static string FormatVoters(string label, IReadOnlyList<string> voters) =>
+        voters.Count > 0 ? $"{label} ({voters.Count}) : {string.Join(", ", voters)}" : $"{label} (0)";
 
     private static RoomModerationController.ModerationType ToModerationType(VoteType type) =>
         type == VoteType.Ban
@@ -417,8 +495,9 @@ public partial class VoteModerationController : ControllerBase
     /// </summary>
     public void TriggerTestSanction(IUser target, VoteType type)
     {
-        int forCount = Math.Max(Settings.Chat.VoteNetThreshold, Settings.Chat.VoteQuorum);
-        _ = ApplySanctionAsync(target, type, forCount, 0);
+        int quorum = type == VoteType.Ban ? Settings.Chat.VoteBanQuorum : Settings.Chat.VoteMuteQuorum;
+        var forVoters = Enumerable.Range(1, Math.Max(quorum, 1)).Select(i => $"tester{i}").ToList();
+        _ = ApplySanctionAsync(target, type, forVoters, []);
     }
 
     public void AddToWhitelist(Id id, string name)
