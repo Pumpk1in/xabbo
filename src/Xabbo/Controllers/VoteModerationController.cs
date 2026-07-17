@@ -124,10 +124,12 @@ public partial class VoteModerationController : ControllerBase
         if (string.IsNullOrEmpty(message)) return;
 
         var parts = message.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
-        // Players type the command with a leading slash (e.g. "/votemute"); accept it with or without.
-        var verb = parts[0].TrimStart('/').ToLowerInvariant();
+        var first = parts[0];
 
-        if (!TryParseVerb(verb, out var type, out var direction))
+        // A vote command must be the whole message, typed as "/verb <pseudo>": it must start
+        // with the slash-prefixed verb, so it never fires from inside a sentence.
+        if (!first.StartsWith('/') ||
+            !TryParseVerb(first[1..].ToLowerInvariant(), out var type, out var direction))
         {
             // Only genuine (non-command) public chat counts toward voter eligibility.
             lock (_lock)
@@ -139,9 +141,9 @@ public partial class VoteModerationController : ControllerBase
         if (type == VoteType.Ban ? !Settings.Chat.VoteBanEnabled : !Settings.Chat.VoteMuteEnabled)
             return;
 
-        if (parts.Length < 2)
+        // Require exactly "/verb <pseudo>" — a bare command or any extra words is not a vote.
+        if (parts.Length != 2)
         {
-            // Bare command (no target) → whisper usage help.
             WhisperReject(voter, Settings.Chat.VoteHelpText);
             return;
         }
