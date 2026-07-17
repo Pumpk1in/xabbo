@@ -23,6 +23,7 @@ public sealed class ModerationCommands(RoomManager roomManager, IAppPathProvider
     private readonly ConcurrentDictionary<string, int> _muteList = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, BanDuration> _banList = new(StringComparer.OrdinalIgnoreCase);
     private DeferredModerationData _deferredData = new();
+    private readonly object _deferredLock = new();
     private ChatPageViewModel? _chatPage;
     private CancellationTokenSource? _roomEntryCts;
 
@@ -163,6 +164,11 @@ public sealed class ModerationCommands(RoomManager roomManager, IAppPathProvider
                 _muteList[userName] = minutes;
         }
 
+        // Apply immediately to targets already present in the room (returned while we were away).
+        foreach (var name in _banList.Keys.Concat(_muteList.Keys).ToList())
+            if (e.Room.TryGetUserByName(name, out IUser? user))
+                _ = ApplyDeferredSanctionAsync(user);
+
         // Schedule a silent ban list check to clean up deferred bans already applied
         if (_deferredData.Bans.ContainsKey(roomId))
         {
@@ -201,55 +207,63 @@ public sealed class ModerationCommands(RoomManager roomManager, IAppPathProvider
 
     private void OnAvatarsAdded(AvatarsEventArgs e)
     {
-        if (e.Avatars is not [User user]) return;
+        foreach (var avatar in e.Avatars)
+            if (avatar is User user)
+                _ = ApplyDeferredSanctionAsync(user);
+    }
 
-        Task.Run(async () =>
+    private async Task ApplyDeferredSanctionAsync(IUser user)
+    {
+        if (_banList.TryGetValue(user.Name, out BanDuration banDuration))
         {
-            if (_banList.TryGetValue(user.Name, out BanDuration banDuration))
+            if (_roomManager.Room?.Data is { IsGroupRoom: true } data && Session.Is(ClientType.Modern))
             {
-                if (_roomManager.Room?.Data is { IsGroupRoom: true } data && Session.Is(ClientType.Modern))
-                {
-                    Ext.Send(new KickGroupMemberMsg(data.GroupId, user.Id));
-                    ShowMessage($"Kicking user '{user.Name}' from room group");
-                    NotifyChatLog(user.Name, "kicked from room group");
-                    await Task.Delay(1500);
-                }
-                string durationString = FormatBanDuration(banDuration);
-                ShowMessage($"Banning user '{user.Name}' {durationString}");
-                NotifyChatLog(user.Name, $"banned {durationString} (deferred)");
-                await Task.Delay(100);
-                BanUser(user, banDuration);
-                _banList.TryRemove(user.Name, out _);
-
-                // Remove from persistent storage
-                if (_roomManager.Room is { Id: var roomId } &&
-                    _deferredData.Bans.TryGetValue(roomId, out var roomBans))
-                {
-                    roomBans.Remove(user.Name);
-                    if (roomBans.Count == 0)
-                        _deferredData.Bans.Remove(roomId);
-                    SaveDeferredData();
-                }
+                Ext.Send(new KickGroupMemberMsg(data.GroupId, user.Id));
+                ShowMessage($"Kicking user '{user.Name}' from room group");
+                NotifyChatLog(user.Name, "kicked from room group");
+                await Task.Delay(1500);
             }
-            else if (_muteList.TryGetValue(user.Name, out int muteDuration))
-            {
-                ShowMessage($"Muting user '{user.Name}'");
-                NotifyChatLog(user.Name, "muted (deferred)");
-                await Task.Delay(100);
-                MuteUser(user, muteDuration);
-                _muteList.TryRemove(user.Name, out _);
+            string durationString = FormatBanDuration(banDuration);
+            ShowMessage($"Banning user '{user.Name}' {durationString}");
+            NotifyChatLog(user.Name, $"banned {durationString} (deferred)");
+            await Task.Delay(100);
+            BanUser(user, banDuration);
+            _banList.TryRemove(user.Name, out _);
 
-                // Remove from persistent storage
-                if (_roomManager.Room is { Id: var roomId } &&
-                    _deferredData.Mutes.TryGetValue(roomId, out var roomMutes))
+            // Remove from persistent storage
+            if (_roomManager.Room is { Id: var roomId })
+                lock (_deferredLock)
                 {
-                    roomMutes.Remove(user.Name);
-                    if (roomMutes.Count == 0)
-                        _deferredData.Mutes.Remove(roomId);
-                    SaveDeferredData();
+                    if (_deferredData.Bans.TryGetValue(roomId, out var roomBans))
+                    {
+                        roomBans.Remove(user.Name);
+                        if (roomBans.Count == 0)
+                            _deferredData.Bans.Remove(roomId);
+                        SaveDeferredData();
+                    }
                 }
-            }
-        });
+        }
+        else if (_muteList.TryGetValue(user.Name, out int muteDuration))
+        {
+            ShowMessage($"Muting user '{user.Name}'");
+            NotifyChatLog(user.Name, "muted (deferred)");
+            await Task.Delay(100);
+            MuteUser(user, muteDuration);
+            _muteList.TryRemove(user.Name, out _);
+
+            // Remove from persistent storage
+            if (_roomManager.Room is { Id: var roomId })
+                lock (_deferredLock)
+                {
+                    if (_deferredData.Mutes.TryGetValue(roomId, out var roomMutes))
+                    {
+                        roomMutes.Remove(user.Name);
+                        if (roomMutes.Count == 0)
+                            _deferredData.Mutes.Remove(roomId);
+                        SaveDeferredData();
+                    }
+                }
+        }
     }
 
     [Command("mute", SupportedClients = ClientType.Modern)]
