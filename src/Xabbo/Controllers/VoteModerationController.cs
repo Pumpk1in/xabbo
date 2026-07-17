@@ -18,9 +18,9 @@ namespace Xabbo.Controllers;
 public enum VoteType { Ban, Mute }
 
 /// <summary>
-/// Community vote-ban / vote-mute engine. Players type <c>:voteban</c>, <c>:votenoban</c>,
-/// <c>:votemute</c> or <c>:votenomute</c> in room chat; when a net threshold + quorum is reached
-/// the target is banned 1h or muted 10min. Runs entirely off incoming chat
+/// Community vote-ban / vote-mute engine. Players type <c>:voteban</c> or <c>:votemute</c> in room
+/// chat to start/join a vote, and <c>:vote no</c> to vote against the current one; when a quorum +
+/// approval ratio is reached the target is banned 1h or muted 10min. Runs entirely off incoming chat
 /// (<see cref="RoomManager.AvatarChat"/>) — the moderator is alerted only through the UI.
 /// </summary>
 [Intercept]
@@ -112,12 +112,12 @@ public partial class VoteModerationController : ControllerBase
 
     private static bool TryParseVerb(string verb, out VoteType type, out VoteDirection direction)
     {
+        // Only the "for" verbs exist; voting against is done with the ":vote no" shorthand on the
+        // single active vote (there is always at most one, so no target is needed to disambiguate).
         switch (verb)
         {
             case "voteban": type = VoteType.Ban; direction = VoteDirection.For; return true;
-            case "votenoban": type = VoteType.Ban; direction = VoteDirection.Against; return true;
             case "votemute": type = VoteType.Mute; direction = VoteDirection.For; return true;
-            case "votenomute": type = VoteType.Mute; direction = VoteDirection.Against; return true;
             default: type = default; direction = default; return false;
         }
     }
@@ -159,7 +159,7 @@ public partial class VoteModerationController : ControllerBase
                 // Require exactly "/verb <pseudo>" — a bare command or any extra words is not a vote.
                 if (parts.Length != 2)
                 {
-                    WhisperReject(voter, Settings.Chat.VoteHelpText);
+                    WhisperReject(voter, BuildVoteHelp(includeShorthand: true));
                     return;
                 }
 
@@ -171,14 +171,14 @@ public partial class VoteModerationController : ControllerBase
 
     /// <summary>
     /// Handles ":vote yes" / ":vote no" — resolves the single active vote and casts on it.
-    /// Only works when exactly one vote is running (the normal case with VoteSingleActive);
+    /// Only works when exactly one vote is running (always the case — one active vote at a time);
     /// with zero or several active votes we can't disambiguate, so we point back to the long form.
     /// </summary>
     private void HandleShorthandVote(IUser voter, string[] parts)
     {
         if (parts.Length != 2 || !TryParseYesNo(parts[1].ToLowerInvariant(), out var direction))
         {
-            WhisperReject(voter, Settings.Chat.VoteHelpText);
+            WhisperReject(voter, BuildVoteHelp(includeShorthand: true));
             return;
         }
 
@@ -188,7 +188,7 @@ public partial class VoteModerationController : ControllerBase
         {
             if (!TryResolveActiveVote(out targetName, out type))
             {
-                WhisperReject(voter, Settings.Chat.VoteNoActiveText);
+                WhisperReject(voter, $"{Settings.Chat.VoteNoActiveText} {BuildVoteHelp(includeShorthand: false)}".Trim());
                 return;
             }
         }
@@ -204,6 +204,21 @@ public partial class VoteModerationController : ControllerBase
             case "no": direction = VoteDirection.Against; return true;
             default: direction = default; return false;
         }
+    }
+
+    /// <summary>
+    /// Builds the vote help whisper from the fragments of the currently enabled sanction types,
+    /// so it never advertises a disabled type. The shorthand line is optional (irrelevant when
+    /// there's no active vote to cast on).
+    /// </summary>
+    private string BuildVoteHelp(bool includeShorthand)
+    {
+        var c = Settings.Chat;
+        var parts = new List<string>();
+        if (c.VoteBanEnabled && !string.IsNullOrWhiteSpace(c.VoteHelpBanText)) parts.Add(c.VoteHelpBanText.Trim());
+        if (c.VoteMuteEnabled && !string.IsNullOrWhiteSpace(c.VoteHelpMuteText)) parts.Add(c.VoteHelpMuteText.Trim());
+        if (includeShorthand && !string.IsNullOrWhiteSpace(c.VoteHelpShorthandText)) parts.Add(c.VoteHelpShorthandText.Trim());
+        return string.Join(" ", parts);
     }
 
     /// <summary>Resolves the one active (within-TTL) vote; returns false if none or more than one.</summary>
@@ -290,7 +305,7 @@ public partial class VoteModerationController : ControllerBase
                 bool sessionActive = _sessions.TryGetValue(key, out var session) &&
                     (now - session.LastVoteTime).TotalMinutes <= Settings.Chat.VoteSessionTtlMinutes;
 
-                if (!sessionActive && Settings.Chat.VoteSingleActive && HasOtherActiveVote(key, now))
+                if (!sessionActive && HasOtherActiveVote(key, now))
                 {
                     // Anti-spam: only one vote may run at a time until it's applied or expires.
                     rejectWhisper = Format(Settings.Chat.VoteInProgressText, display, 0, 0);

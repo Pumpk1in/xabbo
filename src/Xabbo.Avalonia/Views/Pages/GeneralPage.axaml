@@ -6,6 +6,7 @@
   xmlns:ui="using:FluentAvalonia.UI.Controls"
   xmlns:ic="using:FluentIcons.Avalonia.Fluent"
   xmlns:vm="using:Xabbo.ViewModels"
+  xmlns:models="using:Xabbo.Models"
   x:DataType="vm:GeneralPageViewModel"
   mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
   x:Class="Xabbo.Avalonia.Views.GeneralPage"
@@ -342,7 +343,7 @@
                 FontSize="11"
                 TextWrapping="Wrap"
                 Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                Text="Commands: :voteban, :votemute (for) and :votenoban, :votenomute (against the vote)."
+                Text="Commands: :voteban / :votemute to start or join a vote, :vote yes / :vote no to cast on the current one."
               />
               <StackPanel
                 Spacing="4"
@@ -359,11 +360,6 @@
                   IsChecked="{Binding Config.Chat.VoteMuteEnabled}"
                 />
                 <CheckBox
-                  Content="Only one vote at a time (anti-spam)"
-                  Classes="modern"
-                  IsChecked="{Binding Config.Chat.VoteSingleActive}"
-                />
-                <CheckBox
                   Content="Notify voters by whisper (vote counted, blocked, etc.)"
                   Classes="modern"
                   IsChecked="{Binding Config.Chat.VoteWhisperFeedback}"
@@ -378,45 +374,48 @@
                   Classes="modern"
                   IsChecked="{Binding Config.Chat.VoteAnnounceStart}"
                 />
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <TextBlock VerticalAlignment="Center" Text="Ban when at least" />
-                  <NumericUpDown Minimum="1" Maximum="50" Width="110" Value="{Binding Config.Chat.VoteBanQuorum}" />
-                  <TextBlock VerticalAlignment="Center" Text="voters are in favor" />
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <TextBlock VerticalAlignment="Center" Text="Mute when at least" />
-                  <NumericUpDown Minimum="1" Maximum="50" Width="110" Value="{Binding Config.Chat.VoteMuteQuorum}" />
-                  <TextBlock VerticalAlignment="Center" Text="voters are in favor" />
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <TextBlock VerticalAlignment="Center" Text="...and approval reaches" />
-                  <NumericUpDown Minimum="1" Maximum="100" Width="110" Value="{Binding Config.Chat.VoteApprovalPercent}" />
-                  <TextBlock VerticalAlignment="Center" Text="% of votes cast" />
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <TextBlock VerticalAlignment="Center" Text="A voter must have been in the room for" />
-                  <NumericUpDown Minimum="0" Maximum="60" Width="110" Value="{Binding Config.Chat.VoteMinPresenceMinutes}" />
-                  <TextBlock VerticalAlignment="Center" Text="minutes" />
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <TextBlock VerticalAlignment="Center" Text="Vote expires after" />
-                  <NumericUpDown Minimum="1" Maximum="60" Width="110" Value="{Binding Config.Chat.VoteSessionTtlMinutes}" />
-                  <TextBlock VerticalAlignment="Center" Text="minutes of inactivity" />
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <TextBlock VerticalAlignment="Center" Text="Wait before applying the sanction:" />
-                  <NumericUpDown Minimum="0" Maximum="60" Width="110" Value="{Binding Config.Chat.VoteGraceSeconds}" />
-                  <TextBlock VerticalAlignment="Center" Text="seconds (lets others counter-vote)" />
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <TextBlock VerticalAlignment="Center" Text="Cooldown after a sanction:" />
-                  <NumericUpDown Minimum="0" Maximum="120" Width="110" Value="{Binding Config.Chat.VoteCooldownMinutes}" />
-                  <TextBlock VerticalAlignment="Center" Text="minutes" />
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <TextBlock VerticalAlignment="Center" Text="Bubble style for automated messages:" />
-                  <NumericUpDown Minimum="0" Maximum="39" Width="110" Value="{Binding Config.Chat.VoteBubbleStyle}" />
-                </StackPanel>
+                <!-- Per-sanction thresholds (only the quorum differs by type) -->
+                <TextBlock Text="Per sanction" FontSize="12" Margin="0,4,0,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <Grid ColumnDefinitions="*,Auto,*,Auto" RowDefinitions="Auto" ColumnSpacing="12" RowSpacing="8">
+                  <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" TextWrapping="Wrap" Text="Ban — voters in favor" />
+                  <NumericUpDown Grid.Row="0" Grid.Column="1" Width="80" ShowButtonSpinner="False" Minimum="1" Maximum="50" Value="{Binding Config.Chat.VoteBanQuorum}" />
+                  <TextBlock Grid.Row="0" Grid.Column="2" VerticalAlignment="Center" TextWrapping="Wrap" Text="Mute — voters in favor" />
+                  <NumericUpDown Grid.Row="0" Grid.Column="3" Width="80" ShowButtonSpinner="False" Minimum="1" Maximum="50" Value="{Binding Config.Chat.VoteMuteQuorum}" />
+                </Grid>
+                <!-- Shared settings, common to both ban and mute -->
+                <TextBlock Text="Common to both" FontSize="12" Margin="0,4,0,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <Grid ColumnDefinitions="*,Auto,*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                  <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" TextWrapping="Wrap" Text="...and approval reaches (% of votes cast)" />
+                  <NumericUpDown Grid.Row="0" Grid.Column="1" Width="80" ShowButtonSpinner="False" Minimum="1" Maximum="100" Value="{Binding Config.Chat.VoteApprovalPercent}" />
+                  <TextBlock Grid.Row="0" Grid.Column="2" VerticalAlignment="Center" TextWrapping="Wrap" Text="Voter present in room (minutes)" />
+                  <NumericUpDown Grid.Row="0" Grid.Column="3" Width="80" ShowButtonSpinner="False" Minimum="0" Maximum="60" Value="{Binding Config.Chat.VoteMinPresenceMinutes}" />
+
+                  <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" TextWrapping="Wrap" Text="Vote expires (min. inactivity)" />
+                  <NumericUpDown Grid.Row="1" Grid.Column="1" Width="80" ShowButtonSpinner="False" Minimum="1" Maximum="60" Value="{Binding Config.Chat.VoteSessionTtlMinutes}" />
+                  <TextBlock Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" TextWrapping="Wrap" Text="Wait before applying (seconds)" />
+                  <NumericUpDown Grid.Row="1" Grid.Column="3" Width="80" ShowButtonSpinner="False" Minimum="0" Maximum="60" Value="{Binding Config.Chat.VoteGraceSeconds}" />
+
+                  <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" TextWrapping="Wrap" Text="Cooldown after a sanction (minutes)" />
+                  <NumericUpDown Grid.Row="2" Grid.Column="1" Width="80" ShowButtonSpinner="False" Minimum="0" Maximum="120" Value="{Binding Config.Chat.VoteCooldownMinutes}" />
+                  <TextBlock Grid.Row="2" Grid.Column="2" VerticalAlignment="Center" TextWrapping="Wrap" Text="Bubble style (automated messages)" />
+                  <ComboBox Grid.Row="2" Grid.Column="3"
+                    Width="100"
+                    VerticalAlignment="Center"
+                    MaxDropDownHeight="320"
+                    ItemsSource="{x:Static models:ChatBubbleOption.NormalBubbles}"
+                    SelectedItem="{Binding SelectedVoteBubble}"
+                  >
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate DataType="models:ChatBubbleOption">
+                        <Image
+                          Stretch="None"
+                          Source="{Binding ., Converter={StaticResource BubbleImageConverter}}"
+                          ToolTip.Tip="{Binding Name}"
+                        />
+                      </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                </Grid>
               </StackPanel>
             </StackPanel>
           </Expander>

@@ -151,8 +151,16 @@
         <ui:SettingsExpanderItem>
           <StackPanel Spacing="8">
             <StackPanel Spacing="2">
-              <TextBlock Text="Help (shown on bare :voteban or :votemute)" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-              <TextBox Text="{Binding Config.Chat.VoteHelpText}" MaxLength="165" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60" />
+              <TextBlock Text="Help — ban commands (shown only if vote-ban is enabled)" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+              <TextBox Text="{Binding Config.Chat.VoteHelpBanText}" MaxLength="165" />
+            </StackPanel>
+            <StackPanel Spacing="2">
+              <TextBlock Text="Help — mute commands (shown only if vote-mute is enabled)" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+              <TextBox Text="{Binding Config.Chat.VoteHelpMuteText}" MaxLength="165" />
+            </StackPanel>
+            <StackPanel Spacing="2">
+              <TextBlock Text="Help — shorthand line (:vote yes / no)" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+              <TextBox Text="{Binding Config.Chat.VoteHelpShorthandText}" MaxLength="165" />
             </StackPanel>
             <StackPanel Spacing="2">
               <TextBlock Text="Vote counted" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />

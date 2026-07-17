@@ -26,8 +26,6 @@ public sealed class ChatConfig : ReactiveObject
     // Enable each sanction type independently (both on by default).
     [Reactive] public bool VoteBanEnabled { get; set; } = true;
     [Reactive] public bool VoteMuteEnabled { get; set; } = true;
-    // Only one vote can be in progress at a time (anti-spam); a new one can start once it's applied or expires.
-    [Reactive] public bool VoteSingleActive { get; set; } = true;
     // Bubble style forced on all automated vote messages (whispers + announcements), independent of the global chat bubble.
     [Reactive] public int VoteBubbleStyle { get; set; } = 25;
     [Reactive] public bool VoteWhisperFeedback { get; set; } = true;
@@ -47,8 +45,14 @@ public sealed class ChatConfig : ReactiveObject
     [Reactive] public int VoteGraceSeconds { get; set; } = 8;
 
     // Whisper templates sent to voters. Placeholders: {name}, {for}, {against}.
-    [Reactive] public string VoteHelpText { get; set; } =
-        "[Modération par vote] :voteban <pseudo> ou :votemute <pseudo>. [Pour défendre] :votenoban <pseudo> ou :votenomute <pseudo>. [Raccourci sur le vote en cours] :vote yes ou :vote no";
+    // Help fragments assembled per enabled sanction type (ban / mute) + the always-shown shorthand,
+    // so the whisper never mentions a vote type that is disabled.
+    [Reactive] public string VoteHelpBanText { get; set; } =
+        "[Bannir] :voteban <pseudo>";
+    [Reactive] public string VoteHelpMuteText { get; set; } =
+        "[Muter] :votemute <pseudo>";
+    [Reactive] public string VoteHelpShorthandText { get; set; } =
+        "[Participer au vote] :vote yes / :vote no.";
     [Reactive] public string VoteCountedText { get; set; } =
         "Ton vote concernant {name} est pris en compte ({for} pour / {against} contre).";
     [Reactive] public string VoteChangedText { get; set; } =
@@ -67,8 +71,9 @@ public sealed class ChatConfig : ReactiveObject
         "{name} ne peut pas être ciblé.";
     [Reactive] public string VoteInProgressText { get; set; } =
         "Un vote est déjà en cours, attends qu'il se termine avant d'en lancer un autre.";
+    // Lead-in only — the enabled start verbs are appended by the controller.
     [Reactive] public string VoteNoActiveText { get; set; } =
-        "Aucun vote n'est en cours. Lance-en un avec :voteban <pseudo> ou :votemute <pseudo>.";
+        "Aucun vote n'est en cours pour le moment.";
     [Reactive] public string VoteNotPresentLongEnoughText { get; set; } =
         "Tu viens d'arriver, reste un peu dans la pièce avant de pouvoir voter.";
 

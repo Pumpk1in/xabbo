@@ -1,4 +1,5 @@
-﻿using System.Reactive.Linq;
+﻿using System.Linq;
+using System.Reactive.Linq;
 using Splat;
 using ReactiveUI;
 using HanumanInstitute.MvvmDialogs;
@@ -11,6 +12,7 @@ using Xabbo.Components;
 using Xabbo.Configuration;
 using Xabbo.Services.Abstractions;
 using Xabbo.Controllers;
+using Xabbo.Models;
 
 namespace Xabbo.ViewModels;
 
@@ -37,7 +39,20 @@ public class GeneralPageViewModel : PageViewModel
             .WhenAnyValue(x => x.Value)
             .ObserveOn(RxApp.MainThreadScheduler)
             .ToProperty(this, x => x.Config);
+
+        // Vote bubble picker: reflect VoteBubbleStyle into the selection (init + on reload)...
+        _settingsProvider.WhenAnyValue(x => x.Value)
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(cfg => SelectedVoteBubble =
+                ChatBubbleOption.NormalBubbles.FirstOrDefault(b => b.Id == cfg.Chat.VoteBubbleStyle)
+                ?? ChatBubbleOption.NormalBubbles[0]);
+        // ...and write the selection back to config.
+        this.WhenAnyValue(x => x.SelectedVoteBubble)
+            .WhereNotNull()
+            .Subscribe(b => Config.Chat.VoteBubbleStyle = b.Id);
     }
+
+    [Reactive] public ChatBubbleOption? SelectedVoteBubble { get; set; }
 
     [Reactive] public bool IsRoomExpanded { get; set; } = true;
     [Reactive] public bool IsMovementExpanded { get; set; } = true;
