@@ -70,6 +70,11 @@ public partial class VoteModerationController : ControllerBase
     private readonly Dictionary<Id, int> _messageCounts = [];
     private readonly Dictionary<(string Name, VoteType Type), PendingSanction> _pendingSanctions = [];
     private readonly Dictionary<(string Name, VoteType Type), DateTimeOffset> _cooldownUntil = [];
+    // Grace timer: while a vote sits above threshold we hold it for VoteGraceSeconds of silence
+    // before applying. Each key maps to the generation of its live countdown; a stale callback
+    // (superseded by a newer vote, or disarmed) sees a mismatched/absent generation and bails.
+    private readonly Dictionary<(string Name, VoteType Type), long> _graceGen = [];
+    private long _graceCounter;
     private readonly Dictionary<Id, DateTimeOffset> _immuneBanUntil = [];
     private readonly Dictionary<Id, DateTimeOffset> _immuneMuteUntil = [];
     private readonly Dictionary<Id, DateTimeOffset> _lastRejectWhisper = [];
@@ -130,28 +135,97 @@ public partial class VoteModerationController : ControllerBase
         // with the colon-prefixed verb, so it never fires from inside a sentence. The colon
         // (not the slash) lets the moderator vote too — Xabbo's CommandManager blocks outgoing
         // "/"-prefixed chat, but ":"-prefixed chat passes through to the server as normal chat.
-        if (!first.StartsWith(':') ||
-            !TryParseVerb(first[1..].ToLowerInvariant(), out var type, out var direction))
+        if (first.StartsWith(':'))
         {
-            // Only genuine (non-command) public chat counts toward voter eligibility.
-            lock (_lock)
-                _messageCounts[voter.Id] = _messageCounts.GetValueOrDefault(voter.Id) + 1;
-            return;
+            var verb = first[1..].ToLowerInvariant();
+
+            // ":vote yes" / ":vote no" — shorthand that votes on the single active vote,
+            // so you don't have to retype the target's name and the full verb.
+            if (verb == "vote")
+            {
+                HandleShorthandVote(voter, parts);
+                return;
+            }
+
+            if (TryParseVerb(verb, out var type, out var direction))
+            {
+                // Each sanction type can be enabled independently.
+                if (type == VoteType.Ban ? !Settings.Chat.VoteBanEnabled : !Settings.Chat.VoteMuteEnabled)
+                    return;
+
+                // Require exactly "/verb <pseudo>" — a bare command or any extra words is not a vote.
+                if (parts.Length != 2)
+                {
+                    WhisperReject(voter, Settings.Chat.VoteHelpText);
+                    return;
+                }
+
+                HandleVote(voter, parts[1], type, direction);
+                return;
+            }
         }
 
-        // Each sanction type can be enabled independently.
-        if (type == VoteType.Ban ? !Settings.Chat.VoteBanEnabled : !Settings.Chat.VoteMuteEnabled)
-            return;
+        // Only genuine (non-command) public chat counts toward voter eligibility.
+        lock (_lock)
+            _messageCounts[voter.Id] = _messageCounts.GetValueOrDefault(voter.Id) + 1;
+    }
 
-        // Require exactly "/verb <pseudo>" — a bare command or any extra words is not a vote.
-        if (parts.Length != 2)
+    /// <summary>
+    /// Handles ":vote yes" / ":vote no" — resolves the single active vote and casts on it.
+    /// Only works when exactly one vote is running (the normal case with VoteSingleActive);
+    /// with zero or several active votes we can't disambiguate, so we point back to the long form.
+    /// </summary>
+    private void HandleShorthandVote(IUser voter, string[] parts)
+    {
+        if (parts.Length != 2 || !TryParseYesNo(parts[1].ToLowerInvariant(), out var direction))
         {
             WhisperReject(voter, Settings.Chat.VoteHelpText);
             return;
         }
 
-        var targetName = parts[1];
+        string targetName;
+        VoteType type;
+        lock (_lock)
+        {
+            if (!TryResolveActiveVote(out targetName, out type))
+            {
+                WhisperReject(voter, Settings.Chat.VoteNoActiveText);
+                return;
+            }
+        }
+
         HandleVote(voter, targetName, type, direction);
+    }
+
+    private static bool TryParseYesNo(string word, out VoteDirection direction)
+    {
+        switch (word)
+        {
+            case "yes": direction = VoteDirection.For; return true;
+            case "no": direction = VoteDirection.Against; return true;
+            default: direction = default; return false;
+        }
+    }
+
+    /// <summary>Resolves the one active (within-TTL) vote; returns false if none or more than one.</summary>
+    private bool TryResolveActiveVote(out string name, out VoteType type)
+    {
+        name = "";
+        type = default;
+        var now = DateTimeOffset.UtcNow;
+        double ttl = Settings.Chat.VoteSessionTtlMinutes;
+
+        (string Name, VoteType Type)? found = null;
+        foreach (var (key, session) in _sessions)
+        {
+            if ((now - session.LastVoteTime).TotalMinutes > ttl) continue;
+            if (found is not null) return false; // ambiguous — more than one vote running
+            found = key;
+        }
+
+        if (found is null) return false;
+        (name, type) = found.Value;
+        return true;
     }
 
     private static string Format(string template, string name, int forCount, int againstCount) => template
@@ -190,10 +264,10 @@ public partial class VoteModerationController : ControllerBase
             else if (voter.RightsLevel < RightsLevel.Standard &&
                      _messageCounts.GetValueOrDefault(voter.Id) < Settings.Chat.VoteMinMessages)
             {
-                // Eligibility rule is intentionally never revealed — stay completely silent.
+                // Not enough genuine participation yet — tell them (whisper is throttled).
                 // Players with room rights (Standard rights, group admins, owners) are trusted
                 // and exempt from the min-messages gate, so they can vote right away.
-                return;
+                rejectWhisper = Format(Settings.Chat.VoteNotEnoughMessagesText, display, 0, 0);
             }
             else if (_cooldownUntil.TryGetValue((nameLower, type), out var cd) && cd > now)
             {
@@ -251,22 +325,17 @@ public partial class VoteModerationController : ControllerBase
 
                         if (VotePassed(type, session.For, session.Against))
                         {
-                            var cooldown = now + TimeSpan.FromMinutes(Settings.Chat.VoteCooldownMinutes);
-                            var (forVoters, againstVoters) = session.VoterLists();
-
-                            if (target is not null && (type == VoteType.Ban ? _moderation.CanBan : _moderation.CanMute))
-                            {
-                                _sessions.Remove(key);
-                                _cooldownUntil[key] = cooldown;
-                                toApply = (target, type, forVoters, againstVoters);
-                            }
-                            else if (target is null)
-                            {
-                                // Target isn't in the room (fled or stepped out) — apply on return, within the window.
-                                _sessions.Remove(key);
-                                _cooldownUntil[key] = cooldown;
-                                _pendingSanctions[key] = new PendingSanction(now + DeferredSanctionWindow, forVoters, againstVoters);
-                            }
+                            // Threshold reached: don't apply straight away. Hold for a grace delay
+                            // so a last-second counter-vote can still cancel it (0 = apply instantly).
+                            if (Settings.Chat.VoteGraceSeconds > 0)
+                                ArmGraceTimer(key);
+                            else
+                                toApply = ResolvePassedVote(key, session);
+                        }
+                        else
+                        {
+                            // A counter-vote dropped it back below threshold → cancel any pending application.
+                            DisarmGraceTimer(key);
                         }
                     }
                 }
@@ -280,6 +349,72 @@ public partial class VoteModerationController : ControllerBase
 
         if (toApply is { } app)
             _ = ApplySanctionAsync(app.Target, app.Type, app.ForVoters, app.AgainstVoters);
+    }
+
+    /// <summary>Under <see cref="_lock"/>. (Re)starts the grace countdown for a passing vote.</summary>
+    private void ArmGraceTimer((string Name, VoteType Type) key)
+    {
+        long gen = ++_graceCounter;
+        _graceGen[key] = gen;
+        _ = GraceDelayAsync(key, gen);
+    }
+
+    /// <summary>Under <see cref="_lock"/>. Cancels a pending application (its callback then sees no matching gen).</summary>
+    private void DisarmGraceTimer((string Name, VoteType Type) key) => _graceGen.Remove(key);
+
+    private async Task GraceDelayAsync((string Name, VoteType Type) key, long gen)
+    {
+        try { await Task.Delay(TimeSpan.FromSeconds(Settings.Chat.VoteGraceSeconds)); }
+        catch { return; }
+
+        (IUser Target, VoteType Type, List<string> ForVoters, List<string> AgainstVoters)? toApply = null;
+        lock (_lock)
+        {
+            // Superseded by a newer vote, disarmed, or the session is gone.
+            if (_graceGen.GetValueOrDefault(key) != gen) return;
+            if (!_sessions.TryGetValue(key, out var session)) { _graceGen.Remove(key); return; }
+            // A counter-vote may have dropped it below threshold during the delay.
+            if (!VotePassed(session.Type, session.For, session.Against)) { _graceGen.Remove(key); return; }
+            toApply = ResolvePassedVote(key, session);
+        }
+
+        if (toApply is { } app)
+            _ = ApplySanctionAsync(app.Target, app.Type, app.ForVoters, app.AgainstVoters);
+    }
+
+    /// <summary>
+    /// Under <see cref="_lock"/>. Finalizes a passed vote: clears the session, starts the cooldown,
+    /// and returns the sanction to apply outside the lock — or defers it if the target has left.
+    /// </summary>
+    private (IUser Target, VoteType Type, List<string> ForVoters, List<string> AgainstVoters)? ResolvePassedVote(
+        (string Name, VoteType Type) key, VoteSession session)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var type = session.Type;
+        var (forVoters, againstVoters) = session.VoterLists();
+        var cooldown = now + TimeSpan.FromMinutes(Settings.Chat.VoteCooldownMinutes);
+
+        var room = _roomManager.Room;
+        IUser? target = room is not null && room.TryGetUserByName(key.Name, out var u) ? u : null;
+
+        if (target is not null && (type == VoteType.Ban ? _moderation.CanBan : _moderation.CanMute))
+        {
+            _sessions.Remove(key);
+            _graceGen.Remove(key);
+            _cooldownUntil[key] = cooldown;
+            return (target, type, forVoters, againstVoters);
+        }
+
+        if (target is null)
+        {
+            // Target isn't in the room (fled or stepped out) — apply on return, within the window.
+            _sessions.Remove(key);
+            _graceGen.Remove(key);
+            _cooldownUntil[key] = cooldown;
+            _pendingSanctions[key] = new PendingSanction(now + DeferredSanctionWindow, forVoters, againstVoters);
+        }
+
+        return null;
     }
 
     private void AnnounceStart(string targetName, VoteType type)
@@ -438,6 +573,7 @@ public partial class VoteModerationController : ControllerBase
         lock (_lock)
         {
             _sessions.Clear();
+            _graceGen.Clear();
             _messageCounts.Clear();
             _cooldownUntil.Clear();
             _immuneBanUntil.Clear();
@@ -491,6 +627,7 @@ public partial class VoteModerationController : ControllerBase
         lock (_lock)
         {
             _sessions.Remove(key);
+            _graceGen.Remove(key);
             _pendingSanctions.Remove(key);
             _cooldownUntil[key] = DateTimeOffset.UtcNow + TimeSpan.FromMinutes(Settings.Chat.VoteCooldownMinutes);
         }

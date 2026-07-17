@@ -42,10 +42,13 @@ public sealed class ChatConfig : ReactiveObject
     [Reactive] public int VoteApprovalPercent { get; set; } = 66;
     [Reactive] public int VoteSessionTtlMinutes { get; set; } = 5;
     [Reactive] public int VoteCooldownMinutes { get; set; } = 15;
+    // Grace delay: once the threshold is reached, wait this many seconds of vote silence before
+    // applying the sanction, so a last-second counter-vote can still cancel it. 0 = apply instantly.
+    [Reactive] public int VoteGraceSeconds { get; set; } = 8;
 
     // Whisper templates sent to voters. Placeholders: {name}, {for}, {against}.
     [Reactive] public string VoteHelpText { get; set; } =
-        "[Modération par vote] :voteban <pseudo> ou :votemute <pseudo>. [Pour défendre] :votenoban <pseudo> ou :votenomute <pseudo>";
+        "[Modération par vote] :voteban <pseudo> ou :votemute <pseudo>. [Pour défendre] :votenoban <pseudo> ou :votenomute <pseudo>. [Raccourci sur le vote en cours] :vote yes ou :vote no";
     [Reactive] public string VoteCountedText { get; set; } =
         "Ton vote concernant {name} est pris en compte ({for} pour / {against} contre).";
     [Reactive] public string VoteChangedText { get; set; } =
@@ -64,6 +67,10 @@ public sealed class ChatConfig : ReactiveObject
         "{name} ne peut pas être ciblé.";
     [Reactive] public string VoteInProgressText { get; set; } =
         "Un vote est déjà en cours, attends qu'il se termine avant d'en lancer un autre.";
+    [Reactive] public string VoteNoActiveText { get; set; } =
+        "Aucun vote n'est en cours. Lance-en un avec :voteban <pseudo> ou :votemute <pseudo>.";
+    [Reactive] public string VoteNotEnoughMessagesText { get; set; } =
+        "Tu n'as pas assez participé aux discussions de la room pour voter (chuchoter ne compte pas).";
 
     // Public room announcements when a vote passes (sent from your own avatar, not a whisper).
     [Reactive] public string VoteAnnounceBanText { get; set; } =
@@ -73,7 +80,7 @@ public sealed class ChatConfig : ReactiveObject
 
     // Public room announcement when a vote starts (first vote on a target), explaining how to join in.
     [Reactive] public string VoteStartBanText { get; set; } =
-        "Un vote pour bannir {name} vient de démarrer ! Tape :voteban {name} pour voter, ou, :votenoban {name} contre.";
+        "Un vote pour bannir {name} vient de démarrer ! Tape :vote yes pour, ou :vote no contre.";
     [Reactive] public string VoteStartMuteText { get; set; } =
-        "Un vote pour muter {name} vient de démarrer ! Tape :votemute {name} pour voter, ou, :votenomute {name} contre.";
+        "Un vote pour muter {name} vient de démarrer ! Tape :vote yes pour, ou :vote no contre.";
 }

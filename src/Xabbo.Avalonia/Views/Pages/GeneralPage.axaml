@@ -404,6 +404,11 @@
                   <TextBlock VerticalAlignment="Center" Text="minutes of inactivity" />
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBlock VerticalAlignment="Center" Text="Wait before applying the sanction:" />
+                  <NumericUpDown Minimum="0" Maximum="60" Width="110" Value="{Binding Config.Chat.VoteGraceSeconds}" />
+                  <TextBlock VerticalAlignment="Center" Text="seconds (lets others counter-vote)" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="8">
                   <TextBlock VerticalAlignment="Center" Text="Cooldown after a sanction:" />
                   <NumericUpDown Minimum="0" Maximum="120" Width="110" Value="{Binding Config.Chat.VoteCooldownMinutes}" />
                   <TextBlock VerticalAlignment="Center" Text="minutes" />
