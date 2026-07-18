@@ -154,6 +154,11 @@ public partial class VoteModerationController : ControllerBase
             // so you don't have to retype the target's name and the full verb.
             if (verb == "vote")
             {
+                // No rights for any enabled sanction type in this room → no vote could ever
+                // be active here, so stay completely inert (not even a "no active vote" whisper).
+                if (!HasAnyVoteRights())
+                    return;
+
                 HandleShorthandVote(voter, parts);
                 return;
             }
@@ -162,6 +167,11 @@ public partial class VoteModerationController : ControllerBase
             {
                 // Each sanction type can be enabled independently.
                 if (type == VoteType.Ban ? !Settings.Chat.VoteBanEnabled : !Settings.Chat.VoteMuteEnabled)
+                    return;
+
+                // No moderation rights for this sanction type in the current room → stay
+                // completely inert, not even a whisper (nothing could ever be applied).
+                if (!HasVoteRights(type))
                     return;
 
                 // Require exactly "/verb <pseudo>" — a bare command or any extra words is not a vote.
@@ -259,6 +269,10 @@ public partial class VoteModerationController : ControllerBase
     {
         var room = _roomManager.Room;
         if (room is null) return;
+
+        // No moderation rights for this sanction type in the current room → stay inert.
+        // Also covers the ":vote yes/no" shorthand, and rights lost mid-vote.
+        if (!HasVoteRights(type)) return;
 
         // No self-voting.
         if (voter.Name.Equals(targetName, StringComparison.OrdinalIgnoreCase))
@@ -640,6 +654,13 @@ public partial class VoteModerationController : ControllerBase
         type == VoteType.Ban
             ? RoomModerationController.ModerationType.Ban
             : RoomModerationController.ModerationType.Mute;
+
+    private bool HasVoteRights(VoteType type) =>
+        type == VoteType.Ban ? _moderation.CanBan : _moderation.CanMute;
+
+    private bool HasAnyVoteRights() =>
+        (Settings.Chat.VoteBanEnabled && HasVoteRights(VoteType.Ban)) ||
+        (Settings.Chat.VoteMuteEnabled && HasVoteRights(VoteType.Mute));
 
     // Room owners and group admins are never a valid vote target, regardless of the
     // moderator's own rank (so the community can't brigade a trusted admin).
