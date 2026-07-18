@@ -36,6 +36,9 @@ public partial class VoteModerationController : ControllerBase
     private sealed class VoteSession
     {
         public required VoteType Type { get; init; }
+        // Display name of the target as of the first vote — used for the expiry announcement,
+        // since the session is keyed by the lowercased name only.
+        public required string TargetDisplay { get; init; }
         public Dictionary<Id, VoteDirection> Votes { get; } = [];
         public Dictionary<Id, string> VoterNames { get; } = [];
         public HashSet<Id> WarnedDuplicate { get; } = [];
@@ -78,6 +81,11 @@ public partial class VoteModerationController : ControllerBase
     // (superseded by a newer vote, or disarmed) sees a mismatched/absent generation and bails.
     private readonly Dictionary<(string Name, VoteType Type), long> _graceGen = [];
     private long _graceCounter;
+    // Expiry timer: when VoteAnnounceExpired is on we arm a countdown (reset on every vote) so a
+    // vote that never reaches quorum can be announced as expired at its TTL. Same generation guard
+    // as the grace timer — a superseded/removed session's callback sees a mismatched gen and bails.
+    private readonly Dictionary<(string Name, VoteType Type), long> _expireGen = [];
+    private long _expireCounter;
     private readonly Dictionary<Id, DateTimeOffset> _immuneBanUntil = [];
     private readonly Dictionary<Id, DateTimeOffset> _immuneMuteUntil = [];
     private readonly Dictionary<Id, DateTimeOffset> _lastRejectWhisper = [];
@@ -314,7 +322,7 @@ public partial class VoteModerationController : ControllerBase
                 {
                     if (!sessionActive)
                     {
-                        session = new VoteSession { Type = type };
+                        session = new VoteSession { Type = type, TargetDisplay = display };
                         _sessions[key] = session;
                     }
 
@@ -333,6 +341,9 @@ public partial class VoteModerationController : ControllerBase
                         session.VoterNames[voter.Id] = voter.Name;
                         session.WarnedDuplicate.Remove(voter.Id);
                         session.LastVoteTime = now;
+
+                        // Reset the expiry countdown off this fresh vote (no-op if the feature is off).
+                        ArmExpireTimer(key);
 
                         infoWhisper = Format(
                             alreadyVoted ? Settings.Chat.VoteChangedText : Settings.Chat.VoteCountedText,
@@ -397,6 +408,55 @@ public partial class VoteModerationController : ControllerBase
             _ = ApplySanctionAsync(app.Target, app.Type, app.ForVoters, app.AgainstVoters);
     }
 
+    /// <summary>Under <see cref="_lock"/>. (Re)starts the TTL countdown that announces an expired vote.</summary>
+    private void ArmExpireTimer((string Name, VoteType Type) key)
+    {
+        // Only spend a timer when the announcement is enabled; otherwise expiry stays passive as before.
+        if (!Settings.Chat.VoteAnnounceExpired) return;
+        long gen = ++_expireCounter;
+        _expireGen[key] = gen;
+        _ = ExpireDelayAsync(key, gen);
+    }
+
+    private async Task ExpireDelayAsync((string Name, VoteType Type) key, long gen)
+    {
+        try { await Task.Delay(TimeSpan.FromMinutes(Settings.Chat.VoteSessionTtlMinutes)); }
+        catch { return; }
+
+        string? display = null;
+        int forCount = 0, againstCount = 0;
+        VoteType type = default;
+        lock (_lock)
+        {
+            // Superseded by a newer vote (which re-armed), or the session was already resolved/cancelled.
+            if (_expireGen.GetValueOrDefault(key) != gen) return;
+            if (!_sessions.TryGetValue(key, out var session)) { _expireGen.Remove(key); return; }
+            // A passing vote is handled by the grace/apply path — never announce it as expired.
+            if (VotePassed(session.Type, session.For, session.Against)) { _expireGen.Remove(key); return; }
+
+            display = session.TargetDisplay;
+            forCount = session.For;
+            againstCount = session.Against;
+            type = session.Type;
+            _sessions.Remove(key);
+            _expireGen.Remove(key);
+            _graceGen.Remove(key);
+        }
+
+        if (display is not null)
+            AnnounceExpired(display, type, forCount, againstCount);
+    }
+
+    private void AnnounceExpired(string targetName, VoteType type, int forCount, int againstCount)
+    {
+        var template = type == VoteType.Ban
+            ? Settings.Chat.VoteExpiredBanText
+            : Settings.Chat.VoteExpiredMuteText;
+        var text = Format(template, targetName, forCount, againstCount);
+        if (!string.IsNullOrWhiteSpace(text))
+            Ext.Send(new ChatMsg(ChatType.Shout, text, Settings.Chat.VoteBubbleStyle));
+    }
+
     /// <summary>
     /// Under <see cref="_lock"/>. Finalizes a passed vote: clears the session, starts the cooldown,
     /// and returns the sanction to apply outside the lock — or defers it if the target has left.
@@ -416,6 +476,7 @@ public partial class VoteModerationController : ControllerBase
         {
             _sessions.Remove(key);
             _graceGen.Remove(key);
+            _expireGen.Remove(key);
             _cooldownUntil[key] = cooldown;
             return (target, type, forVoters, againstVoters);
         }
@@ -425,6 +486,7 @@ public partial class VoteModerationController : ControllerBase
             // Target isn't in the room (fled or stepped out) — apply on return, within the window.
             _sessions.Remove(key);
             _graceGen.Remove(key);
+            _expireGen.Remove(key);
             _cooldownUntil[key] = cooldown;
             _pendingSanctions[key] = new PendingSanction(now + DeferredSanctionWindow, forVoters, againstVoters);
         }
@@ -596,6 +658,7 @@ public partial class VoteModerationController : ControllerBase
         {
             _sessions.Clear();
             _graceGen.Clear();
+            _expireGen.Clear();
             _enteredAt.Clear();
             _cooldownUntil.Clear();
             _immuneBanUntil.Clear();
@@ -650,6 +713,7 @@ public partial class VoteModerationController : ControllerBase
         {
             _sessions.Remove(key);
             _graceGen.Remove(key);
+            _expireGen.Remove(key);
             _pendingSanctions.Remove(key);
             _cooldownUntil[key] = DateTimeOffset.UtcNow + TimeSpan.FromMinutes(Settings.Chat.VoteCooldownMinutes);
         }

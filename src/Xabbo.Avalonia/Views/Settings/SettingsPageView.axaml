@@ -214,6 +214,14 @@
               <TextBlock Text="Vote started — mute (if enabled)" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
               <TextBox Text="{Binding Config.Chat.VoteStartMuteText}" MaxLength="165" />
             </StackPanel>
+            <StackPanel Spacing="2">
+              <TextBlock Text="Vote expired — ban (if enabled)" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+              <TextBox Text="{Binding Config.Chat.VoteExpiredBanText}" MaxLength="165" />
+            </StackPanel>
+            <StackPanel Spacing="2">
+              <TextBlock Text="Vote expired — mute (if enabled)" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+              <TextBox Text="{Binding Config.Chat.VoteExpiredMuteText}" MaxLength="165" />
+            </StackPanel>
           </StackPanel>
         </ui:SettingsExpanderItem>
       </ui:SettingsExpander>

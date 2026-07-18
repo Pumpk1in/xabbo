@@ -374,6 +374,11 @@
                   Classes="modern"
                   IsChecked="{Binding Config.Chat.VoteAnnounceStart}"
                 />
+                <CheckBox
+                  Content="Announce when a vote expires without reaching the quorum (from your avatar)"
+                  Classes="modern"
+                  IsChecked="{Binding Config.Chat.VoteAnnounceExpired}"
+                />
                 <!-- Per-sanction thresholds (only the quorum differs by type) -->
                 <TextBlock Text="Per sanction" FontSize="12" Margin="0,4,0,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                 <Grid ColumnDefinitions="*,Auto,*,Auto" RowDefinitions="Auto" ColumnSpacing="12" RowSpacing="8">

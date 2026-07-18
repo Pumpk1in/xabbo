@@ -32,6 +32,8 @@ public sealed class ChatConfig : ReactiveObject
     [Reactive] public bool VoteAnnounceSanction { get; set; } = false;
     // Announce in room chat when a vote starts (the first vote on a target), explaining how to vote.
     [Reactive] public bool VoteAnnounceStart { get; set; } = false;
+    // Announce in room chat when a vote expires without reaching the quorum.
+    [Reactive] public bool VoteAnnounceExpired { get; set; } = false;
     [Reactive] public int VoteMinPresenceMinutes { get; set; } = 3;
     // Minimum "for" votes required, per sanction type (a ban demands more people than a mute).
     [Reactive] public int VoteBanQuorum { get; set; } = 4;
@@ -88,4 +90,10 @@ public sealed class ChatConfig : ReactiveObject
         "Un vote pour bannir {name} vient de démarrer ! Tape :vote yes pour, ou :vote no contre.";
     [Reactive] public string VoteStartMuteText { get; set; } =
         "Un vote pour muter {name} vient de démarrer ! Tape :vote yes pour, ou :vote no contre.";
+
+    // Public room announcement when a vote expires without reaching the quorum.
+    [Reactive] public string VoteExpiredBanText { get; set; } =
+        "Le vote pour bannir {name} a expiré ({for} pour / {against} contre).";
+    [Reactive] public string VoteExpiredMuteText { get; set; } =
+        "Le vote pour muter {name} a expiré ({for} pour / {against} contre).";
 }
