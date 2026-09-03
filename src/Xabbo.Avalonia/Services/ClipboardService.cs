@@ -21,11 +21,11 @@ public class ClipboardService(Application app, IUiContext uiContext) : IClipboar
         }
     }
 
-    public Task<string?> GetTextAsync()
+    public async Task<string?> GetTextAsync()
     {
         if (_app.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime { MainWindow.Clipboard: IClipboard clipboard })
-            return Task.FromResult<string?>(null);
+            return null;
 
-        return clipboard.GetTextAsync();
+        return await clipboard.TryGetTextAsync();
     }
 }
