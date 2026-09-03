@@ -120,10 +120,6 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
             <!-- Room ID -->
@@ -196,42 +192,10 @@
                 Text="Chat"
             />
 
-            <TextBlock Classes="modern flashhide" Grid.Row="14" Text="Flow" />
-            <SelectableTextBlock
-              Classes="modern flashhide"
-              Grid.Row="14" Grid.Column="1"
-              TextWrapping="Wrap"
-              Text="{Binding ChatSettings.Flow, Mode=OneWay, Converter={StaticResource HumanizerConverter}}"
-            />
-
-            <TextBlock Classes="modern flashhide" Grid.Row="15" Text="Bubble width"  />
-            <SelectableTextBlock
-              Classes="modern flashhide"
-              Grid.Row="15" Grid.Column="1"
-              TextWrapping="Wrap"
-              Text="{Binding ChatSettings.BubbleWidth, Mode=OneWay, Converter={StaticResource HumanizerConverter}}"
-            />
-
-            <TextBlock Classes="modern flashhide" Grid.Row="16" Text="Scroll speed" />
-            <SelectableTextBlock
-              Classes="modern flashhide"
-              Grid.Row="16" Grid.Column="1"
-              TextWrapping="Wrap"
-              Text="{Binding ChatSettings.ScrollSpeed, Mode=OneWay, Converter={StaticResource HumanizerConverter}}"
-            />
-
-            <TextBlock Classes="modern flashhide" Grid.Row="17" Text="Talk hearing distance" />
-            <SelectableTextBlock
-              Classes="modern flashhide"
-              Grid.Row="17" Grid.Column="1"
-              TextWrapping="Wrap"
-              Text="{Binding ChatSettings.TalkHearingDistance, Mode=OneWay, Converter={StaticResource HumanizerConverter}}"
-            />
-
-            <TextBlock Classes="modern" Grid.Row="18" Text="Flood protection" />
+            <TextBlock Classes="modern" Grid.Row="14" Text="Flood protection" />
             <SelectableTextBlock
               Classes="modern"
-              Grid.Row="18" Grid.Column="1"
+              Grid.Row="14" Grid.Column="1"
               TextWrapping="Wrap"
               Text="{Binding ChatSettings.FloodProtection, Mode=OneWay, Converter={StaticResource HumanizerConverter}}"
             />
