@@ -294,7 +294,7 @@
         <ic:SymbolIcon Symbol="History" FontSize="16" />
       </Button>
       <Panel Grid.Column="5" Margin="10,0,0,0" VerticalAlignment="Center">
-        <Button x:Name="VotedSanctionsButton" VerticalAlignment="Center" Padding="8" ToolTip.Tip="Voted sanctions">
+        <Button x:Name="VotedSanctionsButton" VerticalAlignment="Center" Padding="8" ToolTip.Tip="Moderation">
           <Button.Flyout>
             <Flyout Placement="BottomEdgeAlignedRight">
               <Flyout.FlyoutPresenterTheme>
@@ -305,30 +305,66 @@
               <Grid x:Name="VotedSanctionsFlyoutPanel" Width="360" MaxHeight="420"
                     RowDefinitions="Auto,*"
                     x:DataType="vm:ChatPageViewModel" DataContext="{Binding #ChatPageRoot.DataContext}">
-                <TextBlock Grid.Row="0" Text="Voted sanctions" FontWeight="SemiBold" Margin="4,4,4,8" />
-                <TextBlock Grid.Row="1" Text="No voted sanctions yet."
-                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                           Margin="4" IsVisible="{Binding !HasVotedSanctions}" />
-                <ScrollViewer Grid.Row="1" IsVisible="{Binding HasVotedSanctions}"
-                              VerticalScrollBarVisibility="Auto">
+                <TextBlock Grid.Row="0" Text="Moderation" FontWeight="SemiBold" Margin="4,4,4,8" />
+
+                <!-- Single scroll: pending, sanctions, then the auto-ban rules admin at the bottom. -->
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
                   <StackPanel Spacing="2">
+                <!-- Pending deferred bans (target not yet in the room) -->
+                <StackPanel Spacing="2" Margin="0,0,0,6" IsVisible="{Binding HasPendingBans}">
+                  <TextBlock Text="Pending (on next entry)" FontSize="11" FontWeight="SemiBold"
+                             Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="4,0" />
+                  <ItemsControl ItemsSource="{Binding PendingBans}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:PendingBanViewModel">
+                        <Grid ColumnDefinitions="*,Auto" Margin="4,2">
+                          <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <Border Background="#8A8A8A" CornerRadius="3" Padding="4,1" VerticalAlignment="Center">
+                              <TextBlock Text="deferred" FontSize="9" Foreground="White" />
+                            </Border>
+                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding DurationText}" FontSize="11" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                          </StackPanel>
+                          <Button Grid.Column="1" Content="Cancel" VerticalAlignment="Center"
+                                  Command="{Binding CancelCmd}" />
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+
+                    <TextBlock Text="No sanctions yet." Margin="4,2"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               IsVisible="{Binding !HasVotedSanctions}" />
                     <!-- Active sanctions (with undo) -->
                     <ItemsControl ItemsSource="{Binding ActiveVotedSanctions}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:VotedSanctionViewModel">
                           <Grid ColumnDefinitions="*,Auto" Margin="0,2">
                             <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                              <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                              <StackPanel Orientation="Horizontal" Spacing="6">
+                                <Border Background="{Binding KindBrush}" CornerRadius="3" Padding="4,1" VerticalAlignment="Center">
+                                  <TextBlock Text="{Binding KindLabel}" FontSize="9" Foreground="White" />
+                                </Border>
+                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                              </StackPanel>
                               <StackPanel Orientation="Horizontal" Spacing="10">
                                 <TextBlock Text="{Binding SanctionText}" FontSize="11"
                                            Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                                 <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                           IsVisible="{Binding IsVote}"
                                            ToolTip.Tip="{Binding ForVotersText}"
                                            Text="{Binding ForCount, StringFormat='👍 {0}'}" />
                                 <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                           IsVisible="{Binding IsVote}"
                                            ToolTip.Tip="{Binding AgainstVotersText}"
                                            Text="{Binding AgainstCount, StringFormat='👎 {0}'}" />
                                 <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                           IsVisible="{Binding !IsVote}"
+                                           Text="{Binding DetailText}" />
+                                <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                           IsVisible="{Binding HasExpiry}"
                                            ToolTip.Tip="Sanction expires at this time"
                                            Text="{Binding ExpiresAt, StringFormat='exp. {0:HH:mm}'}" />
                               </StackPanel>
@@ -349,20 +385,65 @@
                         <ItemsControl.ItemTemplate>
                           <DataTemplate x:DataType="vm:VotedSanctionViewModel">
                             <StackPanel Margin="0,2" Opacity="0.5">
-                              <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextDecorations="Strikethrough" />
+                              <StackPanel Orientation="Horizontal" Spacing="6">
+                                <Border Background="{Binding KindBrush}" CornerRadius="3" Padding="4,1" VerticalAlignment="Center">
+                                  <TextBlock Text="{Binding KindLabel}" FontSize="9" Foreground="White" />
+                                </Border>
+                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextDecorations="Strikethrough" VerticalAlignment="Center" />
+                              </StackPanel>
                               <StackPanel Orientation="Horizontal" Spacing="10">
                                 <TextBlock Text="{Binding SanctionText}" FontSize="11"
                                            Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                                 <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                           IsVisible="{Binding IsVote}"
                                            ToolTip.Tip="{Binding ForVotersText}"
                                            Text="{Binding ForCount, StringFormat='👍 {0}'}" />
                                 <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                           IsVisible="{Binding IsVote}"
                                            ToolTip.Tip="{Binding AgainstVotersText}"
                                            Text="{Binding AgainstCount, StringFormat='👎 {0}'}" />
+                                <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                           IsVisible="{Binding !IsVote}"
+                                           Text="{Binding DetailText}" />
                                 <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                            Text="{Binding ExpiresAt, StringFormat='expired {0:HH:mm}'}" />
                               </StackPanel>
                             </StackPanel>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+
+                    <!-- Auto-ban rules admin (bottom of the scroll) -->
+                    <StackPanel Spacing="4" Margin="0,8,0,0">
+                      <Separator />
+                      <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0" Text="Auto-ban rules" FontSize="11" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1" Text="{Binding AutoBanDurationText}" FontSize="11"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                      </Grid>
+                      <Grid ColumnDefinitions="*,Auto">
+                        <TextBox Grid.Column="0" Watermark="pattern e.g. *khur*" Text="{Binding AutoBanRuleInput}" />
+                        <Button Grid.Column="1" Content="Add" Margin="4,0,0,0"
+                                Command="{Binding AddAutoBanRuleCmd}" />
+                      </Grid>
+                      <TextBlock Text="No auto-ban rules for this room." FontSize="11" Margin="4,0"
+                                 Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                 IsVisible="{Binding !HasAutoBanRules}" />
+                      <ItemsControl ItemsSource="{Binding AutoBanRules}" IsVisible="{Binding HasAutoBanRules}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:AutoBanRuleViewModel">
+                            <Grid ColumnDefinitions="*,Auto" Margin="4,2">
+                              <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <Border Background="#D9534F" CornerRadius="3" Padding="4,1" VerticalAlignment="Center">
+                                  <TextBlock Text="auto" FontSize="9" Foreground="White" />
+                                </Border>
+                                <TextBlock Text="{Binding Pattern}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                              </StackPanel>
+                              <Button Grid.Column="1" Content="Remove" VerticalAlignment="Center"
+                                      Command="{Binding RemoveCmd}" />
+                            </Grid>
                           </DataTemplate>
                         </ItemsControl.ItemTemplate>
                       </ItemsControl>

@@ -94,6 +94,20 @@ public class ChatPageViewModel : PageViewModel
     /// <summary>True when a new voted sanction landed and the flyout hasn't been opened since.</summary>
     [Reactive] public bool HasUnseenVotedSanctions { get; set; }
 
+    // Deferred exact-name bans queued for their target's next entry (manual /ban on an absent user).
+    private readonly ObservableCollection<PendingBanViewModel> _pendingBans = new();
+    public ObservableCollection<PendingBanViewModel> PendingBans => _pendingBans;
+    [Reactive] public bool HasPendingBans { get; set; }
+
+    // Auto-ban glob rules for the current room (admin section); fed by ModerationCommands.
+    private readonly ObservableCollection<AutoBanRuleViewModel> _autoBanRules = new();
+    public ObservableCollection<AutoBanRuleViewModel> AutoBanRules => _autoBanRules;
+    [Reactive] public bool HasAutoBanRules { get; set; }
+    [Reactive] public string AutoBanDurationText { get; set; } = "";
+    [Reactive] public string AutoBanRuleInput { get; set; } = "";
+    private Action<string>? _onAddAutoBanRule;
+    public ReactiveCommand<Unit, Unit> AddAutoBanRuleCmd { get; }
+
     public ReactiveCommand<VotedSanctionViewModel, Unit> UndoVotedSanctionCmd { get; }
     public ReactiveCommand<Unit, Unit> AddToWhitelistCmd { get; }
     public ReactiveCommand<Unit, Unit> AddHistoryToWhitelistCmd { get; }
@@ -556,6 +570,15 @@ public class ChatPageViewModel : PageViewModel
 
         UndoVotedSanctionCmd = ReactiveCommand.CreateFromTask<VotedSanctionViewModel>(
             row => TryModerate(() => UndoVotedSanctionAsync(row)));
+        AddAutoBanRuleCmd = ReactiveCommand.Create(() =>
+        {
+            var input = AutoBanRuleInput?.Trim();
+            if (!string.IsNullOrEmpty(input))
+            {
+                _onAddAutoBanRule?.Invoke(input);
+                AutoBanRuleInput = "";
+            }
+        });
         AddToWhitelistCmd = ReactiveCommand.Create(AddSelectedToWhitelist);
         AddHistoryToWhitelistCmd = ReactiveCommand.Create(AddSelectedHistoryToWhitelist);
 
@@ -1325,6 +1348,81 @@ public class ChatPageViewModel : PageViewModel
         {
             HasUnseenVotedSanctions = true;
             RecomputeActiveVotedSanctionCount();
+        });
+    }
+
+    /// <summary>Called by <see cref="ModerationCommands"/> when a deferred or auto (pattern) ban is applied.</summary>
+    public void AddAppliedModerationBan(long userId, string name, SanctionKind kind, string detail, BanDuration duration)
+        => AddVotedSanction(new VotedSanctionViewModel(userId, name, kind, detail, duration));
+
+    /// <summary>Adds a queued deferred ban (target not yet in the room) to the pending list.</summary>
+    public void AddPendingBan(string name, string durationText, Action onCancel)
+    {
+        RxApp.MainThreadScheduler.Schedule(() =>
+        {
+            if (_pendingBans.Any(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase)))
+                return;
+            PendingBanViewModel vm = null!;
+            vm = new PendingBanViewModel(name, durationText, () =>
+            {
+                onCancel();
+                _pendingBans.Remove(vm);
+                HasPendingBans = _pendingBans.Count > 0;
+            });
+            _pendingBans.Add(vm);
+            HasPendingBans = true;
+            HasUnseenVotedSanctions = true;
+        });
+    }
+
+    /// <summary>Removes a queued deferred ban (applied on entry, or cleared elsewhere).</summary>
+    public void RemovePendingBan(string name)
+    {
+        RxApp.MainThreadScheduler.Schedule(() =>
+        {
+            var existing = _pendingBans.FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
+            if (existing is not null)
+                _pendingBans.Remove(existing);
+            HasPendingBans = _pendingBans.Count > 0;
+        });
+    }
+
+    /// <summary>Clears the pending list (e.g. on leaving the room); repopulated on the next room entry.</summary>
+    public void ClearPendingBans()
+    {
+        RxApp.MainThreadScheduler.Schedule(() =>
+        {
+            _pendingBans.Clear();
+            HasPendingBans = false;
+        });
+    }
+
+    /// <summary>Pushes the current room's auto-ban rules to the admin section (called by <see cref="ModerationCommands"/>).</summary>
+    public void SetAutoBanRules(IReadOnlyList<string> patterns, string durationText, Action<string> onAdd, Action<string> onRemove)
+    {
+        RxApp.MainThreadScheduler.Schedule(() =>
+        {
+            _onAddAutoBanRule = onAdd;
+            _autoBanRules.Clear();
+            foreach (var p in patterns)
+            {
+                var pattern = p;
+                _autoBanRules.Add(new AutoBanRuleViewModel(pattern, () => onRemove(pattern)));
+            }
+            AutoBanDurationText = durationText;
+            HasAutoBanRules = _autoBanRules.Count > 0;
+        });
+    }
+
+    /// <summary>Clears the auto-ban admin section (on leaving the room); repopulated on the next room entry.</summary>
+    public void ClearAutoBanRules()
+    {
+        RxApp.MainThreadScheduler.Schedule(() =>
+        {
+            _autoBanRules.Clear();
+            HasAutoBanRules = false;
+            AutoBanDurationText = "";
+            _onAddAutoBanRule = null;
         });
     }
 

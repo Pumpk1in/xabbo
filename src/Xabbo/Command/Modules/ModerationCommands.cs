@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Splat;
 using Xabbo.Messages.Flash;
 using Xabbo.Core;
@@ -15,13 +16,17 @@ using Xabbo.ViewModels;
 namespace Xabbo.Command.Modules;
 
 [CommandModule]
-public sealed class ModerationCommands(RoomManager roomManager, IAppPathProvider appPathProvider) : CommandModule
+public sealed class ModerationCommands(RoomManager roomManager, ProfileManager profileManager, IAppPathProvider appPathProvider) : CommandModule
 {
     private readonly RoomManager _roomManager = roomManager;
+    private readonly ProfileManager _profileManager = profileManager;
     private readonly IAppPathProvider _appPathProvider = appPathProvider;
 
     private readonly ConcurrentDictionary<string, int> _muteList = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, BanDuration> _banList = new(StringComparer.OrdinalIgnoreCase);
+    // Auto-ban glob rules compiled for the current room (recompiled on room entry / edit).
+    private readonly List<(Regex Regex, string Pattern)> _autoBanRules = new();
+    private BanDuration _autoBanDuration = BanDuration.Permanent;
     private DeferredModerationData _deferredData = new();
     private readonly object _deferredLock = new();
     private ChatPageViewModel? _chatPage;
@@ -121,6 +126,31 @@ public sealed class ModerationCommands(RoomManager roomManager, IAppPathProvider
             roomBans[userName] = (int)duration;
             SaveDeferredData();
         }
+
+        NotifyPendingBan(userName, duration);
+    }
+
+    private void NotifyPendingBan(string userName, BanDuration duration)
+    {
+        _chatPage ??= Locator.Current.GetService<ChatPageViewModel>();
+        _chatPage?.AddPendingBan(userName, FormatBanDuration(duration), () => CancelDeferredBan(userName));
+    }
+
+    private void CancelDeferredBan(string userName)
+    {
+        _banList.TryRemove(userName, out _);
+        if (_roomManager.Room is { Id: var roomId })
+            lock (_deferredLock)
+            {
+                if (_deferredData.Bans.TryGetValue(roomId, out var roomBans))
+                {
+                    roomBans.Remove(userName);
+                    if (roomBans.Count == 0)
+                        _deferredData.Bans.Remove(roomId);
+                    SaveDeferredData();
+                }
+            }
+        NotifyChatLog(userName, "deferred ban cancelled");
     }
 
     public void CleanupDeferredBans(IEnumerable<string> bannedNames, long roomId)
@@ -136,6 +166,7 @@ public sealed class ModerationCommands(RoomManager roomManager, IAppPathProvider
             if (inBanList || inDeferredData)
             {
                 NotifyChatLog(name, "already banned, removed from deferred list");
+                _chatPage?.RemovePendingBan(name);
                 cleaned = true;
             }
         }
@@ -164,10 +195,28 @@ public sealed class ModerationCommands(RoomManager roomManager, IAppPathProvider
                 _muteList[userName] = minutes;
         }
 
+        // Load & compile auto-ban patterns for this room.
+        CompileAutoBanRules(roomId);
+
+        // Reflect the loaded deferred bans in the moderation panel's pending list.
+        _chatPage ??= Locator.Current.GetService<ChatPageViewModel>();
+        _chatPage?.ClearPendingBans();
+        foreach (var (userName, duration) in _banList)
+            NotifyPendingBan(userName, duration);
+
+        // Reflect this room's auto-ban rules in the panel's admin section.
+        SyncAutoBanRulesToPanel(roomId);
+
         // Apply immediately to targets already present in the room (returned while we were away).
         foreach (var name in _banList.Keys.Concat(_muteList.Keys).ToList())
             if (e.Room.TryGetUserByName(name, out IUser? user))
                 _ = ApplyDeferredSanctionAsync(user);
+
+        // Auto-ban present users matching a pattern (skip those an exact deferred sanction already covers).
+        if (_autoBanRules.Count > 0)
+            foreach (var user in e.Room.Users.ToList())
+                if (!_banList.ContainsKey(user.Name) && !_muteList.ContainsKey(user.Name))
+                    _ = ApplyAutoBanIfMatchAsync(user);
 
         // Schedule a silent ban list check to clean up deferred bans already applied
         if (_deferredData.Bans.ContainsKey(roomId))
@@ -202,6 +251,9 @@ public sealed class ModerationCommands(RoomManager roomManager, IAppPathProvider
     {
         _muteList.Clear();
         _banList.Clear();
+        _autoBanRules.Clear();
+        _chatPage?.ClearPendingBans();
+        _chatPage?.ClearAutoBanRules();
         Interlocked.Exchange(ref _roomEntryCts, null)?.Cancel();
     }
 
@@ -209,25 +261,22 @@ public sealed class ModerationCommands(RoomManager roomManager, IAppPathProvider
     {
         foreach (var avatar in e.Avatars)
             if (avatar is User user)
-                _ = ApplyDeferredSanctionAsync(user);
+                _ = HandleUserEntryAsync(user);
     }
 
-    private async Task ApplyDeferredSanctionAsync(IUser user)
+    private async Task HandleUserEntryAsync(IUser user)
+    {
+        // Exact deferred ban/mute takes priority; only fall back to pattern auto-ban if nothing exact matched.
+        if (!await ApplyDeferredSanctionAsync(user))
+            await ApplyAutoBanIfMatchAsync(user);
+    }
+
+    private async Task<bool> ApplyDeferredSanctionAsync(IUser user)
     {
         if (_banList.TryGetValue(user.Name, out BanDuration banDuration))
         {
-            if (_roomManager.Room?.Data is { IsGroupRoom: true } data && Session.Is(ClientType.Modern))
-            {
-                Ext.Send(new KickGroupMemberMsg(data.GroupId, user.Id));
-                ShowMessage($"Kicking user '{user.Name}' from room group");
-                NotifyChatLog(user.Name, "kicked from room group");
-                await Task.Delay(1500);
-            }
-            string durationString = FormatBanDuration(banDuration);
-            ShowMessage($"Banning user '{user.Name}' {durationString}");
-            NotifyChatLog(user.Name, $"banned {durationString} (deferred)");
-            await Task.Delay(100);
-            BanUser(user, banDuration);
+            await BanUserNow(user, banDuration, SanctionKind.Deferred, "deferred",
+                $"banned {FormatBanDuration(banDuration)} (deferred)");
             _banList.TryRemove(user.Name, out _);
 
             // Remove from persistent storage
@@ -242,6 +291,7 @@ public sealed class ModerationCommands(RoomManager roomManager, IAppPathProvider
                         SaveDeferredData();
                     }
                 }
+            return true;
         }
         else if (_muteList.TryGetValue(user.Name, out int muteDuration))
         {
@@ -263,7 +313,144 @@ public sealed class ModerationCommands(RoomManager roomManager, IAppPathProvider
                         SaveDeferredData();
                     }
                 }
+            return true;
         }
+        return false;
+    }
+
+    /// <summary>Kicks from the room group if needed, then bans; shared by deferred and auto-ban paths.</summary>
+    private async Task BanUserNow(IUser user, BanDuration duration, SanctionKind kind, string detail, string chatLogAction)
+    {
+        if (_roomManager.Room?.Data is { IsGroupRoom: true } data && Session.Is(ClientType.Modern))
+        {
+            Ext.Send(new KickGroupMemberMsg(data.GroupId, user.Id));
+            ShowMessage($"Kicking user '{user.Name}' from room group");
+            NotifyChatLog(user.Name, "kicked from room group");
+            await Task.Delay(1500);
+        }
+        ShowMessage($"Banning user '{user.Name}' {FormatBanDuration(duration)}");
+        NotifyChatLog(user.Name, chatLogAction);
+        await Task.Delay(100);
+        BanUser(user, duration);
+
+        _chatPage ??= Locator.Current.GetService<ChatPageViewModel>();
+        _chatPage?.AddAppliedModerationBan(user.Id, user.Name, kind, detail, duration);
+        _chatPage?.RemovePendingBan(user.Name);
+    }
+
+    private async Task ApplyAutoBanIfMatchAsync(IUser user)
+    {
+        if (_autoBanRules.Count == 0 || !CanAutoBan(user))
+            return;
+
+        foreach (var (regex, pattern) in _autoBanRules)
+        {
+            if (regex.IsMatch(user.Name))
+            {
+                await BanUserNow(user, _autoBanDuration, SanctionKind.Auto, $"`{pattern}`",
+                    $"auto-banned {FormatBanDuration(_autoBanDuration)} (pattern `{pattern}`)");
+                return;
+            }
+        }
+    }
+
+    // Never auto-ban yourself, staff, or anyone with equal/greater rights; only when we can ban at all.
+    private bool CanAutoBan(IUser user) =>
+        _roomManager.CanBan &&
+        !string.Equals(user.Name, _profileManager.UserData?.Name, StringComparison.OrdinalIgnoreCase) &&
+        !user.IsStaff &&
+        _roomManager.RightsLevel > user.RightsLevel;
+
+    private void CompileAutoBanRules(long roomId)
+    {
+        _autoBanRules.Clear();
+        if (_deferredData.AutoBanPatterns.TryGetValue(roomId, out var patterns))
+            foreach (var pattern in patterns)
+                _autoBanRules.Add((GlobToRegex(pattern), pattern));
+
+        _autoBanDuration = _deferredData.AutoBanDuration.TryGetValue(roomId, out var d)
+            ? (BanDuration)d
+            : BanDuration.Permanent;
+    }
+
+    // Standard shell glob: * = zero or more chars, ? = one char, case-insensitive, whole-name match.
+    private static Regex GlobToRegex(string glob) => new(
+        "^" + Regex.Escape(glob).Replace("\\*", ".*").Replace("\\?", ".") + "$",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+    private void AddAutoBanPattern(long roomId, string pattern)
+    {
+        if (!_deferredData.AutoBanPatterns.TryGetValue(roomId, out var list))
+            _deferredData.AutoBanPatterns[roomId] = list = new();
+        if (!list.Contains(pattern, StringComparer.OrdinalIgnoreCase))
+            list.Add(pattern);
+        SaveDeferredData();
+        CompileAutoBanRules(roomId);
+    }
+
+    private bool RemoveAutoBanPattern(long roomId, string pattern)
+    {
+        if (!_deferredData.AutoBanPatterns.TryGetValue(roomId, out var list))
+            return false;
+        int removed = list.RemoveAll(p => string.Equals(p, pattern, StringComparison.OrdinalIgnoreCase));
+        if (list.Count == 0)
+            _deferredData.AutoBanPatterns.Remove(roomId);
+        if (removed == 0)
+            return false;
+        SaveDeferredData();
+        CompileAutoBanRules(roomId);
+        return true;
+    }
+
+    private void ClearAutoBanPatterns(long roomId)
+    {
+        _deferredData.AutoBanPatterns.Remove(roomId);
+        SaveDeferredData();
+        CompileAutoBanRules(roomId);
+        SyncAutoBanRulesToPanel(roomId);
+    }
+
+    private void SetAutoBanDuration(long roomId, BanDuration duration)
+    {
+        _deferredData.AutoBanDuration[roomId] = (int)duration;
+        SaveDeferredData();
+        _autoBanDuration = duration;
+        SyncAutoBanRulesToPanel(roomId);
+    }
+
+    /// <summary>Adds a pattern and applies it live; shared by the /autoban command and the panel's Add button.</summary>
+    private void ApplyNewAutoBanPattern(long roomId, string pattern)
+    {
+        AddAutoBanPattern(roomId, pattern);
+        SyncAutoBanRulesToPanel(roomId);
+        ShowMessage($"Added auto-ban pattern '{pattern}' ({FormatBanDuration(_autoBanDuration)}).");
+        NotifyChatLog(pattern, "added as auto-ban pattern");
+        // Apply the new rule to users already in the room.
+        if (_roomManager.Room is { } room)
+            foreach (var user in room.Users.ToList())
+                _ = ApplyAutoBanIfMatchAsync(user);
+    }
+
+    /// <summary>Pushes the current room's auto-ban rules to the moderation panel's admin section.</summary>
+    private void SyncAutoBanRulesToPanel(long roomId)
+    {
+        _chatPage ??= Locator.Current.GetService<ChatPageViewModel>();
+        var patterns = _deferredData.AutoBanPatterns.TryGetValue(roomId, out var list)
+            ? list.ToList()
+            : new List<string>();
+        _chatPage?.SetAutoBanRules(
+            patterns,
+            FormatBanDuration(_autoBanDuration),
+            pattern => ApplyNewAutoBanPattern(roomId, pattern),
+            pattern =>
+            {
+                if (RemoveAutoBanPattern(roomId, pattern))
+                {
+                    ShowMessage($"Removed auto-ban pattern '{pattern}'.");
+                    NotifyChatLog(pattern, "removed auto-ban pattern");
+                    SyncAutoBanRulesToPanel(roomId);
+                }
+            });
     }
 
     [Command("mute", SupportedClients = ClientType.Modern)]
@@ -443,6 +630,68 @@ public sealed class ModerationCommands(RoomManager roomManager, IAppPathProvider
             NotifyChatLog(userName, $"will be banned {durationString} upon next entry");
             AddToBanList(userName, banDuration);
         }
+    }
+
+    [Command("autoban", SupportedClients = ClientType.Modern)]
+    public Task HandleAutoBanCommand(CommandArgs args)
+    {
+        if (!_roomManager.IsInRoom || _roomManager.Room is not { Id: var id })
+        {
+            ShowMessage("Reload the room to initialize room state.");
+            return Task.CompletedTask;
+        }
+        long roomId = (long)id;
+
+        // /autoban  |  /autoban list  -> show current patterns.
+        if (args.Length == 0 || args[0].Equals("list", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!_deferredData.AutoBanPatterns.TryGetValue(roomId, out var list) || list.Count == 0)
+                ShowMessage("No auto-ban patterns for this room. Add one with /autoban <pattern> (e.g. *khur*).");
+            else
+                ShowMessage($"Auto-ban patterns ({FormatBanDuration(_autoBanDuration)}): {string.Join(" | ", list)}");
+            return Task.CompletedTask;
+        }
+
+        switch (args[0].ToLowerInvariant())
+        {
+            case "del" or "remove":
+                if (args.Length < 2)
+                    ShowMessage("/autoban del <pattern>");
+                else if (RemoveAutoBanPattern(roomId, args[1]))
+                    ShowMessage($"Removed auto-ban pattern '{args[1]}'.");
+                else
+                    ShowMessage($"Auto-ban pattern '{args[1]}' not found.");
+                break;
+
+            case "clear":
+                ClearAutoBanPatterns(roomId);
+                ShowMessage("Cleared all auto-ban patterns for this room.");
+                break;
+
+            case "duration":
+                BanDuration? d = args.Length < 2 ? null : args[1].ToLowerInvariant() switch
+                {
+                    "hour" => BanDuration.Hour,
+                    "day" => BanDuration.Day,
+                    "perm" => BanDuration.Permanent,
+                    _ => null
+                };
+                if (d is null)
+                    ShowMessage("/autoban duration <hour|day|perm>");
+                else
+                {
+                    SetAutoBanDuration(roomId, d.Value);
+                    ShowMessage($"Auto-ban duration set to {FormatBanDuration(d.Value)}.");
+                }
+                break;
+
+            default:
+                // Anything else is a glob pattern to add.
+                ApplyNewAutoBanPattern(roomId, args[0]);
+                break;
+        }
+
+        return Task.CompletedTask;
     }
 
     private static string FormatBanDuration(BanDuration duration) => duration switch
