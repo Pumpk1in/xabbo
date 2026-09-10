@@ -25,10 +25,12 @@ public sealed class SettingsPageViewModel : PageViewModel
     public AppConfig Config => _config.Value;
 
     public static IReadOnlyList<ChatBubbleOption> NormalBubbles { get; } = ChatBubbleOption.NormalBubbles;
-    public static IReadOnlyList<ChatBubbleOption> OtherBubbles  { get; } = ChatBubbleOption.OtherBubbles;
+    public static IReadOnlyList<ChatBubbleOption> HcBubbles     { get; } = ChatBubbleOption.HcBubbles;
+    public static IReadOnlyList<ChatBubbleOption> NftBubbles    { get; } = ChatBubbleOption.NftBubbles;
 
     [Reactive] public ChatBubbleOption? SelectedNormalBubble { get; set; }
-    [Reactive] public ChatBubbleOption? SelectedOtherBubble  { get; set; }
+    [Reactive] public ChatBubbleOption? SelectedHcBubble     { get; set; }
+    [Reactive] public ChatBubbleOption? SelectedNftBubble    { get; set; }
     [Reactive] public string CustomProfanityWordsText { get; set; } = string.Empty;
     [Reactive] public int HistoryEntryCount { get; set; }
     [Reactive] public string? OllamaConnectionStatus { get; set; }
@@ -91,11 +93,15 @@ public sealed class SettingsPageViewModel : PageViewModel
 
         this.WhenAnyValue(x => x.SelectedNormalBubble)
             .WhereNotNull()
-            .Subscribe(b => { SelectedOtherBubble = null; Config.Chat.BubbleStyle = b.Id; });
+            .Subscribe(b => { SelectedHcBubble = null; SelectedNftBubble = null; Config.Chat.BubbleStyle = b.Id; });
 
-        this.WhenAnyValue(x => x.SelectedOtherBubble)
+        this.WhenAnyValue(x => x.SelectedHcBubble)
             .WhereNotNull()
-            .Subscribe(b => { SelectedNormalBubble = null; Config.Chat.BubbleStyle = b.Id; });
+            .Subscribe(b => { SelectedNormalBubble = null; SelectedNftBubble = null; Config.Chat.BubbleStyle = b.Id; });
+
+        this.WhenAnyValue(x => x.SelectedNftBubble)
+            .WhereNotNull()
+            .Subscribe(b => { SelectedNormalBubble = null; SelectedHcBubble = null; Config.Chat.BubbleStyle = b.Id; });
 
         ApplyCustomWordsCmd = ReactiveCommand.Create(ApplyCustomWords);
         ClearHistoryCmd = ReactiveCommand.Create(ClearHistory);
@@ -134,8 +140,9 @@ public sealed class SettingsPageViewModel : PageViewModel
     {
         var savedId = Config.Chat.BubbleStyle;
         SelectedNormalBubble = ChatBubbleOption.NormalBubbles.FirstOrDefault(b => b.Id == savedId);
-        SelectedOtherBubble  = ChatBubbleOption.OtherBubbles.FirstOrDefault(b => b.Id == savedId);
-        if (SelectedNormalBubble is null && SelectedOtherBubble is null)
+        SelectedHcBubble     = ChatBubbleOption.HcBubbles.FirstOrDefault(b => b.Id == savedId);
+        SelectedNftBubble    = ChatBubbleOption.NftBubbles.FirstOrDefault(b => b.Id == savedId);
+        if (SelectedNormalBubble is null && SelectedHcBubble is null && SelectedNftBubble is null)
             SelectedNormalBubble = ChatBubbleOption.NormalBubbles[0];
     }
 

@@ -20,7 +20,7 @@ public class BubbleImageConverter : IValueConverter
         if (_cache.TryGetValue(opt.Id, out var cached))
             return cached;
 
-        string folder = opt.IsOther ? "chat-bubbles/other" : "chat-bubbles";
+        string folder = opt.Category == BubbleCategory.Nft ? "chat-bubbles/nft" : "chat-bubbles";
         string file = $"bubble_{opt.Id}.png";
         var uri = new Uri($"avares://Xabbo.Avalonia/Assets/Images/{folder}/{file}");
         var bmp = new Bitmap(AssetLoader.Open(uri));

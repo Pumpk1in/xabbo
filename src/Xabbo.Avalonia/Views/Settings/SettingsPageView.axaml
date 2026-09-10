@@ -87,13 +87,57 @@
             </ListBox>
             <Separator />
             <TextBlock
-              Text="Special bubbles (required ingame permissions)"
+              Text="HC bubbles (requires Habbo Club)"
               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
               FontSize="12"
             />
             <ListBox
-              ItemsSource="{x:Static vm:SettingsPageViewModel.OtherBubbles}"
-              SelectedItem="{Binding SelectedOtherBubble}"
+              ItemsSource="{x:Static vm:SettingsPageViewModel.HcBubbles}"
+              SelectedItem="{Binding SelectedHcBubble}"
+              SelectionMode="Single"
+              Background="Transparent"
+              BorderThickness="0"
+            >
+              <ListBox.Resources>
+                <SolidColorBrush x:Key="ListViewItemBackgroundSelected">#9b8aff</SolidColorBrush>
+                <SolidColorBrush x:Key="ListViewItemBackgroundSelectedPointerOver">#9b8aff</SolidColorBrush>
+                <SolidColorBrush x:Key="ListViewItemBackgroundSelectedPressed">#9b8aff</SolidColorBrush>
+                <SolidColorBrush x:Key="ListViewItemBackgroundPointerOver">#9b8aff</SolidColorBrush>
+              </ListBox.Resources>
+              <ListBox.Styles>
+                <Style Selector="ListBoxItem">
+                  <Setter Property="Padding" Value="2" />
+                  <Setter Property="Margin" Value="2" />
+                  <Setter Property="MinWidth" Value="0" />
+                  <Setter Property="MinHeight" Value="0" />
+                  <Setter Property="CornerRadius" Value="4" />
+                </Style>
+                <Style Selector="ListBoxItem:selected /template/ Rectangle#SelectionIndicator">
+                  <Setter Property="IsVisible" Value="false" />
+                </Style>
+              </ListBox.Styles>
+              <ListBox.ItemsPanel>
+                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+              </ListBox.ItemsPanel>
+              <ListBox.ItemTemplate>
+                <DataTemplate DataType="models:ChatBubbleOption">
+                  <Image
+                    Stretch="None"
+                    Source="{Binding ., Converter={StaticResource BubbleImageConverter}}"
+                    ToolTip.Tip="{Binding Name}"
+                  />
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+            <Separator />
+            <TextBlock
+              Text="NFT bubbles (requires owning the collectible)"
+              Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+              FontSize="12"
+            />
+            <ListBox
+              ItemsSource="{x:Static vm:SettingsPageViewModel.NftBubbles}"
+              SelectedItem="{Binding SelectedNftBubble}"
               SelectionMode="Single"
               Background="Transparent"
               BorderThickness="0"
