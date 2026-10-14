@@ -50,9 +50,8 @@ public partial class ClickToController(
     [Reactive] public bool Move { get; set; }
 
     // Variable names used by the game's debug object-variable function to set an avatar's position.
-    // Confirmed by packet capture: -230 = position.x, -231 = position.y, type 1 = User.
-    private const string VarPosX = "-230";
-    private const string VarPosY = "-231";
+    // Confirmed by packet capture: -234 = position (x << 8 | y), type 1 = User.
+    private const string VarPosition = "-234";
     private const int VarTypeUser = 1;
 
     // Index of the avatar to move on the next tile click. Null = none.
@@ -213,29 +212,20 @@ public partial class ClickToController(
         _ = MoveAvatarToAsync(index, walk.X, walk.Y);
     }
 
-    // Each WiredSetObjectVariableValue sets a single variable and triggers one slide. Sending
-    // X and Y back-to-back makes the server ignore Y mid-slide, and an avatar on a furni
-    // (/flatctrl/) ignores position changes entirely until it walks off. So we place each axis
-    // with retries, verifying the real position (tracked by RoomManager) after each attempt.
+    // The position variable packs both axes, so a single WiredSetObjectVariableValue moves the
+    // avatar in one slide. Retry a few times, verifying the real position (tracked by RoomManager).
     private async Task MoveAvatarToAsync(int index, int x, int y)
-    {
-        if (!await TrySetAxisAsync(index, VarPosX, x, t => t.X)) return; // X failed -> stop
-        await TrySetAxisAsync(index, VarPosY, y, t => t.Y);
-    }
-
-    private async Task<bool> TrySetAxisAsync(int index, string varName, int target, System.Func<Tile, int> axis)
     {
         for (int attempt = 0; attempt < 3; attempt++)
         {
-            Send(Out.WiredSetObjectVariableValue, VarTypeUser, index, varName, target, 0);
+            Send(Out.WiredSetObjectVariableValue, VarTypeUser, index, VarPosition, (x << 8) | y, 0);
             await Task.Delay(200);
 
             if (_roomManager.Room?.GetAvatar<IAvatar>(index) is { } avatar &&
-                axis(avatar.Location) == target)
-                return true;
+                avatar.Location.X == x && avatar.Location.Y == y)
+                return;
         }
-
-        return false; // give up silently (avatar likely sitting on a furni)
+        // give up silently
     }
 
     private void SendInfoMessage(string message, int avatarIndex = -1) => Send(new AvatarWhisperMsg(message, avatarIndex));
